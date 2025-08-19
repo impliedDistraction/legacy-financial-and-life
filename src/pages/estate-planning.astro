@@ -27,28 +27,129 @@ import { site } from '../content/site';
 
   <!-- Services Grid -->
   <section class="mx-auto max-w-6xl px-4 py-16">
-    <div class="text-center mb-12">
+    <div class="text-center mb-16">
       <h2 class="text-3xl font-bold scroll-hidden">Our Estate Planning Services</h2>
-      <p class="mt-4 text-lg text-slate-700 scroll-hidden" style="transition-delay: 0.1s;">
+      <p class="mt-4 text-lg text-slate-700 max-w-3xl mx-auto scroll-hidden" style="transition-delay: 0.1s;">
         Comprehensive solutions to protect and preserve your wealth for future generations
       </p>
     </div>
 
     <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-2">
-      {site.estatePlanning.services.map((service, index) => (
-        <div class="bg-white rounded-xl border border-slate-200 p-8 hover:shadow-lg transition-shadow scroll-hidden" style={`transition-delay: ${(index + 1) * 0.1}s;`}>
-          <h3 class="text-xl font-bold text-slate-900 mb-4">{service.title}</h3>
-          <p class="text-slate-700 mb-6">{service.description}</p>
-          <ul class="space-y-2">
-            {service.features.map((feature) => (
-              <li class="flex gap-3">
-                <span class="text-brand-600" aria-hidden="true">✓</span>
-                <span class="text-slate-700">{feature}</span>
-              </li>
-            ))}
-          </ul>
+      <!-- Fixed Annuities -->
+      <div class="group relative bg-gradient-to-br from-blue-50 to-white rounded-xl border border-slate-200 p-8 hover:shadow-xl hover:border-brand-300 transition-all duration-300 scroll-hidden" style="transition-delay: 0.1s;">
+        <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-brand-500 to-brand-600 rounded-full flex items-center justify-center shadow-lg">
+          <span class="text-2xl">🛡️</span>
         </div>
-      ))}
+        <div class="mb-6">
+          <h3 class="text-2xl font-bold text-slate-900 mb-3 group-hover:text-brand-700 transition-colors">Fixed Annuities</h3>
+          <p class="text-slate-700 leading-relaxed">Guaranteed growth with principal protection for conservative investors</p>
+        </div>
+        <ul class="space-y-3">
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">Principal protection</span>
+          </li>
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">Guaranteed interest rates</span>
+          </li>
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">Tax-deferred growth</span>
+          </li>
+        </ul>
+        <div class="mt-6 pt-4 border-t border-slate-100">
+          <div class="text-sm text-slate-500 mb-2">Starting from</div>
+          <div class="text-xl font-bold text-brand-600">Contact for rates</div>
+        </div>
+      </div>
+
+      <!-- Variable Annuities -->
+      <div class="group relative bg-gradient-to-br from-emerald-50 to-white rounded-xl border border-slate-200 p-8 hover:shadow-xl hover:border-brand-300 transition-all duration-300 scroll-hidden" style="transition-delay: 0.2s;">
+        <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg">
+          <span class="text-2xl">📈</span>
+        </div>
+        <div class="mb-6">
+          <h3 class="text-2xl font-bold text-slate-900 mb-3 group-hover:text-brand-700 transition-colors">Variable Annuities</h3>
+          <p class="text-slate-700 leading-relaxed">Investment options with potential for higher returns based on market performance</p>
+        </div>
+        <ul class="space-y-3">
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">Investment flexibility</span>
+          </li>
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">Growth potential</span>
+          </li>
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">Living benefit riders</span>
+          </li>
+        </ul>
+        <div class="mt-6 pt-4 border-t border-slate-100">
+          <div class="text-sm text-slate-500 mb-2">Starting from</div>
+          <div class="text-xl font-bold text-brand-600">Contact for rates</div>
+        </div>
+      </div>
+
+      <!-- Indexed Annuities -->
+      <div class="group relative bg-gradient-to-br from-purple-50 to-white rounded-xl border border-slate-200 p-8 hover:shadow-xl hover:border-brand-300 transition-all duration-300 scroll-hidden" style="transition-delay: 0.3s;">
+        <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+          <span class="text-2xl">⚖️</span>
+        </div>
+        <div class="mb-6">
+          <h3 class="text-2xl font-bold text-slate-900 mb-3 group-hover:text-brand-700 transition-colors">Indexed Annuities</h3>
+          <p class="text-slate-700 leading-relaxed">Market upside potential with downside protection linked to market indices</p>
+        </div>
+        <ul class="space-y-3">
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">Market-linked growth</span>
+          </li>
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">Principal protection</span>
+          </li>
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">No direct market risk</span>
+          </li>
+        </ul>
+        <div class="mt-6 pt-4 border-t border-slate-100">
+          <div class="text-sm text-slate-500 mb-2">Starting from</div>
+          <div class="text-xl font-bold text-brand-600">Contact for rates</div>
+        </div>
+      </div>
+
+      <!-- Estate Planning Strategies -->
+      <div class="group relative bg-gradient-to-br from-amber-50 to-white rounded-xl border border-slate-200 p-8 hover:shadow-xl hover:border-brand-300 transition-all duration-300 scroll-hidden" style="transition-delay: 0.4s;">
+        <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-amber-500 to-amber-600 rounded-full flex items-center justify-center shadow-lg">
+          <span class="text-2xl">🏛️</span>
+        </div>
+        <div class="mb-6">
+          <h3 class="text-2xl font-bold text-slate-900 mb-3 group-hover:text-brand-700 transition-colors">Estate Planning Strategies</h3>
+          <p class="text-slate-700 leading-relaxed">Comprehensive planning to minimize taxes and maximize wealth transfer</p>
+        </div>
+        <ul class="space-y-3">
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">Tax minimization</span>
+          </li>
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">Wealth preservation</span>
+          </li>
+          <li class="flex gap-3 items-start">
+            <span class="text-brand-600 mt-1" aria-hidden="true">✓</span>
+            <span class="text-slate-700">Legacy protection</span>
+          </li>
+        </ul>
+        <div class="mt-6 pt-4 border-t border-slate-100">
+          <div class="text-sm text-slate-500 mb-2">Starting from</div>
+          <div class="text-xl font-bold text-brand-600">Contact for rates</div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -96,42 +197,91 @@ import { site } from '../content/site';
 
   <!-- Process Section -->
   <section class="mx-auto max-w-6xl px-4 py-16">
-    <div class="text-center mb-12">
+    <div class="text-center mb-16">
       <h2 class="text-3xl font-bold scroll-hidden">Our Estate Planning Process</h2>
-      <p class="mt-4 text-lg text-slate-700 scroll-hidden" style="transition-delay: 0.1s;">
+      <p class="mt-4 text-lg text-slate-700 max-w-3xl mx-auto scroll-hidden" style="transition-delay: 0.1s;">
         A comprehensive approach to secure your legacy
       </p>
     </div>
 
-    <div class="grid gap-8 md:grid-cols-3">
-      <div class="text-center scroll-hidden" style="transition-delay: 0.1s;">
-        <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span class="text-2xl font-bold text-brand-600">1</span>
+    <div class="relative">
+      <!-- Connection line for desktop -->
+      <div class="hidden md:block absolute top-8 left-1/2 transform -translate-x-1/2 w-full max-w-4xl">
+        <div class="flex justify-between">
+          <div class="w-16 h-0.5 bg-gradient-to-r from-brand-300 to-brand-500 mt-8"></div>
+          <div class="w-16 h-0.5 bg-gradient-to-r from-brand-500 to-brand-300 mt-8"></div>
         </div>
-        <h3 class="text-xl font-bold text-slate-900 mb-4">Assessment & Discovery</h3>
-        <p class="text-slate-700">
-          Comprehensive review of your current assets, goals, and family situation to understand your unique needs.
-        </p>
       </div>
 
-      <div class="text-center scroll-hidden" style="transition-delay: 0.2s;">
-        <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span class="text-2xl font-bold text-brand-600">2</span>
+      <div class="grid gap-12 md:grid-cols-3">
+        <div class="relative text-center scroll-hidden" style="transition-delay: 0.1s;">
+          <div class="relative">
+            <div class="w-20 h-20 bg-gradient-to-br from-brand-500 to-brand-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg hover:scale-110 transition-transform duration-300">
+              <span class="text-3xl font-bold text-white">1</span>
+            </div>
+            <!-- Decorative elements -->
+            <div class="absolute -top-2 -right-2 w-6 h-6 bg-brand-200 rounded-full opacity-50"></div>
+            <div class="absolute -bottom-2 -left-2 w-4 h-4 bg-brand-300 rounded-full opacity-60"></div>
+          </div>
+          <div class="bg-white rounded-xl p-6 shadow-lg border border-slate-100 hover:shadow-xl transition-shadow duration-300">
+            <h3 class="text-xl font-bold text-slate-900 mb-4">Assessment & Discovery</h3>
+            <p class="text-slate-700 leading-relaxed">
+              Comprehensive review of your current assets, goals, and family situation to understand your unique needs.
+            </p>
+            <div class="mt-4 flex justify-center">
+              <div class="inline-flex items-center text-sm text-brand-600 font-medium">
+                <span class="w-2 h-2 bg-brand-500 rounded-full mr-2"></span>
+                30-60 minutes
+              </div>
+            </div>
+          </div>
         </div>
-        <h3 class="text-xl font-bold text-slate-900 mb-4">Strategy Development</h3>
-        <p class="text-slate-700">
-          Custom estate planning strategy design with appropriate annuity products and wealth preservation techniques.
-        </p>
-      </div>
 
-      <div class="text-center scroll-hidden" style="transition-delay: 0.3s;">
-        <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span class="text-2xl font-bold text-brand-600">3</span>
+        <div class="relative text-center scroll-hidden" style="transition-delay: 0.2s;">
+          <div class="relative">
+            <div class="w-20 h-20 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg hover:scale-110 transition-transform duration-300">
+              <span class="text-3xl font-bold text-white">2</span>
+            </div>
+            <!-- Decorative elements -->
+            <div class="absolute -top-2 -right-2 w-6 h-6 bg-emerald-200 rounded-full opacity-50"></div>
+            <div class="absolute -bottom-2 -left-2 w-4 h-4 bg-emerald-300 rounded-full opacity-60"></div>
+          </div>
+          <div class="bg-white rounded-xl p-6 shadow-lg border border-slate-100 hover:shadow-xl transition-shadow duration-300">
+            <h3 class="text-xl font-bold text-slate-900 mb-4">Strategy Development</h3>
+            <p class="text-slate-700 leading-relaxed">
+              Custom estate planning strategy design with appropriate annuity products and wealth preservation techniques.
+            </p>
+            <div class="mt-4 flex justify-center">
+              <div class="inline-flex items-center text-sm text-emerald-600 font-medium">
+                <span class="w-2 h-2 bg-emerald-500 rounded-full mr-2"></span>
+                1-2 weeks
+              </div>
+            </div>
+          </div>
         </div>
-        <h3 class="text-xl font-bold text-slate-900 mb-4">Implementation & Support</h3>
-        <p class="text-slate-700">
-          Execute your plan with ongoing monitoring and adjustments to ensure it continues to meet your evolving needs.
-        </p>
+
+        <div class="relative text-center scroll-hidden" style="transition-delay: 0.3s;">
+          <div class="relative">
+            <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg hover:scale-110 transition-transform duration-300">
+              <span class="text-3xl font-bold text-white">3</span>
+            </div>
+            <!-- Decorative elements -->
+            <div class="absolute -top-2 -right-2 w-6 h-6 bg-purple-200 rounded-full opacity-50"></div>
+            <div class="absolute -bottom-2 -left-2 w-4 h-4 bg-purple-300 rounded-full opacity-60"></div>
+          </div>
+          <div class="bg-white rounded-xl p-6 shadow-lg border border-slate-100 hover:shadow-xl transition-shadow duration-300">
+            <h3 class="text-xl font-bold text-slate-900 mb-4">Implementation & Support</h3>
+            <p class="text-slate-700 leading-relaxed">
+              Execute your plan with ongoing monitoring and adjustments to ensure it continues to meet your evolving needs.
+            </p>
+            <div class="mt-4 flex justify-center">
+              <div class="inline-flex items-center text-sm text-purple-600 font-medium">
+                <span class="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
+                Ongoing support
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>

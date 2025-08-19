@@ -27,21 +27,91 @@ import { site } from '../content/site';
 
   <!-- Benefits Grid -->
   <section class="mx-auto max-w-6xl px-4 py-16">
-    <div class="text-center mb-12">
+    <div class="text-center mb-16">
       <h2 class="text-3xl font-bold scroll-hidden">Why Join Our Team?</h2>
-      <p class="mt-4 text-lg text-slate-700 scroll-hidden" style="transition-delay: 0.1s;">
+      <p class="mt-4 text-lg text-slate-700 max-w-3xl mx-auto scroll-hidden" style="transition-delay: 0.1s;">
         Access to cutting-edge technology, proven systems, and experienced mentorship
       </p>
     </div>
 
     <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-      {site.hiring.benefits.map((benefit, index) => (
-        <div class="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-shadow scroll-hidden" style={`transition-delay: ${(index + 1) * 0.1}s;`}>
-          <div class="text-4xl mb-4">{benefit.icon}</div>
-          <h3 class="text-xl font-bold text-slate-900 mb-3">{benefit.title}</h3>
-          <p class="text-slate-700">{benefit.description}</p>
+      <!-- Experienced Mentorship -->
+      <div class="group relative bg-gradient-to-br from-blue-50 to-white rounded-xl border border-slate-200 p-8 hover:shadow-xl hover:border-brand-300 transition-all duration-300 scroll-hidden" style="transition-delay: 0.1s;">
+        <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
+          <span class="text-2xl">👨‍🏫</span>
         </div>
-      ))}
+        <div class="text-5xl mb-6 group-hover:scale-110 transition-transform duration-300">👨‍🏫</div>
+        <h3 class="text-xl font-bold text-slate-900 mb-4 group-hover:text-brand-700 transition-colors">Experienced Mentorship</h3>
+        <p class="text-slate-700 leading-relaxed">Learn from Tim and Beth's 15+ years of combined experience</p>
+        <div class="mt-4 pt-4 border-t border-slate-100">
+          <div class="text-sm text-blue-600 font-medium">Direct 1:1 guidance</div>
+        </div>
+      </div>
+
+      <!-- Proven Systems -->
+      <div class="group relative bg-gradient-to-br from-green-50 to-white rounded-xl border border-slate-200 p-8 hover:shadow-xl hover:border-brand-300 transition-all duration-300 scroll-hidden" style="transition-delay: 0.2s;">
+        <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center shadow-lg">
+          <span class="text-2xl">⚙️</span>
+        </div>
+        <div class="text-5xl mb-6 group-hover:scale-110 transition-transform duration-300">⚙️</div>
+        <h3 class="text-xl font-bold text-slate-900 mb-4 group-hover:text-brand-700 transition-colors">Proven Systems</h3>
+        <p class="text-slate-700 leading-relaxed">Access to established processes that have generated 300+ policy sales</p>
+        <div class="mt-4 pt-4 border-t border-slate-100">
+          <div class="text-sm text-green-600 font-medium">300+ policies sold</div>
+        </div>
+      </div>
+
+      <!-- AI-Powered Tools -->
+      <div class="group relative bg-gradient-to-br from-purple-50 to-white rounded-xl border border-slate-200 p-8 hover:shadow-xl hover:border-brand-300 transition-all duration-300 scroll-hidden" style="transition-delay: 0.3s;">
+        <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+          <span class="text-lg font-bold text-white">AI</span>
+        </div>
+        <div class="text-5xl mb-6 group-hover:scale-110 transition-transform duration-300">🤖</div>
+        <h3 class="text-xl font-bold text-slate-900 mb-4 group-hover:text-brand-700 transition-colors">AI-Powered Tools</h3>
+        <p class="text-slate-700 leading-relaxed">Advanced CRM, automated front office, and AI-driven lead generation</p>
+        <div class="mt-4 pt-4 border-t border-slate-100">
+          <div class="text-sm text-purple-600 font-medium">Coming Soon</div>
+        </div>
+      </div>
+
+      <!-- Plan Matching AI -->
+      <div class="group relative bg-gradient-to-br from-amber-50 to-white rounded-xl border border-slate-200 p-8 hover:shadow-xl hover:border-brand-300 transition-all duration-300 scroll-hidden" style="transition-delay: 0.4s;">
+        <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-amber-500 to-amber-600 rounded-full flex items-center justify-center shadow-lg">
+          <span class="text-2xl">🎯</span>
+        </div>
+        <div class="text-5xl mb-6 group-hover:scale-110 transition-transform duration-300">🎯</div>
+        <h3 class="text-xl font-bold text-slate-900 mb-4 group-hover:text-brand-700 transition-colors">Plan Matching AI</h3>
+        <p class="text-slate-700 leading-relaxed">Sophisticated software to match clients with optimal insurance solutions</p>
+        <div class="mt-4 pt-4 border-t border-slate-100">
+          <div class="text-sm text-amber-600 font-medium">Smart matching</div>
+        </div>
+      </div>
+
+      <!-- Automated Communication -->
+      <div class="group relative bg-gradient-to-br from-rose-50 to-white rounded-xl border border-slate-200 p-8 hover:shadow-xl hover:border-brand-300 transition-all duration-300 scroll-hidden" style="transition-delay: 0.5s;">
+        <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-rose-500 to-rose-600 rounded-full flex items-center justify-center shadow-lg">
+          <span class="text-2xl">📞</span>
+        </div>
+        <div class="text-5xl mb-6 group-hover:scale-110 transition-transform duration-300">📞</div>
+        <h3 class="text-xl font-bold text-slate-900 mb-4 group-hover:text-brand-700 transition-colors">Automated Communication</h3>
+        <p class="text-slate-700 leading-relaxed">AI-powered email, text, and call automation to streamline client interaction</p>
+        <div class="mt-4 pt-4 border-t border-slate-100">
+          <div class="text-sm text-rose-600 font-medium">24/7 automation</div>
+        </div>
+      </div>
+
+      <!-- Chat Bot Integration -->
+      <div class="group relative bg-gradient-to-br from-indigo-50 to-white rounded-xl border border-slate-200 p-8 hover:shadow-xl hover:border-brand-300 transition-all duration-300 scroll-hidden" style="transition-delay: 0.6s;">
+        <div class="absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
+          <span class="text-2xl">💬</span>
+        </div>
+        <div class="text-5xl mb-6 group-hover:scale-110 transition-transform duration-300">💬</div>
+        <h3 class="text-xl font-bold text-slate-900 mb-4 group-hover:text-brand-700 transition-colors">Chat Bot Integration</h3>
+        <p class="text-slate-700 leading-relaxed">Lead qualification and initial consultation automation</p>
+        <div class="mt-4 pt-4 border-t border-slate-100">
+          <div class="text-sm text-indigo-600 font-medium">Smart conversations</div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -172,52 +242,102 @@ import { site } from '../content/site';
 
   <!-- Career Path -->
   <section class="mx-auto max-w-6xl px-4 py-16">
-    <div class="text-center mb-12">
+    <div class="text-center mb-16">
       <h2 class="text-3xl font-bold scroll-hidden">Your Career Path</h2>
-      <p class="mt-4 text-lg text-slate-700 scroll-hidden" style="transition-delay: 0.1s;">
+      <p class="mt-4 text-lg text-slate-700 max-w-3xl mx-auto scroll-hidden" style="transition-delay: 0.1s;">
         Structured progression with clear milestones and increasing autonomy
       </p>
     </div>
 
-    <div class="grid gap-8 md:grid-cols-4">
-      <div class="text-center scroll-hidden" style="transition-delay: 0.1s;">
-        <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span class="text-2xl font-bold text-brand-600">1</span>
+    <!-- Timeline container -->
+    <div class="relative">
+      <!-- Timeline line -->
+      <div class="hidden md:block absolute top-20 left-0 w-full h-0.5 bg-gradient-to-r from-brand-200 via-brand-500 to-brand-200"></div>
+      
+      <div class="grid gap-12 md:grid-cols-4">
+        <!-- Step 1: Onboarding -->
+        <div class="relative text-center scroll-hidden" style="transition-delay: 0.1s;">
+          <div class="relative mb-8">
+            <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center mx-auto shadow-xl hover:scale-110 transition-transform duration-300">
+              <span class="text-2xl font-bold text-white">1</span>
+            </div>
+            <!-- Step indicator -->
+            <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-green-400 rounded-full"></div>
+          </div>
+          <div class="bg-white rounded-xl p-6 shadow-lg border border-slate-100 hover:shadow-xl transition-shadow duration-300">
+            <h3 class="text-lg font-bold text-slate-900 mb-3">Onboarding</h3>
+            <p class="text-slate-700 text-sm leading-relaxed mb-4">
+              Comprehensive training on products, systems, and our proven sales methodology.
+            </p>
+            <div class="inline-flex items-center text-xs text-green-600 bg-green-50 px-3 py-1 rounded-full">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Weeks 1-2
+            </div>
+          </div>
         </div>
-        <h3 class="text-lg font-bold text-slate-900 mb-2">Onboarding</h3>
-        <p class="text-slate-700 text-sm">
-          Comprehensive training on products, systems, and our proven sales methodology.
-        </p>
-      </div>
 
-      <div class="text-center scroll-hidden" style="transition-delay: 0.2s;">
-        <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span class="text-2xl font-bold text-brand-600">2</span>
+        <!-- Step 2: Mentorship -->
+        <div class="relative text-center scroll-hidden" style="transition-delay: 0.2s;">
+          <div class="relative mb-8">
+            <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto shadow-xl hover:scale-110 transition-transform duration-300">
+              <span class="text-2xl font-bold text-white">2</span>
+            </div>
+            <!-- Step indicator -->
+            <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-blue-400 rounded-full"></div>
+          </div>
+          <div class="bg-white rounded-xl p-6 shadow-lg border border-slate-100 hover:shadow-xl transition-shadow duration-300">
+            <h3 class="text-lg font-bold text-slate-900 mb-3">Mentorship</h3>
+            <p class="text-slate-700 text-sm leading-relaxed mb-4">
+              Direct mentoring with Tim & Beth, shadowing calls, and hands-on guidance.
+            </p>
+            <div class="inline-flex items-center text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+              <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+              Months 1-3
+            </div>
+          </div>
         </div>
-        <h3 class="text-lg font-bold text-slate-900 mb-2">Mentorship</h3>
-        <p class="text-slate-700 text-sm">
-          Direct mentoring with Tim & Beth, shadowing calls, and hands-on guidance.
-        </p>
-      </div>
 
-      <div class="text-center scroll-hidden" style="transition-delay: 0.3s;">
-        <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span class="text-2xl font-bold text-brand-600">3</span>
+        <!-- Step 3: Independence -->
+        <div class="relative text-center scroll-hidden" style="transition-delay: 0.3s;">
+          <div class="relative mb-8">
+            <div class="w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto shadow-xl hover:scale-110 transition-transform duration-300">
+              <span class="text-2xl font-bold text-white">3</span>
+            </div>
+            <!-- Step indicator -->
+            <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-purple-400 rounded-full"></div>
+          </div>
+          <div class="bg-white rounded-xl p-6 shadow-lg border border-slate-100 hover:shadow-xl transition-shadow duration-300">
+            <h3 class="text-lg font-bold text-slate-900 mb-3">Independence</h3>
+            <p class="text-slate-700 text-sm leading-relaxed mb-4">
+              Gradual transition to independent operation with ongoing support and resources.
+            </p>
+            <div class="inline-flex items-center text-xs text-purple-600 bg-purple-50 px-3 py-1 rounded-full">
+              <span class="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>
+              Months 3-6
+            </div>
+          </div>
         </div>
-        <h3 class="text-lg font-bold text-slate-900 mb-2">Independence</h3>
-        <p class="text-slate-700 text-sm">
-          Gradual transition to independent operation with ongoing support and resources.
-        </p>
-      </div>
 
-      <div class="text-center scroll-hidden" style="transition-delay: 0.4s;">
-        <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span class="text-2xl font-bold text-brand-600">4</span>
+        <!-- Step 4: Leadership -->
+        <div class="relative text-center scroll-hidden" style="transition-delay: 0.4s;">
+          <div class="relative mb-8">
+            <div class="w-16 h-16 bg-gradient-to-br from-amber-500 to-amber-600 rounded-full flex items-center justify-center mx-auto shadow-xl hover:scale-110 transition-transform duration-300">
+              <span class="text-2xl font-bold text-white">4</span>
+            </div>
+            <!-- Step indicator -->
+            <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-amber-400 rounded-full"></div>
+          </div>
+          <div class="bg-white rounded-xl p-6 shadow-lg border border-slate-100 hover:shadow-xl transition-shadow duration-300">
+            <h3 class="text-lg font-bold text-slate-900 mb-3">Leadership</h3>
+            <p class="text-slate-700 text-sm leading-relaxed mb-4">
+              Opportunity to recruit and mentor your own team members as you grow.
+            </p>
+            <div class="inline-flex items-center text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-full">
+              <span class="w-2 h-2 bg-amber-500 rounded-full mr-2"></span>
+              6+ months
+            </div>
+          </div>
         </div>
-        <h3 class="text-lg font-bold text-slate-900 mb-2">Leadership</h3>
-        <p class="text-slate-700 text-sm">
-          Opportunity to recruit and mentor your own team members as you grow.
-        </p>
       </div>
     </div>
   </section>
