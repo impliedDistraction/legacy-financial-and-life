@@ -13,19 +13,55 @@ export const site = {
   features: [
     {
       title: 'Term Life Insurance',
-      body: 'Affordable protection for a set period to safeguard your family\'s income and goals.'
+      body: 'Affordable protection for a set period to safeguard your family\'s income and goals.',
+      icon: '🛡️',
+      isPopular: false,
+      keyFeatures: [
+        'Lower initial premiums',
+        'Temporary coverage periods',
+        'Income replacement focus'
+      ],
+      idealFor: 'Young families and those with temporary financial obligations',
+      learnMoreContent: 'Term life insurance provides maximum coverage at minimal cost for a specific period. Perfect for protecting your family during your highest earning years when financial obligations are greatest.'
     },
     {
       title: 'Whole Life Insurance',
-      body: 'Lifelong coverage with guaranteed cash value that grows over time.'
+      body: 'Lifelong coverage with guaranteed cash value that grows over time.',
+      icon: '💰',
+      isPopular: true,
+      keyFeatures: [
+        'Guaranteed cash value growth',
+        'Level premiums for life',
+        'Dividend potential'
+      ],
+      idealFor: 'Long-term wealth building and estate planning',
+      learnMoreContent: 'Whole life insurance combines permanent protection with a savings component that builds cash value you can access during your lifetime. Premiums remain level and the policy builds guaranteed value.'
     },
     {
       title: 'Universal Life Insurance',
-      body: 'Flexible premiums and death benefits with long-term cash accumulation options.'
+      body: 'Flexible premiums and death benefits with long-term cash accumulation options.',
+      icon: '⚖️',
+      isPopular: false,
+      keyFeatures: [
+        'Flexible premium payments',
+        'Adjustable death benefits',
+        'Investment component options'
+      ],
+      idealFor: 'Those who want flexibility and investment growth potential',
+      learnMoreContent: 'Universal life insurance offers the flexibility to adjust premiums and death benefits as your needs change, while providing cash accumulation opportunities linked to market performance.'
     },
     {
       title: 'Final Expense',
-      body: 'Covers funeral and end-of-life costs to reduce burden on loved ones.'
+      body: 'Covers funeral and end-of-life costs to reduce burden on loved ones.',
+      icon: '🤝',
+      isPopular: false,
+      keyFeatures: [
+        'Simplified underwriting',
+        'Smaller benefit amounts',
+        'Immediate family relief'
+      ],
+      idealFor: 'Seniors and those planning end-of-life expenses',
+      learnMoreContent: 'Final expense insurance is designed specifically to cover funeral costs, medical bills, and other end-of-life expenses. Features simplified applications and guaranteed acceptance options.'
     }
   ],
   retirement: {

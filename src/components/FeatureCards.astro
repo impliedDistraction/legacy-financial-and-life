@@ -2,16 +2,84 @@
 import { site } from '../content/site';
 ---
 <section id="plans" class="mx-auto max-w-6xl px-4 py-12 sm:py-16">
-  <h2 class="text-2xl sm:text-3xl font-bold scroll-hidden">Our Coverage Options</h2>
-  <p class="mt-2 text-slate-700 scroll-hidden" style="transition-delay: 0.1s;">Protect what matters most with plans built around your life.</p>
+  <div class="text-center mb-12">
+    <h2 class="text-2xl sm:text-3xl font-bold scroll-hidden">Our Coverage Options</h2>
+    <p class="mt-2 text-slate-700 scroll-hidden max-w-2xl mx-auto" style="transition-delay: 0.1s;">
+      Protect what matters most with plans built around your life. Choose the coverage that fits your family's unique needs and goals.
+    </p>
+  </div>
 
-  <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4" data-animate-group="feature-cards">
-    {site.features.map((f) => (
-      <article class="rounded-2xl border border-slate-200 p-5 hover:shadow-sm hover-lift scroll-hidden">
-        <h3 class="font-semibold">{f.title}</h3>
-        <p class="mt-2 text-slate-700">{f.body}</p>
+  <div class="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4" data-animate-group="feature-cards">
+    {site.features.map((feature, index) => (
+      <article class="relative rounded-2xl border border-slate-200 p-6 hover:shadow-lg hover-lift scroll-hidden transition-all duration-200 group" style={`transition-delay: ${index * 0.1}s;`}>
+        {feature.isPopular && (
+          <div class="absolute -top-3 left-1/2 transform -translate-x-1/2">
+            <span class="bg-brand-600 text-white px-3 py-1 rounded-full text-xs font-semibold">Most Popular</span>
+          </div>
+        )}
+        
+        <div class="text-center mb-4">
+          <div class="text-3xl mb-2">{feature.icon}</div>
+          <h3 class="font-semibold text-lg">{feature.title}</h3>
+        </div>
+        
+        <p class="text-slate-700 text-sm mb-4">{feature.body}</p>
+        
+        <div class="space-y-2 mb-4">
+          <p class="text-xs font-medium text-brand-700 uppercase tracking-wide">Key Features:</p>
+          <ul class="space-y-1">
+            {feature.keyFeatures.map((keyFeature) => (
+              <li class="flex items-start gap-2 text-xs text-slate-600">
+                <span class="text-brand-500 mt-0.5" aria-hidden="true">✓</span>
+                <span>{keyFeature}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        
+        <div class="mb-4 p-3 bg-slate-50 rounded-lg">
+          <p class="text-xs font-medium text-slate-700 mb-1">Ideal for:</p>
+          <p class="text-xs text-slate-600">{feature.idealFor}</p>
+        </div>
+        
+        <div class="space-y-2">
+          <details class="group/details">
+            <summary class="cursor-pointer text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1">
+              <span>Learn More</span>
+              <svg class="w-3 h-3 transition-transform group-open/details:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </summary>
+            <div class="mt-2 text-xs text-slate-600 leading-relaxed">
+              {feature.learnMoreContent}
+            </div>
+          </details>
+          
+          <button class="w-full mt-3 bg-brand-600 hover:bg-brand-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200 btn-animate">
+            Get Quote
+          </button>
+        </div>
+        
+        <!-- Placeholder for future pricing information -->
+        <div class="mt-4 pt-4 border-t border-slate-100">
+          <div class="text-center">
+            <p class="text-xs text-slate-500">Starting from</p>
+            <p class="text-sm font-semibold text-slate-400">Pricing available upon quote</p>
+          </div>
+        </div>
       </article>
     ))}
+  </div>
+  
+  <!-- Call-to-action section -->
+  <div class="mt-12 text-center">
+    <div class="bg-gradient-to-r from-brand-50 to-blue-50 rounded-2xl p-8 scroll-hidden" style="transition-delay: 0.4s;">
+      <h3 class="text-xl font-semibold mb-2">Not sure which plan is right for you?</h3>
+      <p class="text-slate-700 mb-4 max-w-lg mx-auto">Let our experienced agents help you compare options and find the perfect coverage for your family's needs and budget.</p>
+      <a href="#contact" class="inline-block bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-lg font-semibold btn-animate hover-lift transition-all duration-200">
+        Schedule Free Consultation
+      </a>
+    </div>
   </div>
 </section>
 
