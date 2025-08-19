@@ -129,3 +129,88 @@ html:focus-within {
 .btn-animate:hover::before {
   left: 100%;
 }
+
+/* Header logo and title animations */
+@keyframes logoEntrance {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) rotate(-5deg);
+  }
+  60% {
+    transform: scale(1.05) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes titleSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes subtleGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(26, 98, 219, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(26, 98, 219, 0.5);
+  }
+}
+
+/* Header logo classes */
+.logo-animate {
+  animation: logoEntrance 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.logo-hover {
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.logo-hover:hover {
+  transform: scale(1.1) rotate(3deg);
+  filter: drop-shadow(0 4px 8px rgba(26, 98, 219, 0.3));
+}
+
+/* Business title classes */
+.title-animate {
+  animation: titleSlideIn 0.6s ease-out 0.3s both;
+}
+
+.title-enhanced {
+  background: linear-gradient(135deg, #1a62db 0%, #267fff 50%, #1a62db 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  transition: all 0.3s ease-out;
+  position: relative;
+}
+
+.title-enhanced::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #1a62db, #267fff);
+  transition: width 0.3s ease-out;
+}
+
+.title-enhanced:hover {
+  background-position: 100% 0%;
+  transform: translateY(-1px);
+  filter: drop-shadow(0 2px 4px rgba(26, 98, 219, 0.2));
+}
+
+.title-enhanced:hover::after {
+  width: 100%;
+}
