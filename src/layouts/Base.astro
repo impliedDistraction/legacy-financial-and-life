@@ -1,4 +1,5 @@
 ---
+import { site } from '../content/site';
 import SEO from '../components/SEO.astro';
 const { title = 'Legacy Financial & Life', description = 'Life insurance and retirement strategies built on clarity and respect.' } = Astro.props;
 ---
@@ -8,7 +9,7 @@ const { title = 'Legacy Financial & Life', description = 'Life insurance and ret
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
     <SEO title={title} description={description}>
-    <link rel="icon" href="/favicon.svg">
+    <link rel="icon" href={site.branding.favicon}>
   </head>
   <body>
     <main class="min-h-dvh">{Astro.slots.default ? <slot /> : null}</main>

@@ -5,6 +5,12 @@ export const site = {
   email: 'info@legacyf-l.com', // TODO: update
   cityState: 'Luthersville, GA', // TODO: confirm spellings/details
   tagline: 'Trusted. Personal. Protective. Strategic.',
+  // Brand assets - easy to update when new images are available
+  branding: {
+    logo: '/favicon.svg', // TODO: Replace with /images/logo.svg when available
+    ogImage: '/og-image.jpg', // TODO: Replace with /images/og-image.jpg when available
+    favicon: '/favicon.svg' // TODO: Replace with /images/favicon.ico when available
+  },
   hero: {
     heading: 'Secure Your Family\'s Future with Confidence',
     sub: 'Customized life insurance solutions designed to protect loved ones, grow wealth, and bring peace of mind—today and tomorrow.',
@@ -80,7 +86,9 @@ export const site = {
       'Financial planning, retirement solutions, and family protection focus',
       'Community-minded: service-oriented and relationship-driven'
     ],
-    headshotAlt: 'Tim and Beth Byrd smiling outdoors'
+    headshotAlt: 'Tim and Beth Byrd smiling outdoors',
+    // Image path - easy to update when new images are available
+    headshotSrc: '/og-image.jpg' // TODO: Replace with /images/team-photo.jpg when available
   },
   cta: {
     heading: 'Ready to talk through your options?',
