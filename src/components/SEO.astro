@@ -1,0 +1,22 @@
+---
+const { title, description } = Astro.props;
+---
+<title>{title}</title>
+<meta name="description" content={description}>
+<meta property="og:type" content="website">
+<meta property="og:title" content={title}>
+<meta property="og:description" content={description}>
+<meta property="og:image" content="/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json" is:inline>
+{
+  "@context": "https://schema.org",
+  "@type": "InsuranceAgency",
+  "name": "Legacy Financial & Life",
+  "url": "https://legacyf-l.com",
+  "areaServed": "US-GA",
+  "telephone": "(XXX) XXX-XXXX",
+  "email": "info@legacyf-l.com"
+}
+</script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
