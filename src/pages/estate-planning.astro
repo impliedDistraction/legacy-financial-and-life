@@ -1,11 +1,16 @@
 ---
 import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import ContactForm from '../components/ContactForm.astro';
+import Footer from '../components/Footer.astro';
 import { site } from '../content/site';
+import '../styles/tailwind.css';
 ---
 <Base 
   title={`${site.estatePlanning.title} | ${site.name}`}
   description={site.estatePlanning.subtitle}
 >
+  <Header />
   <!-- Hero Section -->
   <section class="relative isolate overflow-hidden bg-gradient-to-br from-brand-50 to-white">
     <div class="mx-auto max-w-6xl px-4 py-20 sm:py-28">
@@ -300,4 +305,7 @@ import { site } from '../content/site';
       </a>
     </div>
   </section>
+
+  <ContactForm />
+  <Footer />
 </Base>
