@@ -8,29 +8,101 @@ import { site } from '../content/site';
 
     <form class="mt-6 grid gap-4 sm:grid-cols-2" action="https://formspree.io/f/your-form-id" method="POST">
       <label class="grid gap-1">
-        <span class="text-sm font-medium">Full name</span>
-        <input name="name" required class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200">
+        <span class="text-sm font-medium">Full name <span class="text-red-500">*</span></span>
+        <input 
+          name="name" 
+          required 
+          placeholder="Enter your full name"
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+        >
       </label>
+      
       <label class="grid gap-1">
-        <span class="text-sm font-medium">Email</span>
-        <input type="email" name="email" required class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200">
+        <span class="text-sm font-medium">Email <span class="text-red-500">*</span></span>
+        <input 
+          type="email" 
+          name="email" 
+          required 
+          placeholder="Enter your email address"
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+        >
       </label>
+      
+      <label class="grid gap-1">
+        <span class="text-sm font-medium">Phone number</span>
+        <input 
+          type="tel" 
+          name="phone" 
+          placeholder="(555) 123-4567"
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+        >
+      </label>
+      
+      <label class="grid gap-1">
+        <span class="text-sm font-medium">Service interest</span>
+        <select 
+          name="service_interest" 
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none bg-white"
+        >
+          <option value="">Select a service (optional)</option>
+          <option value="life-insurance">Life Insurance</option>
+          <option value="retirement-planning">Retirement Planning</option>
+          <option value="estate-planning">Estate Planning</option>
+          <option value="annuities">Annuities</option>
+          <option value="career-opportunity">Career Opportunity</option>
+          <option value="general-consultation">General Consultation</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      
       <label class="grid gap-1 sm:col-span-2">
         <span class="text-sm font-medium">How can we help?</span>
-        <textarea name="message" rows="4" class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200"></textarea>
+        <textarea 
+          name="message" 
+          rows="4" 
+          placeholder="Tell us about your insurance needs, goals, or any questions you have..."
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none resize-vertical"
+        ></textarea>
       </label>
+      
+      <!-- Preferred Contact Method -->
+      <div class="sm:col-span-2">
+        <span class="text-sm font-medium block mb-2">Preferred contact method</span>
+        <div class="flex flex-wrap gap-4">
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="radio" name="contact_preference" value="email" checked class="text-brand-600 focus:ring-brand-200">
+            <span class="text-sm text-slate-700">Email</span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="radio" name="contact_preference" value="phone" class="text-brand-600 focus:ring-brand-200">
+            <span class="text-sm text-slate-700">Phone call</span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="radio" name="contact_preference" value="text" class="text-brand-600 focus:ring-brand-200">
+            <span class="text-sm text-slate-700">Text message</span>
+          </label>
+        </div>
+      </div>
 
-      <div class="sm:col-span-2 flex items-center justify-between">
+      <div class="sm:col-span-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div class="text-sm text-slate-600">
           Or reach us at <a class="underline hover:text-brand-700 transition-colors" href={`mailto:${site.email}`}>{site.email}</a> · {site.phone}
         </div>
-        <button type="submit" class="rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 font-semibold btn-animate hover-lift">
+        <button type="submit" class="w-full sm:w-auto rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold btn-animate hover-lift transition-all duration-200">
           {site.cta.button}
         </button>
       </div>
+      
+      <!-- Form metadata for Formspree -->
       <input type="hidden" name="_subject" value="Legacy F&L Website Inquiry">
+      <input type="hidden" name="_next" value={`${site.url}/form-success`}>
+      <input type="hidden" name="_error" value={`${site.url}/form-error`}>
+      <input type="hidden" name="_cc" value={site.email}>
     </form>
   </div>
 
   <p class="mt-4 text-xs text-slate-500">{site.footerNote}</p>
 </section>
+
+<!-- Enhanced Form Script -->
+<script src="../scripts/form-validation.js"></script>
