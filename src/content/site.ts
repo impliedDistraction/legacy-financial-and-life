@@ -5,10 +5,29 @@ export const site = {
   email: 'info@legacyf-l.com', // TODO: update
   cityState: 'Luthersville, GA', // TODO: confirm spellings/details
   tagline: 'Trusted. Personal. Protective. Strategic.',
+  // Brand assets - updated with real company assets
+  branding: {
+    logo: '/images/logo.svg', // Legacy Financial & Life official logo
+    ogImage: '/images/team-photo.jpg', // Tim and Beth professional photo
+    favicon: '/favicon.svg' // Keep existing favicon for now
+  },
   hero: {
     heading: 'Secure Your Family\'s Future with Confidence',
     sub: 'Customized life insurance solutions designed to protect loved ones, grow wealth, and bring peace of mind—today and tomorrow.',
-    cta: 'Book a Free Consultation'
+    cta: 'Book a Free Consultation',
+    enhanced: {
+      backgroundImage: '/images/team-photo.jpg',
+      features: [
+        'Over $75M in assets managed',
+        '300+ policies sold in 2 years', 
+        '15+ years combined experience'
+      ],
+      trustIndicators: [
+        'Licensed in Georgia',
+        'Community trusted since 2009',
+        'Specialized in retirement planning'
+      ]
+    }
   },
   features: [
     {
@@ -74,13 +93,28 @@ export const site = {
   },
   team: {
     heading: 'Meet Tim & Beth Byrd',
-    intro: 'Local, neighborly agents focused on education and clarity—not hype.',
+    intro: 'Tim and Beth Byrd are dedicated professionals specializing in financial planning, retirement solutions, and asset management. They bring over 15 years of combined experience across private, nonprofit, and government sectors.',
+    description: 'Together, they\'ve managed more than $75M in HUD assets, sold 300+ life insurance policies in two years, and served in CFO and bookkeeping roles. Between the two of them, they hold advanced degrees in human services and behavioral science and are accomplished grant writers. Lifelong community volunteers, they\'ve led youth programs, served their church for over 20 years, and remain committed to helping others build secure financial futures.',
     bullets: [
-      '15+ years of combined experience across private, nonprofit, and public sectors',
-      'Financial planning, retirement solutions, and family protection focus',
-      'Community-minded: service-oriented and relationship-driven'
+      'Managed over $75M in HUD assets across public and private sectors',
+      'Sold 300+ life insurance policies in just two years of specialized practice',
+      'Advanced degrees in human services and behavioral science',
+      'Accomplished grant writers with proven track record of securing funding',
+      'Over 20 years of dedicated church and community service',
+      'Led youth programs and volunteer initiatives throughout their careers'
     ],
-    headshotAlt: 'Tim and Beth Byrd smiling outdoors'
+    experience: {
+      title: 'Professional Experience & Expertise',
+      highlights: [
+        '15+ years combined experience across private, nonprofit, and government sectors',
+        'CFO and bookkeeping roles with proven financial management success',
+        'Specialized expertise in retirement solutions and asset management',
+        'Deep community roots with focus on education and relationship-driven service'
+      ]
+    },
+    headshotAlt: 'Tim and Beth Byrd - Legacy Financial & Life professional team photo',
+    // Updated to use real team photo
+    headshotSrc: '/images/team-photo.jpg'
   },
   cta: {
     heading: 'Ready to talk through your options?',
@@ -88,5 +122,91 @@ export const site = {
     button: 'Schedule a Strategy Call'
   },
   footerNote:
-    'Licensed in GA. This website is for educational purposes. Policies and features vary by carrier and state.'
+    'Licensed in GA. This website is for educational purposes. Policies and features vary by carrier and state.',
+  
+  // Estate Planning Page Content
+  estatePlanning: {
+    title: 'Estate Planning & Annuity Solutions',
+    subtitle: 'Secure your legacy with strategic planning and tax-advantaged growth',
+    hero: {
+      heading: 'Protect Your Legacy with Strategic Estate Planning',
+      sub: 'Comprehensive annuity solutions and estate planning strategies designed to preserve wealth, minimize taxes, and ensure your assets transfer according to your wishes.'
+    },
+    services: [
+      {
+        title: 'Fixed Annuities',
+        description: 'Guaranteed growth with principal protection for conservative investors',
+        features: ['Principal protection', 'Guaranteed interest rates', 'Tax-deferred growth']
+      },
+      {
+        title: 'Variable Annuities', 
+        description: 'Investment options with potential for higher returns based on market performance',
+        features: ['Investment flexibility', 'Growth potential', 'Living benefit riders']
+      },
+      {
+        title: 'Indexed Annuities',
+        description: 'Market upside potential with downside protection linked to market indices',
+        features: ['Market-linked growth', 'Principal protection', 'No direct market risk']
+      },
+      {
+        title: 'Estate Planning Strategies',
+        description: 'Comprehensive planning to minimize taxes and maximize wealth transfer',
+        features: ['Tax minimization', 'Wealth preservation', 'Legacy protection']
+      }
+    ]
+  },
+
+  // Hiring/Recruiting Page Content  
+  hiring: {
+    title: 'Join Our Growing Team',
+    subtitle: 'Build your insurance career with experienced mentors and cutting-edge tools',
+    hero: {
+      heading: 'Launch Your Insurance Career with Legacy Financial & Life',
+      sub: 'Join Tim and Beth Byrd as your upline and gain access to proven systems, mentorship, and the latest AI-powered tools to accelerate your success in the insurance industry.'
+    },
+    benefits: [
+      {
+        title: 'Experienced Mentorship',
+        description: 'Learn from Tim and Beth\'s 15+ years of combined experience',
+        icon: '👨‍🏫'
+      },
+      {
+        title: 'Proven Systems',
+        description: 'Access to established processes that have generated 300+ policy sales',
+        icon: '⚙️'
+      },
+      {
+        title: 'AI-Powered Tools (Coming Soon)',
+        description: 'Advanced CRM, automated front office, and AI-driven lead generation',
+        icon: '🤖'
+      },
+      {
+        title: 'Plan Matching AI',
+        description: 'Sophisticated software to match clients with optimal insurance solutions',
+        icon: '🎯'
+      },
+      {
+        title: 'Automated Communication',
+        description: 'AI-powered email, text, and call automation to streamline client interaction',
+        icon: '📞'
+      },
+      {
+        title: 'Chat Bot Integration',
+        description: 'Lead qualification and initial consultation automation',
+        icon: '💬'
+      }
+    ],
+    uplineSupport: {
+      title: 'Comprehensive Upline Support',
+      description: 'Tim and Beth provide hands-on guidance and support to help you succeed',
+      features: [
+        'Weekly training sessions and strategy calls',
+        'Lead generation assistance and referral sharing',
+        'Contract negotiation and carrier relationship support',
+        'Business development planning and goal setting',
+        'Access to established client acquisition methods',
+        'Technology integration and system training'
+      ]
+    }
+  }
 };

@@ -2,14 +2,70 @@
 import { site } from '../content/site';
 ---
 <section id="team" class="mx-auto max-w-6xl px-4 py-12 sm:py-16">
-  <h2 class="text-2xl sm:text-3xl font-bold scroll-hidden">{site.team.heading}</h2>
-  <div class="mt-6 grid gap-8 sm:grid-cols-5 items-start">
-    <img src="/og-image.jpg" alt={site.team.headshotAlt} class="rounded-2xl border border-slate-200 sm:col-span-2 hover-scale scroll-hidden" style="transition-delay: 0.1s;">
-    <div class="sm:col-span-3 scroll-hidden" style="transition-delay: 0.2s;">
-      <p class="text-slate-700">{site.team.intro}</p>
-      <ul class="mt-4 space-y-2" data-animate-group="team-bullets">
-        {site.team.bullets.map((b) => <li class="flex gap-2 scroll-hidden"><span aria-hidden="true">•</span><span>{b}</span></li>)}
-      </ul>
+  <div class="text-center mb-12">
+    <h2 class="text-3xl sm:text-4xl font-bold scroll-hidden">{site.team.heading}</h2>
+    <p class="mt-4 text-xl text-slate-700 max-w-4xl mx-auto scroll-hidden" style="transition-delay: 0.1s;">
+      {site.team.intro}
+    </p>
+  </div>
+
+  <div class="mt-8 grid gap-12 lg:grid-cols-2 items-center">
+    <!-- Image Column -->
+    <div class="relative scroll-hidden" style="transition-delay: 0.2s;">
+      <img 
+        src={site.team.headshotSrc} 
+        alt={site.team.headshotAlt} 
+        class="rounded-2xl border border-slate-200 w-full hover-scale shadow-xl"
+      />
+      <!-- Professional credentials overlay -->
+      <div class="absolute bottom-4 left-4 bg-white/95 backdrop-blur rounded-lg p-3 shadow-lg">
+        <div class="text-sm font-semibold text-brand-700">Licensed in Georgia</div>
+        <div class="text-xs text-slate-600">15+ Years Combined Experience</div>
+      </div>
+    </div>
+
+    <!-- Content Column -->
+    <div class="scroll-hidden" style="transition-delay: 0.3s;">
+      <p class="text-lg text-slate-700 leading-relaxed mb-6">
+        {site.team.description}
+      </p>
+
+      <!-- Experience Highlights -->
+      <div class="mb-8">
+        <h3 class="text-xl font-bold text-slate-900 mb-4">{site.team.experience.title}</h3>
+        <div class="grid gap-3" data-animate-group="experience-highlights">
+          {site.team.experience.highlights.map((highlight) => (
+            <div class="flex gap-3 scroll-hidden">
+              <span class="w-2 h-2 bg-brand-500 rounded-full mt-2 flex-shrink-0"></span>
+              <span class="text-slate-700">{highlight}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Key Achievements -->
+      <div class="bg-brand-50 rounded-xl p-6">
+        <h3 class="text-lg font-bold text-brand-900 mb-4">Key Achievements & Background</h3>
+        <ul class="space-y-2" data-animate-group="team-bullets">
+          {site.team.bullets.map((bullet) => (
+            <li class="flex gap-3 scroll-hidden">
+              <span class="text-brand-600" aria-hidden="true">✓</span>
+              <span class="text-slate-700">{bullet}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <!-- Call to Action -->
+      <div class="mt-8 text-center lg:text-left">
+        <a 
+          href="#contact" 
+          class="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-lg font-semibold hover-lift"
+        >
+          Schedule a Consultation
+          <span aria-hidden="true">→</span>
+        </a>
+      </div>
     </div>
   </div>
 </section>

@@ -1,0 +1,244 @@
+---
+import Base from '../layouts/Base.astro';
+import { site } from '../content/site';
+---
+<Base 
+  title={`${site.hiring.title} | ${site.name}`}
+  description={site.hiring.subtitle}
+>
+  <!-- Hero Section -->
+  <section class="relative isolate overflow-hidden bg-gradient-to-br from-brand-50 to-white">
+    <div class="mx-auto max-w-6xl px-4 py-20 sm:py-28">
+      <div class="text-center">
+        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight animate-fade-in">
+          {site.hiring.hero.heading}
+        </h1>
+        <p class="mt-6 text-xl text-slate-700 max-w-4xl mx-auto animate-fade-in-up" style="animation-delay: 0.2s;">
+          {site.hiring.hero.sub}
+        </p>
+        <div class="mt-8 animate-fade-in-up" style="animation-delay: 0.4s;">
+          <a href="#contact" class="rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold btn-animate hover-lift">
+            Start Your Career Journey
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Benefits Grid -->
+  <section class="mx-auto max-w-6xl px-4 py-16">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold scroll-hidden">Why Join Our Team?</h2>
+      <p class="mt-4 text-lg text-slate-700 scroll-hidden" style="transition-delay: 0.1s;">
+        Access to cutting-edge technology, proven systems, and experienced mentorship
+      </p>
+    </div>
+
+    <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+      {site.hiring.benefits.map((benefit, index) => (
+        <div class="bg-white rounded-xl border border-slate-200 p-6 hover:shadow-lg transition-shadow scroll-hidden" style={`transition-delay: ${(index + 1) * 0.1}s;`}>
+          <div class="text-4xl mb-4">{benefit.icon}</div>
+          <h3 class="text-xl font-bold text-slate-900 mb-3">{benefit.title}</h3>
+          <p class="text-slate-700">{benefit.description}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Upline Support Section -->
+  <section class="bg-brand-50 py-16">
+    <div class="mx-auto max-w-6xl px-4">
+      <div class="grid gap-12 lg:grid-cols-2 items-center">
+        <div class="scroll-hidden">
+          <img 
+            src={site.team.headshotSrc} 
+            alt={site.team.headshotAlt}
+            class="rounded-2xl shadow-xl border border-slate-200 w-full hover-scale"
+          />
+        </div>
+        <div class="scroll-hidden" style="transition-delay: 0.2s;">
+          <h2 class="text-3xl font-bold text-slate-900 mb-6">
+            {site.hiring.uplineSupport.title}
+          </h2>
+          <p class="text-lg text-slate-700 mb-6">
+            {site.hiring.uplineSupport.description}
+          </p>
+          <ul class="space-y-3">
+            {site.hiring.uplineSupport.features.map((feature) => (
+              <li class="flex gap-3">
+                <span class="text-brand-600" aria-hidden="true">✓</span>
+                <span class="text-slate-700">{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Technology & Innovation -->
+  <section class="mx-auto max-w-6xl px-4 py-16">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold scroll-hidden">Advanced Technology Stack</h2>
+      <p class="mt-4 text-lg text-slate-700 scroll-hidden" style="transition-delay: 0.1s;">
+        Be among the first to leverage cutting-edge AI tools for insurance sales
+      </p>
+    </div>
+
+    <div class="grid gap-8 md:grid-cols-2">
+      <div class="bg-gradient-to-br from-brand-600 to-brand-700 rounded-xl p-8 text-white scroll-hidden" style="transition-delay: 0.1s;">
+        <h3 class="text-2xl font-bold mb-4">🤖 AI-Powered CRM (Coming Soon)</h3>
+        <p class="text-brand-100 mb-4">
+          Intelligent customer relationship management with automated lead scoring, 
+          follow-up reminders, and personalized communication strategies.
+        </p>
+        <ul class="space-y-2 text-brand-100">
+          <li>• Automated lead qualification</li>
+          <li>• Smart follow-up sequences</li>
+          <li>• Predictive analytics</li>
+        </ul>
+      </div>
+
+      <div class="bg-gradient-to-br from-brand-500 to-brand-600 rounded-xl p-8 text-white scroll-hidden" style="transition-delay: 0.2s;">
+        <h3 class="text-2xl font-bold mb-4">🎯 Plan Matching AI</h3>
+        <p class="text-brand-100 mb-4">
+          Sophisticated algorithms that analyze client profiles and recommend 
+          optimal insurance solutions with unprecedented accuracy.
+        </p>
+        <ul class="space-y-2 text-brand-100">
+          <li>• Risk assessment automation</li>
+          <li>• Product recommendation engine</li>
+          <li>• Needs analysis optimization</li>
+        </ul>
+      </div>
+
+      <div class="bg-gradient-to-br from-brand-700 to-brand-800 rounded-xl p-8 text-white scroll-hidden" style="transition-delay: 0.3s;">
+        <h3 class="text-2xl font-bold mb-4">📞 Communication Automation</h3>
+        <p class="text-brand-100 mb-4">
+          AI-driven email, text, and call automation that maintains personal 
+          touch while scaling your outreach capabilities.
+        </p>
+        <ul class="space-y-2 text-brand-100">
+          <li>• Personalized email campaigns</li>
+          <li>• Smart text messaging</li>
+          <li>• Automated appointment scheduling</li>
+        </ul>
+      </div>
+
+      <div class="bg-gradient-to-br from-brand-600 to-brand-800 rounded-xl p-8 text-white scroll-hidden" style="transition-delay: 0.4s;">
+        <h3 class="text-2xl font-bold mb-4">💬 Intelligent Chat Bots</h3>
+        <p class="text-brand-100 mb-4">
+          24/7 lead capture and initial consultation automation with natural 
+          language processing for seamless client interactions.
+        </p>
+        <ul class="space-y-2 text-brand-100">
+          <li>• Initial needs assessment</li>
+          <li>• Appointment booking</li>
+          <li>• FAQ automation</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Success Metrics -->
+  <section class="bg-slate-900 py-16">
+    <div class="mx-auto max-w-6xl px-4">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-bold text-white scroll-hidden">Proven Track Record</h2>
+        <p class="mt-4 text-lg text-slate-300 scroll-hidden" style="transition-delay: 0.1s;">
+          Join a team with demonstrated success and established systems
+        </p>
+      </div>
+
+      <div class="grid gap-8 md:grid-cols-3 text-center">
+        <div class="scroll-hidden" style="transition-delay: 0.1s;">
+          <div class="text-4xl font-bold text-brand-400 mb-2">$75M+</div>
+          <div class="text-lg text-white mb-2">Assets Managed</div>
+          <div class="text-slate-400">Institutional-level experience</div>
+        </div>
+        <div class="scroll-hidden" style="transition-delay: 0.2s;">
+          <div class="text-4xl font-bold text-brand-400 mb-2">300+</div>
+          <div class="text-lg text-white mb-2">Policies Sold</div>
+          <div class="text-slate-400">In just two years</div>
+        </div>
+        <div class="scroll-hidden" style="transition-delay: 0.3s;">
+          <div class="text-4xl font-bold text-brand-400 mb-2">15+</div>
+          <div class="text-lg text-white mb-2">Years Experience</div>
+          <div class="text-slate-400">Combined team expertise</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Career Path -->
+  <section class="mx-auto max-w-6xl px-4 py-16">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold scroll-hidden">Your Career Path</h2>
+      <p class="mt-4 text-lg text-slate-700 scroll-hidden" style="transition-delay: 0.1s;">
+        Structured progression with clear milestones and increasing autonomy
+      </p>
+    </div>
+
+    <div class="grid gap-8 md:grid-cols-4">
+      <div class="text-center scroll-hidden" style="transition-delay: 0.1s;">
+        <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl font-bold text-brand-600">1</span>
+        </div>
+        <h3 class="text-lg font-bold text-slate-900 mb-2">Onboarding</h3>
+        <p class="text-slate-700 text-sm">
+          Comprehensive training on products, systems, and our proven sales methodology.
+        </p>
+      </div>
+
+      <div class="text-center scroll-hidden" style="transition-delay: 0.2s;">
+        <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl font-bold text-brand-600">2</span>
+        </div>
+        <h3 class="text-lg font-bold text-slate-900 mb-2">Mentorship</h3>
+        <p class="text-slate-700 text-sm">
+          Direct mentoring with Tim & Beth, shadowing calls, and hands-on guidance.
+        </p>
+      </div>
+
+      <div class="text-center scroll-hidden" style="transition-delay: 0.3s;">
+        <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl font-bold text-brand-600">3</span>
+        </div>
+        <h3 class="text-lg font-bold text-slate-900 mb-2">Independence</h3>
+        <p class="text-slate-700 text-sm">
+          Gradual transition to independent operation with ongoing support and resources.
+        </p>
+      </div>
+
+      <div class="text-center scroll-hidden" style="transition-delay: 0.4s;">
+        <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span class="text-2xl font-bold text-brand-600">4</span>
+        </div>
+        <h3 class="text-lg font-bold text-slate-900 mb-2">Leadership</h3>
+        <p class="text-slate-700 text-sm">
+          Opportunity to recruit and mentor your own team members as you grow.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="bg-brand-600 py-16">
+    <div class="mx-auto max-w-4xl px-4 text-center">
+      <h2 class="text-3xl font-bold text-white mb-6">
+        Ready to Launch Your Insurance Career?
+      </h2>
+      <p class="text-xl text-brand-100 mb-8">
+        Join Tim & Beth Byrd and gain access to proven systems, cutting-edge technology, and experienced mentorship.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="#contact" class="rounded-lg bg-white text-brand-600 hover:bg-brand-50 px-8 py-4 font-semibold btn-animate hover-lift">
+          Apply to Join Our Team
+        </a>
+        <a href="tel:(XXX) XXX-XXXX" class="rounded-lg border-2 border-white text-white hover:bg-white hover:text-brand-600 px-8 py-4 font-semibold btn-animate">
+          Call to Learn More
+        </a>
+      </div>
+    </div>
+  </section>
+</Base>

@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "fetch-images": "node scripts/fetch-images.js",
+    "update-images": "node scripts/update-images.js",
+    "images:status": "node scripts/update-images.js --status"
   },
   "dependencies": {
     "astro": "^4.15.0"
