@@ -30,10 +30,4 @@ yarn-error.log*
 # Astro
 .astro/
 
-# Images (until finalized)
-public/images/*.jpg
-public/images/*.png
-public/images/*.svg
-public/images/*.webp
-public/images/*.ico
 !public/images/README.md

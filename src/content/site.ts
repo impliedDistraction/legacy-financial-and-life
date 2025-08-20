@@ -7,16 +7,19 @@ export const site = {
   tagline: 'Trusted. Personal. Protective. Strategic.',
   // Brand assets - updated with real company assets
   branding: {
-    logo: '/images/logo.svg', // Legacy Financial & Life official logo
-    ogImage: '/images/team-photo.jpg', // Tim and Beth professional photo
-    favicon: '/favicon.svg' // Keep existing favicon for now
+  // Mapped to images present in /public/images
+  logo: '/images/logo.png', // PNG logo (user will convert to SVG later)
+  logoAlt: 'Legacy Financial & Life logo',
+  ogImage: '/images/professional-image-of-both-beth-and-tim-1200w.jpg', // use generated 1200w for OG
+  ogAlt: 'Tim and Beth Byrd - Legacy Financial & Life professional photo',
+  favicon: '/images/favicon.ico'
   },
   hero: {
     heading: 'Secure Your Family\'s Future with Confidence',
     sub: 'Customized life insurance solutions designed to protect loved ones, grow wealth, and bring peace of mind—today and tomorrow.',
     cta: 'Book a Free Consultation',
     enhanced: {
-      backgroundImage: '/images/team-photo.jpg',
+  backgroundImage: '/images/professional-image-of-both-beth-and-tim',
       features: [
         'Over $75M in assets managed',
         '300+ policies sold in 2 years', 
@@ -112,9 +115,9 @@ export const site = {
         'Deep community roots with focus on education and relationship-driven service'
       ]
     },
-    headshotAlt: 'Tim and Beth Byrd - Legacy Financial & Life professional team photo',
-    // Updated to use real team photo
-    headshotSrc: '/images/team-photo.jpg'
+  headshotAlt: 'Tim and Beth Byrd - Legacy Financial & Life professional team photo',
+  // Updated to use real team photo (base path — components will append sizes/webp)
+  headshotSrc: '/images/professional-image-of-both-beth-and-tim'
   },
   cta: {
     heading: 'Ready to talk through your options?',

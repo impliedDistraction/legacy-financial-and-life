@@ -6,7 +6,7 @@ import { site } from '../content/site';
     <h2 class="text-2xl sm:text-3xl font-bold">{site.cta.heading}</h2>
     <p class="mt-2 text-slate-700">{site.cta.sub}</p>
 
-    <form class="mt-6 grid gap-4 sm:grid-cols-2" action="https://formspree.io/f/your-form-id" method="POST">
+  <form class="mt-6 grid gap-4 sm:grid-cols-2" action="https://formspree.io/f/mdkdrwbj" method="POST">
       <label class="grid gap-1">
         <span class="text-sm font-medium">Full name <span class="text-red-500">*</span></span>
         <input 
@@ -94,10 +94,11 @@ import { site } from '../content/site';
       </div>
       
       <!-- Form metadata for Formspree -->
-      <input type="hidden" name="_subject" value="Legacy F&L Website Inquiry">
-      <input type="hidden" name="_next" value={`${site.url}/form-success`}>
-      <input type="hidden" name="_error" value={`${site.url}/form-error`}>
-      <input type="hidden" name="_cc" value={site.email}>
+  <input type="hidden" name="_subject" value="Legacy F&L Website Inquiry">
+  <!-- Use relative URLs so Formspree redirects stay on this site instead of legacyf-l.com -->
+  <input type="hidden" name="_next" value="/form-success">
+  <input type="hidden" name="_error" value="/form-error">
+  <input type="hidden" name="_cc" value={site.email}>
     </form>
   </div>
 

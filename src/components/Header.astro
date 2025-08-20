@@ -4,11 +4,17 @@ import { site } from '../content/site';
 <header class="sticky top-0 z-40 bg-white/85 backdrop-blur border-b border-slate-200">
   <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
     <a href="/" class="flex items-center gap-3 group">
-      <img 
-        src={site.branding.logo} 
-        alt="Legacy Financial & Life Logo" 
-        class="h-8 w-8 rounded logo-animate logo-hover"
-      >
+      <picture>
+        { /* prefer svg when available */ }
+        <source srcset={site.branding.logo.replace('.png', '.svg')} type="image/svg+xml" />
+        <img
+          src={site.branding.logo}
+          alt={site.branding.logoAlt ?? 'Legacy Financial & Life Logo'}
+          class="h-8 w-8 rounded logo-animate logo-hover object-contain"
+          width="32"
+          height="32"
+        />
+      </picture>
       <span class="font-semibold text-lg title-animate title-enhanced">{site.name}</span>
     </a>
     <nav class="hidden sm:flex gap-6">
