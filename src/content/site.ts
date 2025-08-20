@@ -139,9 +139,9 @@ export const site = {
         features: ['Principal protection', 'Guaranteed interest rates', 'Tax-deferred growth']
       },
       {
-        title: 'Variable Annuities', 
-        description: 'Investment options with potential for higher returns based on market performance',
-        features: ['Investment flexibility', 'Growth potential', 'Living benefit riders']
+        title: 'Retirement Income Planning',
+        description: 'Strategic planning to ensure steady income throughout your retirement years',
+        features: ['Income replacement strategies', 'Tax-efficient withdrawals', 'Longevity protection']
       },
       {
         title: 'Indexed Annuities',
