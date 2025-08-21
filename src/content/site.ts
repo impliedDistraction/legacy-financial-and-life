@@ -1,8 +1,8 @@
 export const site = {
   name: 'Legacy Financial & Life',
   url: 'https://legacyf-l.com',
-  phone: '(XXX) XXX-XXXX', // TODO: update
-  email: 'info@legacyf-l.com', // TODO: update
+  phone: '(706) 333-5641',
+  email: 'Beth@legacyf-l.com',
   cityState: 'Luthersville, GA', // TODO: confirm spellings/details
   tagline: 'Trusted. Personal. Protective. Strategic.',
   // Brand assets - updated with real company assets
