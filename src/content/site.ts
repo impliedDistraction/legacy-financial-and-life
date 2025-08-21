@@ -162,28 +162,122 @@ export const site = {
   // Event Information
   event: {
     title: 'Wills & Living Trusts',
-    subtitle: 'Free Educational Event',
-    description: 'Join us for a comprehensive educational seminar covering the essential aspects of estate planning and protecting your family\'s future.',
-    date: 'September 11, 2025', // TODO: Update with actual date
-    time: '6:30 PM', // TODO: Update with actual time
-    location: 'Luthersville, GA Area', // TODO: Update with specific venue
+    subtitle: 'Join Legacy Financial & Life for an Exclusive In-Person Event',
+    description: 'Register to be our guest at this unique and FREE educational event',
+    location: {
+      name: 'Madras Community Center',
+      address: '2355 Hwy-29 N',
+      city: 'Newnan',
+      state: 'GA',
+      zip: '30265',
+      fullAddress: '2355 Hwy-29 N, Newnan, GA 30265'
+    },
     isActive: true, // Set to false to hide event
-    topics: [
-      'The Advantages and Disadvantages of Wills & Living Trusts',
-      'Powers of Attorney',
-      'Probate Court',
-      'Costs of Nursing Home Care',
-      'Protecting your Heirs\' Inheritance',
-      'And More!'
+    sessions: [
+      {
+        id: 'thu-2pm',
+        day: 'Thursday',
+        date: 'September 11th',
+        year: '2025',
+        time: '2:00 PM',
+        fullDateTime: 'Thursday, September 11, 2025 2:00 PM',
+        value: 'Thursday, September 11, 2025 2:00 PM'
+      },
+      {
+        id: 'thu-6pm',
+        day: 'Thursday', 
+        date: 'September 11th',
+        year: '2025',
+        time: '6:00 PM',
+        fullDateTime: 'Thursday, September 11, 2025 6:00 PM',
+        value: 'Thursday, September 11, 2025 6:00 PM'
+      },
+      {
+        id: 'sat-11am',
+        day: 'Saturday',
+        date: 'September 13th', 
+        year: '2025',
+        time: '11:00 AM',
+        fullDateTime: 'Saturday, September 13, 2025 11:00 AM',
+        value: 'Saturday, September 13, 2025 11:00 AM'
+      },
+      {
+        id: 'sat-2pm',
+        day: 'Saturday',
+        date: 'September 13th',
+        year: '2025', 
+        time: '2:00 PM',
+        fullDateTime: 'Saturday, September 13, 2025 2:00 PM',
+        value: 'Saturday, September 13, 2025 2:00 PM'
+      }
     ],
-    callToAction: 'Reserve Your Spot Today',
+    topics: [
+      'The advantages and disadvantages of Wills and Living Trusts',
+      'How Powers of Attorney work and don\'t work (some may not be valid if you are disabled or pass away)',
+      'How Probate Court works and why you may want to avoid it for your family',
+      'Why putting property in your children\'s names may be a mistake',
+      'Common missteps by families raising children with challenges, disabilities or special needs',
+      'Protecting your home from being swallowed up by the Costs of Nursing Home Care',
+      'Protecting your heirs inheritance from lawsuits, divorce and spend-thrifts',
+      'Best practices for naming retirement accounts and Life Insurance beneficiaries',
+      'How the new Secure Act affects your Trust and/or Retirement Accounts'
+    ],
+    callToAction: 'RSVP Now',
     benefits: [
-      'Learn essential estate planning strategies',
-      'Understand probate court processes',
-      'Discover ways to protect your inheritance',
-      'Get expert insights from Tim & Beth Byrd',
-      'Ask questions in a comfortable setting',
-      'Free educational materials provided'
+      'Learn essential estate planning strategies in easy to understand terms',
+      'Understand how to avoid the most common costly mistakes',
+      'Discover methods to protect your home from nursing home costs',
+      'Get expert insights from experienced professionals',
+      'Ask questions in a comfortable, educational setting',
+      'Free educational materials and consultation'
+    ],
+    disclaimers: [
+      'For educational purposes only – nothing will be sold at this seminar.',
+      'This class is not affiliated with and is offered independently of Madras Community Center.',
+      'Be our guest at this unique and FREE educational event.',
+      'If married, spouses are encouraged to attend. Adults only.'
+    ],
+    consent: {
+      required: true,
+      text: 'YES, I agree to be contacted by Legacy Financial & Life.',
+      disclaimer: 'By submitting, you agree to be contacted via phone, email, and text by a licensed representative with Legacy Financial & Life regarding Wills & Living Trusts. Msg & data rates may apply.'
+    },
+    hosts: [
+      {
+        name: 'Tim & Beth Byrd',
+        description: 'Tim and Beth Byrd are dedicated professionals specializing in financial planning, retirement solutions, and asset management. They bring over 15 years of combined experience across private, nonprofit, and government sectors. Together, they\'ve managed more than $75M in HUD assets, sold 300+ life insurance policies in two years, and served in CFO and bookkeeping roles. Between the two of them, they hold advanced degrees in human services and behavioral science and are accomplished grant writers. Lifelong community volunteers, they\'ve led youth programs, served their church for over 20 years, and remain committed to helping others build secure financial futures.',
+        credentials: [
+          '15+ years combined experience',
+          'Managed $75M+ in HUD assets',
+          'Sold 300+ life insurance policies in two years',
+          'Advanced degrees in human services and behavioral science',
+          'Accomplished grant writers',
+          '20+ years of church and community service'
+        ]
+      },
+      {
+        name: 'Mike Morice',
+        description: 'Mike Morice is a seasoned professional specializing in generational wealth strategies and estate planning. A proud graduate of Loyola University Chicago and former professional volleyball athlete, Mike has built a career dedicated to helping his clients secure their financial futures and build lasting legacies. Mike has empowered countless clients to navigate the complexities of estate planning, offering tailored guidance on trusts, wills, and investment strategies. Mike and his wife, Kate, reside in Plainfield with their two children, MJ and Lola. Mike is an avid reader and loves creating lasting memories with his family.',
+        credentials: [
+          'Graduate of Loyola University Chicago',
+          'Former professional volleyball athlete',
+          'Specializes in generational wealth strategies',
+          'Expert in trusts, wills, and investment strategies',
+          'Experienced in estate planning complexities'
+        ]
+      },
+      {
+        name: 'Mo Dadkhah',
+        description: 'Mo Dadkhah is the broker owner of Main Street Real Estate Group and for the last fifteen years has focused his attention primarily on estate planning, real estate, and corporate law. Mo has been named a Top 50 Attorney by the Top 100 Magazine, his Firm has been selected as an Inc. 5000 list of fastest-growing companies, and he has been named as a Chicago Agent Magazine Who\'s Who for seven consecutive years. He has also been the host of WGN\'s Market Overdrive radio show. Mo brings a wide range of knowledge in estate planning, real estate, and corporate law together to best guide his clients on how to best protect themselves.',
+        credentials: [
+          'Broker owner of Main Street Real Estate Group',
+          '15+ years focused on estate planning, real estate, and corporate law',
+          'Named Top 50 Attorney by Top 100 Magazine',
+          'Inc. 5000 fastest-growing companies list',
+          'Chicago Agent Magazine Who\'s Who for 7 consecutive years',
+          'Host of WGN\'s Market Overdrive radio show'
+        ]
+      }
     ]
   },
 

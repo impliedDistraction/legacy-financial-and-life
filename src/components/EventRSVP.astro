@@ -5,7 +5,7 @@ import { site } from '../content/site';
 <section id="event-rsvp" class="mx-auto max-w-4xl px-4 py-12 sm:py-16">
   <div class="text-center mb-8">
     <h2 class="text-2xl sm:text-3xl font-bold">Reserve Your Spot</h2>
-    <p class="mt-2 text-slate-700">Join us for this free educational event on {site.event.date}</p>
+    <p class="mt-2 text-slate-700">Register to be our guest at this unique and FREE educational event</p>
   </div>
 
   <div class="rounded-2xl border border-slate-200 p-6 sm:p-8 hover-lift bg-white shadow-lg">
@@ -44,17 +44,6 @@ import { site } from '../content/site';
       </label>
       
       <label class="grid gap-1">
-        <span class="text-sm font-medium">Email Address <span class="text-red-500">*</span></span>
-        <input 
-          type="email" 
-          name="email" 
-          required 
-          placeholder="your.email@example.com"
-          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
-        />
-      </label>
-      
-      <label class="grid gap-1">
         <span class="text-sm font-medium">Phone Number <span class="text-red-500">*</span></span>
         <input 
           type="tel" 
@@ -64,51 +53,54 @@ import { site } from '../content/site';
           class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
         />
       </label>
-
-      <!-- Number of Attendees -->
+      
       <label class="grid gap-1">
-        <span class="text-sm font-medium">Number of Attendees</span>
+        <span class="text-sm font-medium">Email Address <span class="text-red-500">*</span></span>
+        <input 
+          type="email" 
+          name="email" 
+          required 
+          placeholder="your.email@example.com"
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+        />
+      </label>
+
+      <!-- Date and Time Selection -->
+      <label class="grid gap-1 sm:col-span-2">
+        <span class="text-sm font-medium">Select Which Date and Time You'll Attend <span class="text-red-500">*</span></span>
         <select 
-          name="attendee_count" 
+          name="event_session" 
+          required
           class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none bg-white"
         >
-          <option value="1">1 person</option>
-          <option value="2">2 people</option>
-          <option value="3">3 people</option>
-          <option value="4">4 people</option>
-          <option value="5+">5+ people</option>
+          <option value="">Please select a session...</option>
+          {site.event.sessions.map((session) => (
+            <option value={session.value}>{session.value}</option>
+          ))}
+          <option value="cannot_attend">I can't attend either date. Please send me information about future events.</option>
         </select>
       </label>
 
-      <!-- Preferred Contact Method -->
-      <div class="grid gap-1">
-        <span class="text-sm font-medium">Preferred Contact Method</span>
-        <div class="flex flex-wrap gap-4 pt-2">
-          <label class="flex items-center space-x-2 cursor-pointer">
-            <input type="radio" name="contact_preference" value="email" checked class="text-brand-600 focus:ring-brand-200">
-            <span class="text-sm text-slate-700">Email</span>
-          </label>
-          <label class="flex items-center space-x-2 cursor-pointer">
-            <input type="radio" name="contact_preference" value="phone" class="text-brand-600 focus:ring-brand-200">
-            <span class="text-sm text-slate-700">Phone</span>
-          </label>
-          <label class="flex items-center space-x-2 cursor-pointer">
-            <input type="radio" name="contact_preference" value="text" class="text-brand-600 focus:ring-brand-200">
-            <span class="text-sm text-slate-700">Text</span>
+      <!-- Consent Checkbox -->
+      <div class="sm:col-span-2">
+        <div class="flex items-start space-x-3">
+          <input 
+            type="checkbox" 
+            name="consent" 
+            id="consent"
+            required
+            value="yes"
+            class="mt-1 rounded border-slate-300 text-brand-600 focus:ring-brand-200"
+          />
+          <label for="consent" class="text-sm text-slate-700">
+            <span class="font-medium">Consent <span class="text-red-500">*</span></span><br>
+            <span class="font-medium">{site.event.consent.text}</span>
           </label>
         </div>
+        <p class="text-xs text-slate-500 mt-2 ml-6">
+          {site.event.consent.disclaimer}
+        </p>
       </div>
-      
-      <!-- Special Accommodations -->
-      <label class="grid gap-1 sm:col-span-2">
-        <span class="text-sm font-medium">Special Accommodations or Questions</span>
-        <textarea 
-          name="message" 
-          rows="3" 
-          placeholder="Any dietary restrictions, accessibility needs, or questions about the event..."
-          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none resize-vertical"
-        ></textarea>
-      </label>
       
       <!-- Submit Button and Info -->
       <div class="sm:col-span-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -127,29 +119,23 @@ import { site } from '../content/site';
       <input type="hidden" name="_error" value="/form-error">
       <input type="hidden" name="_cc" value={site.email}>
       <input type="hidden" name="event_name" value={site.event.title}>
-      <input type="hidden" name="event_date" value={site.event.date}>
+      <input type="hidden" name="event_location" value={site.event.location.fullAddress}>
     </form>
   </div>
   
   <!-- Event Details Reminder -->
   <div class="mt-8 bg-brand-50 border border-brand-200 rounded-lg p-6">
-    <h4 class="font-semibold text-brand-800 mb-3">Event Details</h4>
-    <div class="grid sm:grid-cols-3 gap-4 text-sm">
-      <div>
-        <span class="font-medium text-brand-700">Date:</span>
-        <p class="text-brand-800">{site.event.date}</p>
+    <h4 class="font-semibold text-brand-800 mb-3">Event Location</h4>
+    <div class="text-sm">
+      <div class="mb-2">
+        <span class="font-medium text-brand-700">{site.event.location.name}</span>
       </div>
-      <div>
-        <span class="font-medium text-brand-700">Time:</span>
-        <p class="text-brand-800">{site.event.time}</p>
-      </div>
-      <div>
-        <span class="font-medium text-brand-700">Location:</span>
-        <p class="text-brand-800">{site.event.location}</p>
+      <div class="text-brand-800">
+        <p>{site.event.location.fullAddress}</p>
       </div>
     </div>
     <p class="text-xs text-brand-600 mt-4">
-      Specific venue details will be provided in your confirmation email after registration.
+      Choose your preferred date and time when completing the form above.
     </p>
   </div>
 
