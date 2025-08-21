@@ -1,6 +1,10 @@
 ---
 import { site } from '../content/site';
 const year = new Date().getFullYear();
+
+// Check if we're on the home page to determine link behavior
+const isHomePage = Astro.url.pathname === '/';
+const homePrefix = isHomePage ? '' : '/';
 ---
 <footer class="mt-16 border-t border-slate-200 bg-slate-50">
   <div class="mx-auto max-w-6xl px-4 py-8">
@@ -15,16 +19,16 @@ const year = new Date().getFullYear();
       <!-- Navigation - better mobile layout -->
       <nav class="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-6">
         <div class="grid grid-cols-2 gap-3 text-center sm:flex sm:gap-6">
-          <a href="#plans" class="text-sm text-slate-600 hover:text-slate-900 transition-colors px-2 py-1 rounded hover:bg-white">Plans</a>
-          <a href="#retirement" class="text-sm text-slate-600 hover:text-slate-900 transition-colors px-2 py-1 rounded hover:bg-white">Retirement</a>
+          <a href={`${homePrefix}#plans`} class="text-sm text-slate-600 hover:text-slate-900 transition-colors px-2 py-1 rounded hover:bg-white">Plans</a>
+          <a href={`${homePrefix}#retirement`} class="text-sm text-slate-600 hover:text-slate-900 transition-colors px-2 py-1 rounded hover:bg-white">Retirement</a>
         </div>
         <div class="grid grid-cols-2 gap-3 text-center sm:flex sm:gap-6">
           <a href="/estate-planning" class="text-sm text-slate-600 hover:text-slate-900 transition-colors px-2 py-1 rounded hover:bg-white">Estate Planning</a>
           <a href="/hiring" class="text-sm text-slate-600 hover:text-slate-900 transition-colors px-2 py-1 rounded hover:bg-white">Careers</a>
         </div>
         <div class="grid grid-cols-2 gap-3 text-center sm:flex sm:gap-6">
-          <a href="#team" class="text-sm text-slate-600 hover:text-slate-900 transition-colors px-2 py-1 rounded hover:bg-white">Team</a>
-          <a href="#contact" class="text-sm text-slate-600 hover:text-slate-900 transition-colors px-2 py-1 rounded hover:bg-white">Contact</a>
+          <a href={`${homePrefix}#team`} class="text-sm text-slate-600 hover:text-slate-900 transition-colors px-2 py-1 rounded hover:bg-white">Team</a>
+          <a href={`${homePrefix}#contact`} class="text-sm text-slate-600 hover:text-slate-900 transition-colors px-2 py-1 rounded hover:bg-white">Contact</a>
         </div>
       </nav>
     </div>
