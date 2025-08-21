@@ -205,7 +205,7 @@ export const site = {
         id: 'sat-2pm',
         day: 'Saturday',
         date: 'September 13th',
-        year: '2025', 
+        year: '2025',
         time: '2:00 PM',
         fullDateTime: 'Saturday, September 13, 2025 2:00 PM',
         value: 'Saturday, September 13, 2025 2:00 PM'

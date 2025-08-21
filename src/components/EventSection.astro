@@ -1,0 +1,100 @@
+---
+import { site } from '../content/site';
+
+// Check if event should be visible based on date
+function isEventActive() {
+  if (!site.event.isActive) return false;
+  
+  const now = new Date();
+  const eventDates = site.event.sessions.map(session => {
+    // Parse the event date from session
+    const dateParts = session.date.replace(/st|nd|rd|th/, '');
+    const year = session.year || '2025';
+    const monthDay = `${dateParts}, ${year}`;
+    const eventDate = new Date(`${monthDay} ${session.time}`);
+    return eventDate;
+  });
+  
+  // Find the latest event date
+  const latestEventDate = new Date(Math.max(...eventDates));
+  
+  // Show event until the latest event has passed
+  return now < latestEventDate;
+}
+
+const showEvent = isEventActive();
+---
+
+{showEvent && (
+  <section id="event" class="mx-auto max-w-6xl px-4 py-12 sm:py-16 bg-gradient-to-br from-brand-50 to-white">
+    <div class="text-center mb-8">
+      <div class="inline-block bg-brand-100 text-brand-800 text-sm font-medium px-4 py-2 rounded-full mb-4">
+        🎓 {site.event.subtitle}
+      </div>
+      <h2 class="text-3xl sm:text-4xl font-bold mb-4">{site.event.title}</h2>
+      <p class="text-xl text-slate-700 max-w-2xl mx-auto mb-8">
+        {site.event.description}
+      </p>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-lg max-w-4xl mx-auto">
+      <h3 class="text-lg font-semibold mb-6 text-slate-900 text-center">Available Event Times</h3>
+      
+      <!-- Event Sessions Grid -->
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {site.event.sessions.map((session) => (
+          <a 
+            href="/wills-trusts-event"
+            class="block bg-slate-50 rounded-lg p-4 border border-slate-200 hover:border-brand-300 hover:bg-brand-50 transition-all duration-200 hover-lift text-center"
+          >
+            <div class="text-brand-600 font-semibold text-sm uppercase tracking-wide">{session.day}</div>
+            <div class="text-slate-900 font-bold text-lg">{session.date}</div>
+            <div class="text-slate-700 font-medium">{session.time}</div>
+          </a>
+        ))}
+      </div>
+
+      <!-- Location Info -->
+      <div class="text-center pt-6 border-t border-slate-200 mb-6">
+        <div class="text-brand-600 font-semibold text-sm uppercase tracking-wide">Location</div>
+        <div class="text-slate-900 font-bold text-lg">{site.event.location.name}</div>
+        <div class="text-slate-700">{site.event.location.fullAddress}</div>
+      </div>
+
+      <!-- Event Highlights -->
+      <div class="grid md:grid-cols-3 gap-4 mb-6">
+        <div class="bg-slate-50 rounded-lg p-4 text-center border border-slate-200">
+          <div class="text-2xl mb-2">🎓</div>
+          <div class="font-medium text-slate-900">Educational Seminar</div>
+          <div class="text-sm text-slate-600">Learn estate planning basics</div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-4 text-center border border-slate-200">
+          <div class="text-2xl mb-2">✨</div>
+          <div class="font-medium text-slate-900">Completely FREE</div>
+          <div class="text-sm text-slate-600">No cost to attend</div>
+        </div>
+        <div class="bg-slate-50 rounded-lg p-4 text-center border border-slate-200">
+          <div class="text-2xl mb-2">👥</div>
+          <div class="font-medium text-slate-900">Expert Speakers</div>
+          <div class="text-sm text-slate-600">Experienced professionals</div>
+        </div>
+      </div>
+
+      <!-- CTA Buttons -->
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a 
+          href="/wills-trusts-event" 
+          class="rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold btn-animate hover-lift transition-all duration-200 text-center"
+        >
+          {site.event.callToAction}
+        </a>
+        <a 
+          href="/wills-trusts-event#event-details" 
+          class="rounded-lg border border-brand-600 text-brand-600 hover:bg-brand-50 px-6 py-3 font-semibold transition-colors text-center"
+        >
+          Learn More
+        </a>
+      </div>
+    </div>
+  </section>
+)}
