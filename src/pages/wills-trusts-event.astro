@@ -3,6 +3,7 @@ import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import EventRSVP from '../components/EventRSVP.astro';
 import Footer from '../components/Footer.astro';
+import Map from '../components/Map.astro';
 import { site } from '../content/site';
 import '../styles/tailwind.css';
 ---
@@ -218,24 +219,67 @@ import '../styles/tailwind.css';
   <section class="mx-auto max-w-4xl px-4 py-12">
     <div class="text-center mb-8">
       <h2 class="text-2xl sm:text-3xl font-bold mb-4">Directions</h2>
+      <p class="text-lg text-slate-600 max-w-2xl mx-auto">
+        Get directions to {site.event.location.name} for the Wills & Living Trusts educational event. 
+        Choose your preferred navigation app or view the interactive map below.
+      </p>
     </div>
     
     <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-lg">
-      <div class="text-center">
-        <h3 class="text-xl font-semibold mb-2 text-slate-900">{site.event.location.name}</h3>
-        <p class="text-lg text-slate-700 mb-6">{site.event.location.fullAddress}</p>
-        
-        <!-- Map placeholder - could be enhanced with actual map integration -->
-        <div class="bg-slate-100 rounded-lg p-8 border border-slate-200">
-          <div class="text-slate-500 text-center">
-            <svg class="w-16 h-16 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            </svg>
-            <p class="text-slate-600 font-medium">Interactive map coming soon</p>
-            <p class="text-sm text-slate-500 mt-2">Use the address above for GPS navigation</p>
+      <!-- Interactive Map Component -->
+      <Map 
+        location={site.event.location} 
+        height="400px"
+        showDirectionsLinks={true}
+        className="mb-6"
+      />
+      
+      <!-- Additional Venue Information -->
+      <div class="grid md:grid-cols-2 gap-6 mt-8 pt-6 border-t border-slate-200">
+        <div class="text-center md:text-left">
+          <h4 class="font-semibold text-slate-900 mb-2">📍 Location Details</h4>
+          <div class="space-y-1 text-sm text-slate-600">
+            <p><strong>Address:</strong> {site.event.location.fullAddress}</p>
+            {site.event.location.phone && (
+              <p><strong>Phone:</strong> 
+                <a href={`tel:${site.event.location.phone}`} class="text-brand-600 hover:text-brand-700">
+                  {site.event.location.phone}
+                </a>
+              </p>
+            )}
+            {site.event.location.parkingInfo && (
+              <p><strong>Parking:</strong> {site.event.location.parkingInfo}</p>
+            )}
           </div>
         </div>
+        
+        <div class="text-center md:text-left">
+          <h4 class="font-semibold text-slate-900 mb-2">ℹ️ Event Information</h4>
+          <div class="space-y-1 text-sm text-slate-600">
+            <p><strong>Event:</strong> {site.event.title}</p>
+            <p><strong>Host:</strong> Legacy Financial & Life</p>
+            <p><strong>Cost:</strong> FREE Educational Event</p>
+            {site.event.location.notes && (
+              <p><strong>Note:</strong> {site.event.location.notes}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="flex flex-col sm:flex-row gap-3 mt-6 pt-6 border-t border-slate-200">
+        <a 
+          href="#event-rsvp" 
+          class="flex-1 bg-brand-600 hover:bg-brand-700 text-white py-3 px-4 rounded-lg font-medium text-center transition-colors"
+        >
+          🎟️ RSVP for Event
+        </a>
+        <a 
+          href={`tel:${site.phone}`}
+          class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-900 py-3 px-4 rounded-lg font-medium text-center transition-colors"
+        >
+          📞 Call for Questions
+        </a>
       </div>
     </div>
   </section>

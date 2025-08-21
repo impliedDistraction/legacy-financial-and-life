@@ -1,0 +1,144 @@
+---
+import type { LocationInfo } from '../types/location';
+
+interface Props {
+  location: LocationInfo;
+  height?: string;
+  className?: string;
+  showDirectionsLinks?: boolean;
+}
+
+const { 
+  location, 
+  height = "400px", 
+  className = "",
+  showDirectionsLinks = true 
+} = Astro.props;
+
+// Environment variables for API keys
+const GOOGLE_MAPS_API_KEY = import.meta.env.GOOGLE_MAPS_API_KEY;
+const MAPBOX_ACCESS_TOKEN = import.meta.env.MAPBOX_ACCESS_TOKEN;
+
+// Generate map URLs for different providers
+const googleMapsEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY || 'demo'}&q=${encodeURIComponent(location.fullAddress)}`;
+const googleMapsDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(location.fullAddress)}`;
+const appleMapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(location.fullAddress)}`;
+const wazeUrl = `https://waze.com/ul?q=${encodeURIComponent(location.fullAddress)}`;
+
+// Fallback to simple Google Maps embed without API key (limited functionality)
+const simpleMapsEmbedUrl = `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3!2d${location.longitude || -84.7999}!3d${location.latitude || 33.3807}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2z${encodeURIComponent(location.name)}!5e0!3m2!1sen!2sus!4v1234567890!5m2!1sen!2sus`;
+---
+
+<div class={`map-container ${className}`}>
+  <!-- Interactive Map -->
+  <div class="relative" style={`height: ${height}`}>
+    <!-- Google Maps Embed (Primary option) -->
+    {GOOGLE_MAPS_API_KEY && (
+      <iframe
+        src={googleMapsEmbedUrl}
+        width="100%"
+        height="100%"
+        style="border:0;"
+        allowfullscreen=""
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        class="rounded-lg shadow-sm"
+        title={`Map showing ${location.name}`}
+      ></iframe>
+    )}
+    
+    <!-- Fallback: Basic Google Maps embed (no API key required) -->
+    {!GOOGLE_MAPS_API_KEY && (
+      <div class="relative w-full h-full">
+        <iframe
+          src={`https://www.google.com/maps?q=${encodeURIComponent(location.fullAddress)}&output=embed`}
+          width="100%"
+          height="100%"
+          style="border:0;"
+          allowfullscreen=""
+          loading="lazy"
+          class="rounded-lg shadow-sm"
+          title={`Map showing ${location.name}`}
+        ></iframe>
+        <div class="absolute top-2 right-2 bg-white rounded px-2 py-1 text-xs text-slate-600 shadow">
+          <span>📍 Interactive map</span>
+        </div>
+      </div>
+    )}
+  </div>
+
+  <!-- Navigation Links -->
+  {showDirectionsLinks && (
+    <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <!-- Google Maps Directions -->
+      <a
+        href={googleMapsDirectionsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors font-medium text-sm"
+      >
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+        Google Maps
+      </a>
+
+      <!-- Apple Maps -->
+      <a
+        href={appleMapsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white px-4 py-3 rounded-lg transition-colors font-medium text-sm"
+      >
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+        </svg>
+        Apple Maps
+      </a>
+
+      <!-- Waze -->
+      <a
+        href={wazeUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="flex items-center justify-center gap-2 bg-cyan-500 hover:bg-cyan-600 text-white px-4 py-3 rounded-lg transition-colors font-medium text-sm"
+      >
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M10.2 21.23c0 .78-.63 1.41-1.41 1.41s-1.41-.63-1.41-1.41.63-1.41 1.41-1.41 1.41.63 1.41 1.41zm6-2c0 .78-.63 1.41-1.41 1.41s-1.41-.63-1.41-1.41.63-1.41 1.41-1.41 1.41.63 1.41 1.41zM24 14.5c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9zm-2 0c0-3.86-3.14-7-7-7s-7 3.14-7 7 3.14 7 7 7 7-3.14 7-7z"/>
+        </svg>
+        Waze
+      </a>
+    </div>
+  )}
+
+  <!-- Address Information -->
+  <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+    <div class="text-center">
+      <h4 class="font-semibold text-slate-900 mb-1">{location.name}</h4>
+      <p class="text-slate-700 mb-2">{location.fullAddress}</p>
+      <div class="flex flex-wrap justify-center gap-4 text-sm text-slate-600">
+        {location.phone && (
+          <a href={`tel:${location.phone}`} class="hover:text-slate-900 transition-colors">
+            📞 {location.phone}
+          </a>
+        )}
+        {location.website && (
+          <a href={location.website} target="_blank" rel="noopener noreferrer" class="hover:text-slate-900 transition-colors">
+            🌐 Website
+          </a>
+        )}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .map-container {
+    @apply w-full;
+  }
+  
+  /* Ensure iframe responsiveness */
+  .map-container iframe {
+    @apply w-full h-full;
+  }
+</style>
