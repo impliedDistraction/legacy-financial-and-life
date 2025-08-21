@@ -37,13 +37,17 @@ import '../styles/tailwind.css';
           <h3 class="text-lg font-semibold mb-6 text-slate-900">Available Events</h3>
           <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {site.event.sessions.map((session) => (
-              <div class="bg-slate-50 rounded-lg p-4 border border-slate-200 hover-lift">
+              <button 
+                type="button"
+                onclick={`selectEventSession('${session.value}')`}
+                class="event-session-btn bg-slate-50 rounded-lg p-4 border border-slate-200 hover:border-brand-300 hover:bg-brand-50 transition-all duration-200 hover-lift cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
                 <div class="text-center">
                   <div class="text-brand-600 font-semibold text-sm uppercase tracking-wide">{session.day}</div>
                   <div class="text-slate-900 font-bold text-lg">{session.date}</div>
                   <div class="text-slate-700 font-medium">{session.time}</div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
           
@@ -151,40 +155,59 @@ import '../styles/tailwind.css';
     </div>
 
     <div class="space-y-12">
-      {site.event.hosts.map((host, index) => (
-        <div class={`bg-gradient-to-br ${index % 2 === 0 ? 'from-brand-50 to-white' : 'from-slate-50 to-white'} rounded-2xl border border-slate-200 p-8 sm:p-12`}>
-          <div class="grid lg:grid-cols-3 gap-8 items-start">
-            <div class="lg:col-span-2">
-              <h3 class="text-2xl font-bold mb-4 text-slate-900">{host.name}</h3>
-              <div class="space-y-4 text-slate-700">
-                <p class="text-lg leading-relaxed">
-                  {host.description}
-                </p>
-                <div class="grid sm:grid-cols-2 gap-3 pt-4">
-                  {host.credentials.map((credential) => (
-                    <div class="flex items-center space-x-2">
-                      <span class="w-2 h-2 bg-brand-500 rounded-full flex-shrink-0"></span>
-                      <span class="text-sm font-medium">{credential}</span>
-                    </div>
-                  ))}
+      {site.event.hosts.map((host, index) => {
+        // Map speaker names to their image files
+        const speakerImages = {
+          'Tim & Beth Byrd': 'tim-beth-byrd-speakers.jpg',
+          'Mike Morice': 'mike-morice-speaker.jpg', 
+          'Mo Dadkhah': 'mo-dadkhah-speaker.jpg'
+        };
+        const speakerImage = speakerImages[host.name];
+        
+        return (
+          <div class={`bg-gradient-to-br ${index % 2 === 0 ? 'from-brand-50 to-white' : 'from-slate-50 to-white'} rounded-2xl border border-slate-200 p-8 sm:p-12`}>
+            <div class="grid lg:grid-cols-3 gap-8 items-start">
+              <div class="lg:col-span-2">
+                <h3 class="text-2xl font-bold mb-4 text-slate-900">{host.name}</h3>
+                <div class="space-y-4 text-slate-700">
+                  <p class="text-lg leading-relaxed">
+                    {host.description}
+                  </p>
+                  <div class="grid sm:grid-cols-2 gap-3 pt-4">
+                    {host.credentials.map((credential) => (
+                      <div class="flex items-center space-x-2">
+                        <span class="w-2 h-2 bg-brand-500 rounded-full flex-shrink-0"></span>
+                        <span class="text-sm font-medium">{credential}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="text-center lg:text-right">
-              <div class="inline-block bg-white rounded-xl p-4 shadow-lg">
-                <div class="w-48 h-48 bg-slate-200 rounded-lg flex items-center justify-center mx-auto">
-                  <div class="text-slate-500 text-center">
-                    <svg class="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                    </svg>
-                    <p class="text-sm font-medium">{host.name}</p>
-                  </div>
+              <div class="text-center lg:text-right">
+                <div class="inline-block bg-white rounded-xl p-4 shadow-lg">
+                  {speakerImage ? (
+                    <img 
+                      src={`/images/${speakerImage}`}
+                      alt={`${host.name} - Event Speaker`}
+                      class="w-48 h-48 object-cover rounded-lg mx-auto"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div class="w-48 h-48 bg-slate-200 rounded-lg flex items-center justify-center mx-auto">
+                      <div class="text-slate-500 text-center">
+                        <svg class="w-16 h-16 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                        <p class="text-sm font-medium">{host.name}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   </section>
 
@@ -272,6 +295,34 @@ import '../styles/tailwind.css';
       }
     });
   });
+
+  // Function to select event session and scroll to form
+  function selectEventSession(sessionValue) {
+    // Scroll to the RSVP form
+    const rsvpSection = document.querySelector('#event-rsvp');
+    if (rsvpSection) {
+      rsvpSection.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // Pre-select the session in the form after a short delay for scrolling
+    setTimeout(() => {
+      const sessionSelect = document.querySelector('select[name="event_session"]');
+      if (sessionSelect) {
+        sessionSelect.value = sessionValue;
+        // Trigger change event in case there are any listeners
+        sessionSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        
+        // Add visual feedback
+        sessionSelect.style.background = '#eff6ff';
+        setTimeout(() => {
+          sessionSelect.style.background = '';
+        }, 2000);
+      }
+    }, 500);
+  }
+
+  // Make function globally available
+  window.selectEventSession = selectEventSession;
 
   // Track event page view
   if (typeof gtag !== 'undefined') {
