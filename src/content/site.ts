@@ -159,6 +159,34 @@ export const site = {
     ]
   },
 
+  // Event Information
+  event: {
+    title: 'Wills & Living Trusts',
+    subtitle: 'Free Educational Event',
+    description: 'Join us for a comprehensive educational seminar covering the essential aspects of estate planning and protecting your family\'s future.',
+    date: 'September 11, 2025', // TODO: Update with actual date
+    time: '6:30 PM', // TODO: Update with actual time
+    location: 'Luthersville, GA Area', // TODO: Update with specific venue
+    isActive: true, // Set to false to hide event
+    topics: [
+      'The Advantages and Disadvantages of Wills & Living Trusts',
+      'Powers of Attorney',
+      'Probate Court',
+      'Costs of Nursing Home Care',
+      'Protecting your Heirs\' Inheritance',
+      'And More!'
+    ],
+    callToAction: 'Reserve Your Spot Today',
+    benefits: [
+      'Learn essential estate planning strategies',
+      'Understand probate court processes',
+      'Discover ways to protect your inheritance',
+      'Get expert insights from Tim & Beth Byrd',
+      'Ask questions in a comfortable setting',
+      'Free educational materials provided'
+    ]
+  },
+
   // Hiring/Recruiting Page Content  
   hiring: {
     title: 'Join Our Growing Team',

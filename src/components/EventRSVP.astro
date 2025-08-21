@@ -1,0 +1,160 @@
+---
+import { site } from '../content/site';
+---
+
+<section id="event-rsvp" class="mx-auto max-w-4xl px-4 py-12 sm:py-16">
+  <div class="text-center mb-8">
+    <h2 class="text-2xl sm:text-3xl font-bold">Reserve Your Spot</h2>
+    <p class="mt-2 text-slate-700">Join us for this free educational event on {site.event.date}</p>
+  </div>
+
+  <div class="rounded-2xl border border-slate-200 p-6 sm:p-8 hover-lift bg-white shadow-lg">
+    <div class="mb-6">
+      <h3 class="text-xl font-semibold mb-2">Event RSVP</h3>
+      <p class="text-slate-600">Please fill out the form below to reserve your seat for our {site.event.title} seminar.</p>
+    </div>
+
+    <form 
+      action="https://formspree.io/f/mgegenpo" 
+      method="POST" 
+      class="grid gap-4 sm:grid-cols-2"
+      id="event-rsvp-form"
+    >
+      <!-- Personal Information -->
+      <label class="grid gap-1">
+        <span class="text-sm font-medium">First Name <span class="text-red-500">*</span></span>
+        <input 
+          type="text" 
+          name="first_name" 
+          required 
+          placeholder="Your first name"
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+        />
+      </label>
+      
+      <label class="grid gap-1">
+        <span class="text-sm font-medium">Last Name <span class="text-red-500">*</span></span>
+        <input 
+          type="text" 
+          name="last_name" 
+          required 
+          placeholder="Your last name"
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+        />
+      </label>
+      
+      <label class="grid gap-1">
+        <span class="text-sm font-medium">Email Address <span class="text-red-500">*</span></span>
+        <input 
+          type="email" 
+          name="email" 
+          required 
+          placeholder="your.email@example.com"
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+        />
+      </label>
+      
+      <label class="grid gap-1">
+        <span class="text-sm font-medium">Phone Number <span class="text-red-500">*</span></span>
+        <input 
+          type="tel" 
+          name="phone" 
+          required 
+          placeholder="(555) 123-4567"
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+        />
+      </label>
+
+      <!-- Number of Attendees -->
+      <label class="grid gap-1">
+        <span class="text-sm font-medium">Number of Attendees</span>
+        <select 
+          name="attendee_count" 
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none bg-white"
+        >
+          <option value="1">1 person</option>
+          <option value="2">2 people</option>
+          <option value="3">3 people</option>
+          <option value="4">4 people</option>
+          <option value="5+">5+ people</option>
+        </select>
+      </label>
+
+      <!-- Preferred Contact Method -->
+      <div class="grid gap-1">
+        <span class="text-sm font-medium">Preferred Contact Method</span>
+        <div class="flex flex-wrap gap-4 pt-2">
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="radio" name="contact_preference" value="email" checked class="text-brand-600 focus:ring-brand-200">
+            <span class="text-sm text-slate-700">Email</span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="radio" name="contact_preference" value="phone" class="text-brand-600 focus:ring-brand-200">
+            <span class="text-sm text-slate-700">Phone</span>
+          </label>
+          <label class="flex items-center space-x-2 cursor-pointer">
+            <input type="radio" name="contact_preference" value="text" class="text-brand-600 focus:ring-brand-200">
+            <span class="text-sm text-slate-700">Text</span>
+          </label>
+        </div>
+      </div>
+      
+      <!-- Special Accommodations -->
+      <label class="grid gap-1 sm:col-span-2">
+        <span class="text-sm font-medium">Special Accommodations or Questions</span>
+        <textarea 
+          name="message" 
+          rows="3" 
+          placeholder="Any dietary restrictions, accessibility needs, or questions about the event..."
+          class="rounded-lg border border-slate-300 px-3 py-2 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none resize-vertical"
+        ></textarea>
+      </label>
+      
+      <!-- Submit Button and Info -->
+      <div class="sm:col-span-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="text-sm text-slate-600">
+          Questions? Call us at <a class="underline hover:text-brand-700 transition-colors" href={`tel:${site.phone}`}>{site.phone}</a> 
+          or email <a class="underline hover:text-brand-700 transition-colors" href={`mailto:${site.email}`}>{site.email}</a>
+        </div>
+        <button type="submit" class="w-full sm:w-auto rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold btn-animate hover-lift transition-all duration-200">
+          {site.event.callToAction}
+        </button>
+      </div>
+      
+      <!-- Form metadata for Formspree -->
+      <input type="hidden" name="_subject" value="Event RSVP - Wills & Living Trusts Seminar">
+      <input type="hidden" name="_next" value="/event-success">
+      <input type="hidden" name="_error" value="/form-error">
+      <input type="hidden" name="_cc" value={site.email}>
+      <input type="hidden" name="event_name" value={site.event.title}>
+      <input type="hidden" name="event_date" value={site.event.date}>
+    </form>
+  </div>
+  
+  <!-- Event Details Reminder -->
+  <div class="mt-8 bg-brand-50 border border-brand-200 rounded-lg p-6">
+    <h4 class="font-semibold text-brand-800 mb-3">Event Details</h4>
+    <div class="grid sm:grid-cols-3 gap-4 text-sm">
+      <div>
+        <span class="font-medium text-brand-700">Date:</span>
+        <p class="text-brand-800">{site.event.date}</p>
+      </div>
+      <div>
+        <span class="font-medium text-brand-700">Time:</span>
+        <p class="text-brand-800">{site.event.time}</p>
+      </div>
+      <div>
+        <span class="font-medium text-brand-700">Location:</span>
+        <p class="text-brand-800">{site.event.location}</p>
+      </div>
+    </div>
+    <p class="text-xs text-brand-600 mt-4">
+      Specific venue details will be provided in your confirmation email after registration.
+    </p>
+  </div>
+
+  <p class="mt-4 text-xs text-slate-500 text-center">{site.footerNote}</p>
+</section>
+
+<!-- Enhanced Form Script -->
+<script src="../scripts/form-validation.js"></script>
