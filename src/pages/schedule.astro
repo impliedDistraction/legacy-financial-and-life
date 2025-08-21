@@ -1,0 +1,86 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Scheduling from '../components/Scheduling.astro';
+import Footer from '../components/Footer.astro';
+import { site } from '../content/site';
+import '../styles/tailwind.css';
+---
+
+<Base 
+  title="Schedule a Consultation — Legacy Financial & Life" 
+  description="Book a free consultation with Tim and Beth Byrd to discuss your life insurance, retirement planning, and financial protection needs."
+>
+  <Header />
+  
+  <!-- Page Hero -->
+  <section class="relative isolate overflow-hidden bg-gradient-to-br from-brand-50 to-white py-16 sm:py-20">
+    <div class="absolute inset-x-0 -top-40 -z-10 transform-gpu overflow-hidden blur-3xl sm:-top-80" aria-hidden="true">
+      <div class="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-brand-200 to-brand-400 opacity-20 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"></div>
+    </div>
+
+    <div class="mx-auto max-w-4xl px-4 text-center">
+      <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight">{site.cta.heading}</h1>
+      <p class="mt-4 text-lg text-slate-700">{site.cta.sub}</p>
+      
+      <div class="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+        <div class="flex items-center justify-center gap-2 text-sm font-medium text-brand-700">
+          <span class="w-2 h-2 bg-brand-500 rounded-full"></span>
+          <span>15+ Years Experience</span>
+        </div>
+        <div class="flex items-center justify-center gap-2 text-sm font-medium text-brand-700">
+          <span class="w-2 h-2 bg-brand-500 rounded-full"></span>
+          <span>300+ Policies Sold</span>
+        </div>
+        <div class="flex items-center justify-center gap-2 text-sm font-medium text-brand-700">
+          <span class="w-2 h-2 bg-brand-500 rounded-full"></span>
+          <span>$75M+ Assets Managed</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <Scheduling />
+  
+  <!-- Why Schedule Section -->
+  <section class="mx-auto max-w-6xl px-4 py-12 sm:py-16">
+    <div class="text-center mb-12">
+      <h2 class="text-2xl sm:text-3xl font-bold">Why Schedule with Tim & Beth?</h2>
+      <p class="mt-2 text-slate-700 max-w-2xl mx-auto">Our personalized approach ensures you get the right protection for your unique situation</p>
+    </div>
+
+    <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+      <div class="text-center">
+        <div class="mx-auto w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Proven Track Record</h3>
+        <p class="text-slate-600">Over 300 policies sold and $75M in assets managed with a focus on client education and trust</p>
+      </div>
+
+      <div class="text-center">
+        <div class="mx-auto w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C20.832 18.477 19.246 18 17.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Educational Approach</h3>
+        <p class="text-slate-600">We believe in educating our clients so they can make informed decisions about their financial future</p>
+      </div>
+
+      <div class="text-center">
+        <div class="mx-auto w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Community Focused</h3>
+        <p class="text-slate-600">Rooted in the Luthersville, GA community with over 20 years of local service and involvement</p>
+      </div>
+    </div>
+  </section>
+
+  <Footer />
+</Base>
