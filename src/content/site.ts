@@ -170,7 +170,15 @@ export const site = {
       city: 'Newnan',
       state: 'GA',
       zip: '30265',
-      fullAddress: '2355 Hwy-29 N, Newnan, GA 30265'
+      fullAddress: '2355 Hwy-29 N, Newnan, GA 30265',
+      // GPS coordinates for Madras Community Center, Newnan, GA
+      latitude: 33.3807,
+      longitude: -84.7999,
+      // Additional venue information
+      phone: '(770) 253-2670',
+      website: 'https://www.newnan.gov/departments/recreation/facilities/community-centers',
+      parkingInfo: 'Free parking available on-site',
+      notes: 'Accessible facility with on-site parking'
     },
     isActive: true, // Set to false to hide event
     sessions: [
