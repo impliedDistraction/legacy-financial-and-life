@@ -20,7 +20,7 @@ import '../styles/tailwind.css';
       <div class="relative left-[calc(50%-11rem)] aspect-[1155/678] w-[36.125rem] -translate-x-1/2 rotate-[30deg] bg-gradient-to-tr from-brand-200 to-brand-400 opacity-20 sm:left-[calc(50%-30rem)] sm:w-[72.1875rem]"></div>
     </div>
     
-    <div class="mx-auto max-w-6xl px-4 text-center">
+    <div class="mx-auto max-w-6xl px-2 sm:px-4 text-center">
       <div class="animate-fade-in-up">
         <div class="inline-block bg-brand-100 text-brand-800 text-sm font-medium px-4 py-2 rounded-full mb-6">
           🎓 {site.event.subtitle}
@@ -34,9 +34,9 @@ import '../styles/tailwind.css';
         </p>
         
         <!-- Available Events Grid -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-lg mb-8 max-w-5xl mx-auto">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 shadow-lg mb-8 max-w-5xl mx-auto">
           <h3 class="text-lg font-semibold mb-6 text-slate-900">Available Events</h3>
-          <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {site.event.sessions.map((session) => (
               <button 
                 type="button"
@@ -86,7 +86,7 @@ import '../styles/tailwind.css';
   </section>
 
   <!-- Event Details Section -->
-  <section id="event-details" class="mx-auto max-w-6xl px-4 py-12 sm:py-16">
+  <section id="event-details" class="mx-auto max-w-6xl px-2 sm:px-4 py-12 sm:py-16">
     <div class="text-center mb-12">
       <h2 class="text-3xl sm:text-4xl font-bold mb-4">What You'll Learn</h2>
       <p class="text-xl text-slate-700 max-w-4xl mx-auto mb-6">
@@ -147,7 +147,7 @@ import '../styles/tailwind.css';
   </section>
 
   <!-- Hosts Section -->
-  <section class="mx-auto max-w-6xl px-4 py-12 sm:py-16 bg-white">
+  <section class="mx-auto max-w-6xl px-2 sm:px-4 py-12 sm:py-16 bg-white">
     <div class="text-center mb-12">
       <h2 class="text-3xl sm:text-4xl font-bold mb-4">Get to Know Your Hosts</h2>
       <p class="text-xl text-slate-700 max-w-3xl mx-auto">
@@ -159,15 +159,15 @@ import '../styles/tailwind.css';
       {site.event.hosts.map((host, index) => {
         // Map speaker names to their image files
         const speakerImages = {
-          'Tim & Beth Byrd': 'tim-beth-byrd-speakers.jpg',
-          'Mike Morice': 'mike-morice-speaker.jpg', 
-          'Mo Dadkhah': 'mo-dadkhah-speaker.jpg'
+          'Tim & Beth Byrd': 'professional-image-of-both-beth-and-tim-800w.jpg',
+          'Mike Morice': null, // Image not available
+          'Mo Dadkhah': null   // Image not available
         };
         const speakerImage = speakerImages[host.name];
         
         return (
-          <div class={`bg-gradient-to-br ${index % 2 === 0 ? 'from-brand-50 to-white' : 'from-slate-50 to-white'} rounded-2xl border border-slate-200 p-8 sm:p-12`}>
-            <div class="grid lg:grid-cols-3 gap-8 items-start">
+          <div class={`bg-gradient-to-br ${index % 2 === 0 ? 'from-brand-50 to-white' : 'from-slate-50 to-white'} rounded-2xl border border-slate-200 p-4 sm:p-8 lg:p-12`}>
+            <div class="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 items-start">
               <div class="lg:col-span-2">
                 <h3 class="text-2xl font-bold mb-4 text-slate-900">{host.name}</h3>
                 <div class="space-y-4 text-slate-700">
@@ -216,7 +216,7 @@ import '../styles/tailwind.css';
   <EventRSVP />
 
   <!-- Directions Section -->
-  <section class="mx-auto max-w-4xl px-4 py-12">
+  <section class="mx-auto max-w-4xl px-2 sm:px-4 py-12">
     <div class="text-center mb-8">
       <h2 class="text-2xl sm:text-3xl font-bold mb-4">Directions</h2>
       <p class="text-lg text-slate-600 max-w-2xl mx-auto">
@@ -225,7 +225,7 @@ import '../styles/tailwind.css';
       </p>
     </div>
     
-    <div class="bg-white rounded-2xl border border-slate-200 p-8 shadow-lg">
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-6 lg:p-8 shadow-lg">
       <!-- Interactive Map Component -->
       <Map 
         location={site.event.location} 
@@ -285,7 +285,7 @@ import '../styles/tailwind.css';
   </section>
 
   <!-- Disclaimers Section -->
-  <section class="mx-auto max-w-4xl px-4 py-8">
+  <section class="mx-auto max-w-4xl px-2 sm:px-4 py-8">
     <div class="bg-amber-50 border border-amber-200 rounded-lg p-6">
       <div class="space-y-3">
         {site.event.disclaimers.map((disclaimer) => (
@@ -296,7 +296,7 @@ import '../styles/tailwind.css';
   </section>
 
   <!-- Contact Information -->
-  <section class="mx-auto max-w-4xl px-4 py-12 text-center">
+  <section class="mx-auto max-w-4xl px-2 sm:px-4 py-12 text-center">
     <div class="bg-slate-50 border border-slate-200 rounded-lg p-6">
       <h3 class="text-lg font-semibold text-slate-900 mb-2">Questions About the Event?</h3>
       <p class="text-slate-700 mb-4">
