@@ -23,6 +23,10 @@ import { site } from '../content/site';
           alt={site.team.headshotAlt ?? site.branding.ogAlt ?? 'Team photo'}
           class="rounded-2xl border border-slate-200 w-full hover-scale shadow-xl object-cover max-h-[560px] sm:max-h-[720px]"
           sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 500px"
+          width="800"
+          height="800"
+          loading="lazy"
+          decoding="async"
         />
       </picture>
       <!-- Professional credentials overlay -->
