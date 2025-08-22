@@ -1,0 +1,95 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import '../styles/tailwind.css';
+---
+<Base title="RSVP | Legacy Financial & Life" description="Join us for our upcoming event—reserve your spot today.">
+  <Header />
+
+  <!-- Hero -->
+  <section class="relative isolate overflow-hidden bg-gradient-to-br from-brand-50 to-white">
+    <div class="mx-auto max-w-6xl px-4 py-14 sm:py-20">
+      <div class="text-center max-w-3xl mx-auto">
+        <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight">You're invited</h1>
+        <p class="mt-4 text-lg text-slate-700">We'd love to have you join us. Please RSVP below.</p>
+      </div>
+
+      <!-- People images -->
+      <div class="mt-10 grid gap-6 sm:grid-cols-3">
+        <div class="scroll-hidden">
+          <img
+            src="/images/LYFL_Tim_and_Beth_Bryd_2025-09-11.jpeg"
+            alt="Hosts portrait"
+            class="w-full h-72 object-cover rounded-2xl border border-slate-200 shadow-md"
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+        <div class="scroll-hidden">
+          <img
+            src="/images/LYFL_Mo_Dadkhah_2025-09-11.jpg"
+            alt="Guest portrait"
+            class="w-full h-72 object-cover rounded-2xl border border-slate-200 shadow-md"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+        <div class="scroll-hidden">
+          <img
+            src="/images/LYFL_Mike_Morice_2025-09-11.jpg"
+            alt="Guest portrait"
+            class="w-full h-72 object-cover rounded-2xl border border-slate-200 shadow-md"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RSVP form -->
+  <section class="mx-auto max-w-3xl px-4 pb-16">
+    <div class="rounded-2xl border border-slate-200 p-6 sm:p-8 hover-lift">
+      <h2 class="text-2xl sm:text-3xl font-bold">RSVP</h2>
+      <p class="mt-2 text-slate-700">Let us know you're coming and how many will attend.</p>
+
+      <form class="mt-6 grid gap-4 sm:grid-cols-2" action="https://formspree.io/f/mdkdrwbj" method="POST">
+        <label class="grid gap-1">
+          <span class="text-sm font-medium">Full name <span class="text-red-500">*</span></span>
+          <input name="name" required placeholder="Your full name" class="rounded-lg border border-slate-300 px-3 py-2 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none" />
+        </label>
+        <label class="grid gap-1">
+          <span class="text-sm font-medium">Email <span class="text-red-500">*</span></span>
+          <input type="email" name="email" required placeholder="you@example.com" class="rounded-lg border border-slate-300 px-3 py-2 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none" />
+        </label>
+        <label class="grid gap-1">
+          <span class="text-sm font-medium">Phone</span>
+          <input type="tel" name="phone" placeholder="(555) 123-4567" class="rounded-lg border border-slate-300 px-3 py-2 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none" />
+        </label>
+        <label class="grid gap-1">
+          <span class="text-sm font-medium">Number attending <span class="text-red-500">*</span></span>
+          <input type="number" min="1" max="10" name="attendees" required value="1" class="rounded-lg border border-slate-300 px-3 py-2 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none" />
+        </label>
+        <label class="grid gap-1 sm:col-span-2">
+          <span class="text-sm font-medium">Comments or accommodations</span>
+          <textarea name="message" rows="4" placeholder="Anything we should know?" class="rounded-lg border border-slate-300 px-3 py-2 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none resize-vertical"></textarea>
+        </label>
+
+        <div class="sm:col-span-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div class="text-sm text-slate-600">We'll send a confirmation to your email.</div>
+          <button type="submit" class="w-full sm:w-auto rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold btn-animate hover-lift">Submit RSVP</button>
+        </div>
+
+        <!-- Form metadata / redirect targets -->
+        <input type="hidden" name="_subject" value="Event RSVP" />
+        <input type="hidden" name="_next" value="/form-success" />
+        <input type="hidden" name="_error" value="/form-error" />
+        <input type="hidden" name="form_type" value="rsvp" />
+      </form>
+    </div>
+    <p class="mt-4 text-xs text-slate-500">Your information is kept private and used only for event coordination.</p>
+  </section>
+
+  <Footer />
+</Base>
