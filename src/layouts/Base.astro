@@ -13,8 +13,6 @@ const { title = 'Legacy Financial & Life', description = 'Life insurance and ret
   </head>
   <body>
     <main class="min-h-dvh">{Astro.slots.default ? <slot /> : null}</main>
-    <script>
-      import('../scripts/animations.ts');
-    </script>
+  <script src="/scripts/animations.js" defer></script>
   </body>
 </html>
