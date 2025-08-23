@@ -1,22 +1,3 @@
-{
-  "domain": "legacyf-l.com",
-  "baseUrl": "https://legacyf-l.com",
-  "downloadedAt": "2025-08-20T13:16:41.182Z",
-  "images": [
-    {
-      "url": "https://images.leadconnectorhq.com/image/f_webp/q_80/r_1200/u_https://assets.cdn.filesafe.space/tVDU4Sir1AkYWzIHAQkx/media/681494bba1ba5a4be4c3bd71.jpeg",
-      "localPath": "/home/josh/projects/legacy-financial/legacy-financial-and-life/public/images/681494bba1ba5a4be4c3bd71.jpeg",
-      "filename": "681494bba1ba5a4be4c3bd71.jpeg"
-    },
-    {
-      "url": "https://images.leadconnectorhq.com/image/f_webp/q_80/r_1200/u_https://assets.cdn.filesafe.space/Di63K4vWGjq8NryyJXEG/media/68a09542babce8708a5e00af.png",
-      "localPath": "/home/josh/projects/legacy-financial/legacy-financial-and-life/public/images/68a09542babce8708a5e00af.png",
-      "filename": "68a09542babce8708a5e00af.png"
-    },
-    {
-      "url": "https://stcdn.leadconnectorhq.com/funnel/icon/favicon.ico",
-      "localPath": "/home/josh/projects/legacy-financial/legacy-financial-and-life/public/images/favicon.ico",
-      "filename": "favicon.ico"
-    }
-  ]
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:84a88da3a9f3df40570c27b03a9623eca4c7baf88c1e330b34afc57274e83956
+size 1082
