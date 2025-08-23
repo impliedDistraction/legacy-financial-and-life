@@ -7,11 +7,11 @@ const { title = 'Legacy Financial & Life', description = 'Life insurance and ret
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width">
-    <SEO title={title} description={description}>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <SEO title={title} description={description} />
     <link rel="icon" href={site.branding.favicon}>
   </head>
-  <body>
+  <body class="overflow-x-hidden">
     <main class="min-h-dvh">{Astro.slots.default ? <slot /> : null}</main>
   <script src="/scripts/animations.js" defer></script>
   </body>
