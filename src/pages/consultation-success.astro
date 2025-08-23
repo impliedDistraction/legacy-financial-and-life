@@ -1,0 +1,129 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { site } from '../content/site';
+---
+
+<Base 
+  title="Consultation Scheduled — Legacy Financial & Life" 
+  description="Your consultation with Tim and Beth Byrd has been successfully scheduled. We look forward to discussing your insurance and financial planning needs."
+>
+  <Header />
+  
+  <!-- Success Hero -->
+  <section class="relative isolate overflow-hidden bg-gradient-to-br from-green-50 to-white py-16 sm:py-20">
+    <div class="mx-auto max-w-4xl px-4 text-center">
+      
+      <!-- Success Icon -->
+      <div class="animate-fade-in-up mb-8">
+        <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Success Message -->
+      <div class="animate-fade-in-up" style="animation-delay: 0.2s;">
+        <h1 class="text-4xl font-bold text-slate-900 mb-6">Consultation Scheduled!</h1>
+        <p class="text-xl text-slate-700 mb-8">
+          Thank you for scheduling your consultation with Tim and Beth. 
+          We'll send you a confirmation email shortly with all the details.
+        </p>
+        
+        <!-- Next Steps Card -->
+        <div class="bg-white rounded-xl border border-slate-200 p-8 mb-8 shadow-lg max-w-2xl mx-auto">
+          <h2 class="text-lg font-semibold text-slate-900 mb-6">What happens next?</h2>
+          <div class="space-y-4 text-left">
+            <div class="flex items-start space-x-4">
+              <span class="flex-shrink-0 w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center text-sm font-medium text-brand-700">1</span>
+              <div>
+                <p class="font-medium text-slate-800">Email Confirmation</p>
+                <p class="text-slate-600 text-sm">You'll receive a confirmation email with meeting details and calendar invite</p>
+              </div>
+            </div>
+            <div class="flex items-start space-x-4">
+              <span class="flex-shrink-0 w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center text-sm font-medium text-brand-700">2</span>
+              <div>
+                <p class="font-medium text-slate-800">Calendar Invite</p>
+                <p class="text-slate-600 text-sm">Add the meeting to your Google, Outlook, or Apple calendar</p>
+              </div>
+            </div>
+            <div class="flex items-start space-x-4">
+              <span class="flex-shrink-0 w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center text-sm font-medium text-brand-700">3</span>
+              <div>
+                <p class="font-medium text-slate-800">Reminder Notification</p>
+                <p class="text-slate-600 text-sm">We'll send you a reminder 24 hours before your consultation</p>
+              </div>
+            </div>
+            <div class="flex items-start space-x-4">
+              <span class="flex-shrink-0 w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center text-sm font-medium text-brand-700">4</span>
+              <div>
+                <p class="font-medium text-slate-800">Preparation Materials</p>
+                <p class="text-slate-600 text-sm">Optional: We'll send a brief questionnaire to help us prepare for your consultation</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Contact Info -->
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-8 max-w-2xl mx-auto">
+          <p class="text-amber-800 text-sm">
+            <strong>Questions or need to reschedule?</strong> Contact us at 
+            <a href={`tel:${site.phone}`} class="underline hover:text-amber-900 font-medium">{site.phone}</a>
+            or email <a href={`mailto:${site.email}`} class="underline hover:text-amber-900 font-medium">{site.email}</a>
+          </p>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <a 
+            href="/" 
+            class="rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold btn-animate hover-lift transition-all duration-200"
+          >
+            Return Home
+          </a>
+          <a 
+            href="/schedule" 
+            class="rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 px-6 py-3 font-semibold transition-colors"
+          >
+            Schedule Another Consultation
+          </a>
+        </div>
+      </div>
+
+      <!-- Additional Information -->
+      <div class="mt-12 text-center">
+        <div class="bg-brand-50 rounded-lg p-6 border border-brand-200 max-w-2xl mx-auto">
+          <h3 class="text-lg font-semibold text-brand-900 mb-2">Preparing for Your Consultation</h3>
+          <p class="text-brand-800 mb-4">
+            To make the most of our time together, consider having these items ready:
+          </p>
+          <ul class="text-brand-700 text-sm space-y-1 text-left max-w-md mx-auto">
+            <li>• Current insurance policies (if any)</li>
+            <li>• Financial goals and timeline</li>
+            <li>• Questions about life insurance or retirement planning</li>
+            <li>• Information about dependents and beneficiaries</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+  
+  <Footer />
+</Base>
+
+<script>
+  // Track successful consultation scheduling
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'consultation_scheduled', {
+      'event_category': 'engagement',
+      'event_label': 'cal_com_success'
+    });
+  }
+
+  // Store scheduling success for potential follow-up
+  sessionStorage.setItem('consultation_scheduled', 'true');
+  sessionStorage.setItem('scheduled_timestamp', new Date().toISOString());
+</script>

@@ -13,44 +13,99 @@ import { site } from '../content/site';
     <div class="rounded-2xl border border-slate-200 p-6 sm:p-8 hover-lift">
       <h3 class="text-xl font-semibold mb-4">Book Your Appointment</h3>
       
-      <!-- Placeholder for Calendly/Acuity/other scheduling service -->
-      <div class="bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg p-8 text-center">
-        <div class="mb-4">
-          <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-          </svg>
-        </div>
-        <h4 class="text-lg font-medium text-slate-600 mb-2">Calendar Integration Ready</h4>
-        <p class="text-sm text-slate-500 mb-4">
-          This space will be replaced with your preferred scheduling service (Calendly, Acuity Scheduling, etc.)
-        </p>
-        
-        <!-- Demo scheduling options -->
-        <div class="space-y-3 text-left max-w-sm mx-auto">
-          <div class="bg-white rounded-lg p-3 border border-slate-200">
-            <div class="font-medium text-slate-800">Initial Consultation</div>
-            <div class="text-sm text-slate-600">30 minutes • Phone or Video</div>
-            <div class="text-sm text-brand-600 font-medium">Free</div>
-          </div>
-          <div class="bg-white rounded-lg p-3 border border-slate-200">
-            <div class="font-medium text-slate-800">Comprehensive Planning Session</div>
-            <div class="text-sm text-slate-600">60 minutes • In-person or Video</div>
-            <div class="text-sm text-brand-600 font-medium">Free</div>
-          </div>
-          <div class="bg-white rounded-lg p-3 border border-slate-200">
-            <div class="font-medium text-slate-800">Policy Review & Strategy</div>
-            <div class="text-sm text-slate-600">45 minutes • Phone or Video</div>
-            <div class="text-sm text-brand-600 font-medium">Free</div>
-          </div>
-        </div>
-        
-        <div class="mt-6">
-          <button class="w-full rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold btn-animate hover-lift transition-all duration-200">
-            Connect Calendar Service
-          </button>
-          <p class="mt-2 text-xs text-slate-500">
-            Placeholder - Integrate with your preferred scheduling platform
+      <!-- Cal.com Scheduling Widget -->
+      <div class="cal-scheduling-container rounded-lg border border-slate-200 overflow-hidden bg-white">
+        <!-- Demo Notice -->
+        <div class="bg-blue-50 border-b border-blue-200 p-3 text-center">
+          <p class="text-sm text-blue-800">
+            <span class="font-medium">Demo Integration:</span> Replace "your-calcom-username" with your actual Cal.com username
           </p>
+        </div>
+        
+        <!-- Cal.com Embed -->
+        <div class="p-4">
+          <cal-inline 
+            calLink="your-calcom-username/30min-consultation"
+            style="width:100%;height:600px;overflow:hidden"
+            config='{"layout": "month_view", "theme": "light", "hideEventTypeDetails": false, "styles": {"branding": {"brandColor": "#1a62db"}}}'>
+          </cal-inline>
+          
+          <!-- Fallback Content (shown when Cal.com is not available) -->
+          <div class="cal-fallback space-y-6">
+            <div class="text-center py-8">
+              <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+              </div>
+              <h4 class="text-lg font-semibold text-slate-800 mb-2">Schedule Your Consultation</h4>
+              <p class="text-slate-600 mb-6">Choose from our available consultation options</p>
+            </div>
+            
+            <!-- Demo Event Types -->
+            <div class="space-y-3">
+              <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h5 class="font-semibold text-slate-800">Initial Consultation</h5>
+                    <p class="text-sm text-slate-600 mt-1">Get to know each other and discuss your basic insurance needs</p>
+                    <div class="flex items-center mt-2 text-sm text-slate-500">
+                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      30 minutes
+                    </div>
+                  </div>
+                  <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
+                </div>
+              </div>
+              
+              <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h5 class="font-semibold text-slate-800">Comprehensive Planning Session</h5>
+                    <p class="text-sm text-slate-600 mt-1">In-depth review of your financial situation and personalized recommendations</p>
+                    <div class="flex items-center mt-2 text-sm text-slate-500">
+                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      60 minutes
+                    </div>
+                  </div>
+                  <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
+                </div>
+              </div>
+              
+              <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h5 class="font-semibold text-slate-800">Policy Review & Strategy</h5>
+                    <p class="text-sm text-slate-600 mt-1">Review existing policies and optimize your insurance strategy</p>
+                    <div class="flex items-center mt-2 text-sm text-slate-500">
+                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      45 minutes
+                    </div>
+                  </div>
+                  <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Contact CTA -->
+            <div class="bg-brand-50 rounded-lg p-4 text-center">
+              <p class="text-brand-800 text-sm mb-3">Ready to schedule? Contact us directly:</p>
+              <div class="flex flex-col sm:flex-row gap-2 justify-center">
+                <a href={`tel:${site.phone}`} class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                  Call {site.phone}
+                </a>
+                <a href={`mailto:${site.email}`} class="bg-white border border-brand-200 text-brand-700 hover:bg-brand-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                  Email {site.email}
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -130,3 +185,86 @@ import { site } from '../content/site';
     </div>
   </div>
 </section>
+
+<!-- Custom Styling for Cal.com Embed -->
+<style>
+  .cal-scheduling-container {
+    background: white;
+    position: relative;
+  }
+  
+  /* Custom styling to match site branding */
+  .cal-scheduling-container iframe {
+    border-radius: 8px;
+  }
+  
+  /* Show fallback by default, hide when Cal.com loads */
+  .cal-fallback {
+    display: block;
+  }
+  
+  /* Hide fallback when Cal.com embed is active */
+  .cal-scheduling-container:has(cal-inline[data-cal-loaded]) .cal-fallback {
+    display: none;
+  }
+  
+  /* Override Cal.com colors to match brand */
+  :global(.cal-scheduling-container cal-inline) {
+    --cal-brand-color: #1a62db;
+    --cal-brand-text-color: #ffffff;
+    --cal-border-color: #e2e8f0;
+    --cal-text-color: #1e293b;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .cal-scheduling-container {
+      margin: -1rem;
+      border-radius: 0;
+    }
+    
+    .cal-scheduling-container > div {
+      padding: 1rem;
+    }
+  }
+</style>
+
+<!-- Cal.com Integration Script -->
+<script>
+  // Load Cal.com embed script
+  const script = document.createElement('script');
+  script.src = 'https://app.cal.com/embed/embed.js';
+  script.async = true;
+  
+  script.onload = function() {
+    // Cal.com script loaded successfully
+    console.log('Cal.com embed script loaded');
+    
+    // Optional: Add event listeners for Cal.com events
+    if (window.Cal) {
+      window.Cal.ns = window.Cal.ns || {};
+      window.Cal.ns["legacyfinancial"] = window.Cal.ns["legacyfinancial"] || {};
+      
+      // Listen for booking events
+      window.Cal("on", {
+        action: "bookingSuccessful",
+        callback: function(event) {
+          console.log('Booking successful:', event);
+          // Optional: Track analytics, show custom success message, etc.
+          if (typeof gtag !== 'undefined') {
+            gtag('event', 'schedule_consultation', {
+              'event_category': 'engagement',
+              'event_label': 'cal_com_booking'
+            });
+          }
+        }
+      });
+    }
+  };
+  
+  script.onerror = function() {
+    console.log('Cal.com embed script failed to load, fallback content will remain visible');
+  };
+  
+  document.head.appendChild(script);
+</script>
