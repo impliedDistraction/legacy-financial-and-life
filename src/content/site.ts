@@ -12,7 +12,7 @@ export const site = {
   logoAlt: 'Legacy Financial & Life logo',
   ogImage: '/images/professional-image-of-both-beth-and-tim-1200w.jpg', // use generated 1200w for OG
   ogAlt: 'Tim and Beth Byrd - Legacy Financial & Life professional photo',
-  favicon: '/images/favicon.ico'
+  favicon: '/favicon.svg' // Use working SVG favicon from public root
   },
   hero: {
     heading: 'Secure Your Family\'s Future with Confidence',
