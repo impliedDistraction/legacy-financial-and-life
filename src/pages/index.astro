@@ -18,3 +18,27 @@ import '../styles/tailwind.css';
   <ContactForm />
   <Footer />
 </Base>
+
+<script>
+  // Smooth scroll to hash target on load if navigated with /#section from other pages
+  (function () {
+    const scrollToHash = () => {
+      const hash = window.location.hash;
+      if (!hash) return;
+      const el = document.querySelector(hash);
+      if (!el) return;
+      // Use smooth behavior; header is sticky, so scrollIntoView works well for simple sections
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    // Run after first paint to ensure DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', scrollToHash, { once: true });
+    } else {
+      requestAnimationFrame(scrollToHash);
+    }
+
+    // Also handle when navigating to a new hash on the same page
+    window.addEventListener('hashchange', scrollToHash);
+  })();
+  </script>

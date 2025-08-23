@@ -1,5 +1,8 @@
 ---
 import { site } from '../content/site';
+// Check if we're on the home page to determine link behavior
+const isHomePage = Astro.url.pathname === '/';
+const homePrefix = isHomePage ? '' : '/';
 ---
 <header class="sticky top-0 z-40 bg-white/85 backdrop-blur border-b border-slate-200">
   <div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
@@ -18,14 +21,14 @@ import { site } from '../content/site';
       <span class="font-semibold text-lg title-animate title-enhanced">{site.name}</span>
     </a>
     <nav class="hidden sm:flex gap-6">
-      <a href="#plans" class="hover:text-brand-700 transition-colors">Plans</a>
-      <a href="#retirement" class="hover:text-brand-700 transition-colors">Retirement</a>
+      <a href={`${homePrefix}#plans`} class="hover:text-brand-700 transition-colors">Plans</a>
+      <a href={`${homePrefix}#retirement`} class="hover:text-brand-700 transition-colors">Retirement</a>
       <a href="/estate-planning" class="hover:text-brand-700 transition-colors">Estate Planning</a>
       <a href="/hiring" class="hover:text-brand-700 transition-colors">Careers</a>
-  <a href="/rsvp" class="hover:text-brand-700 transition-colors">RSVP</a>
-      <a href="#team" class="hover:text-brand-700 transition-colors">Team</a>
+      <a href={`${homePrefix}#team`} class="hover:text-brand-700 transition-colors">Team</a>
+      <a href="/rsvp" class="hover:text-brand-700 transition-colors">RSVP</a>
       <a href="/schedule" class="hover:text-brand-700 transition-colors">Schedule</a>
-      <a href="#contact" class="hover:text-brand-700 transition-colors">Contact</a>
+      <a href={`${homePrefix}#contact`} class="hover:text-brand-700 transition-colors">Contact</a>
     </nav>
     <a href="/schedule" class="ml-4 inline-block rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold btn-animate hover-lift">
       {site.hero.cta}
