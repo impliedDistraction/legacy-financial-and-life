@@ -4,9 +4,11 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
+  "dev": "astro dev",
+  "prebuild": "bash scripts/ensure-lfs.sh || sh scripts/ensure-lfs.sh || true",
+  "build": "astro build",
     "preview": "astro preview",
+  "postinstall": "git lfs install && git lfs fetch --all && git lfs checkout || echo 'Git LFS not available; skipping'",
     "fetch-images": "node scripts/fetch-images.js",
     "update-images": "node scripts/update-images.js",
     "images:status": "node scripts/update-images.js --status",
