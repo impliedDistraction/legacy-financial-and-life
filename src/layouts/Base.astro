@@ -11,7 +11,7 @@ const { title = 'Legacy Financial & Life', description = 'Life insurance and ret
     <SEO title={title} description={description} />
     <link rel="icon" href={site.branding.favicon}>
   </head>
-  <body class="overflow-x-hidden">
+  <body>
     <main class="min-h-dvh">{Astro.slots.default ? <slot /> : null}</main>
   <script src="/scripts/animations.js" defer></script>
   </body>
