@@ -1,5 +1,26 @@
 ---
 import { site } from '../content/site';
+
+// Derive Cal.com settings from site content
+const calUsername = site.cal?.username?.trim?.() || '';
+const calBrandColor = site.cal?.brandColor || '#1a62db';
+const calPrimaryEventTypeSlug = site.cal?.primaryEventTypeSlug?.trim?.() || '';
+
+// Build calLink — if primary event type provided, deep-link to it; else list view for user
+const calLink = calUsername
+  ? (calPrimaryEventTypeSlug ? `${calUsername}/${calPrimaryEventTypeSlug}` : calUsername)
+  : 'josh-byrom-d3jwh7'; // temporary fallback until client username is provided
+
+// Event launcher cards — only when explicitly configured
+const hasQuickEvents = Array.isArray(site.cal?.eventTypes) && site.cal.eventTypes.length > 0;
+const quickEvents = hasQuickEvents
+  ? site.cal!.eventTypes.map((e) => ({
+      title: e.title,
+      description: e.description,
+      duration: e.duration,
+      calLink: calUsername ? `${calUsername}/${e.slug}` : `josh-byrom-d3jwh7/${e.slug}`
+    }))
+  : [];
 ---
 
 <section id="schedule" class="mx-auto max-w-6xl px-4 py-12 sm:py-16">
@@ -11,23 +32,29 @@ import { site } from '../content/site';
   <div class="grid gap-8 lg:grid-cols-2 items-start">
     <!-- Scheduling Widget Column -->
     <div class="rounded-2xl border border-slate-200 p-6 sm:p-8 hover-lift">
-      <h3 class="text-xl font-semibold mb-4">Book Your Appointment</h3>
+  <h3 class="text-xl font-semibold mb-4">Book Your Appointment</h3>
       
       <!-- Cal.com Scheduling Widget -->
-      <div class="cal-scheduling-container rounded-lg border border-slate-200 overflow-hidden bg-white">
-        <!-- Demo Notice -->
-        <div class="bg-blue-50 border-b border-blue-200 p-3 text-center">
-          <p class="text-sm text-blue-800">
-            <span class="font-medium">Demo Integration:</span> This is a DEMO
-          </p>
-        </div>
+  <div class="cal-scheduling-container rounded-lg border border-slate-200 overflow-hidden bg-white" style={`--cal-brand-color: ${calBrandColor}`}>
+        {calUsername === '' && (
+          <div class="bg-amber-50 border-b border-amber-200 p-3 text-center" role="status" aria-live="polite">
+            <p class="text-sm text-amber-900">
+              <span class="font-medium">Temporary Preview:</span> Cal.com username pending. Using a placeholder until tomorrow.
+            </p>
+          </div>
+        )}
         
         <!-- Cal.com Embed -->
         <div class="p-4">
           <cal-inline 
-            calLink="josh-byrom-d3jwh7"
-            style="width:100%;height:600px;overflow:hidden"
-            config='{"layout": "month_view", "theme": "light", "hideEventTypeDetails": false, "styles": {"branding": {"brandColor": "#1a62db"}}}'>
+            calLink={calLink}
+            style="width:100%;height:660px;overflow:hidden"
+            config={JSON.stringify({
+              layout: 'month_view',
+              theme: 'light',
+              hideEventTypeDetails: false,
+              styles: { branding: { brandColor: calBrandColor } }
+            })}>
           </cal-inline>
           
           <!-- Fallback Content (shown when Cal.com is not available) -->
@@ -42,56 +69,47 @@ import { site } from '../content/site';
               <p class="text-slate-600 mb-6">Choose from our available consultation options</p>
             </div>
             
-            <!-- Demo Event Types -->
+            <!-- Quick launch event types -->
             <div class="space-y-3">
-              <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer">
-                <div class="flex justify-between items-start">
-                  <div>
-                    <h5 class="font-semibold text-slate-800">Initial Consultation</h5>
-                    <p class="text-sm text-slate-600 mt-1">Get to know each other and discuss your basic insurance needs</p>
-                    <div class="flex items-center mt-2 text-sm text-slate-500">
-                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
-                      30 minutes
+              {hasQuickEvents ? (
+                quickEvents.map((evt) => (
+                  <a href={`https://cal.com/${evt.calLink}`} target="_blank" rel="noopener noreferrer" class="block w-full text-left border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer group" data-cal-link={evt.calLink}>
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <h5 class="font-semibold text-slate-800 group-hover:text-slate-900">{evt.title}</h5>
+                        <p class="text-sm text-slate-600 mt-1">{evt.description}</p>
+                        <div class="flex items-center mt-2 text-sm text-slate-500">
+                          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                          </svg>
+                          {evt.duration}
+                        </div>
+                      </div>
+                      <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
                     </div>
-                  </div>
-                  <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
-                </div>
-              </div>
-              
-              <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer">
-                <div class="flex justify-between items-start">
-                  <div>
-                    <h5 class="font-semibold text-slate-800">Comprehensive Planning Session</h5>
-                    <p class="text-sm text-slate-600 mt-1">In-depth review of your financial situation and personalized recommendations</p>
-                    <div class="flex items-center mt-2 text-sm text-slate-500">
-                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
-                      60 minutes
+                  </a>
+                ))
+              ) : (
+                <a href={`https://cal.com/${calLink}`} target="_blank" rel="noopener noreferrer" class="block w-full text-left border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer group" data-cal-link={calLink}>
+                  <div class="flex justify-between items-start">
+                    <div>
+                      <h5 class="font-semibold text-slate-800 group-hover:text-slate-900">Find a time that works</h5>
+                      <p class="text-sm text-slate-600 mt-1">Open our live calendar to pick a time</p>
+                      <div class="flex items-center mt-2 text-sm text-slate-500">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        30–60 minutes
+                      </div>
                     </div>
+                    <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
                   </div>
-                  <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
-                </div>
-              </div>
-              
-              <div class="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer">
-                <div class="flex justify-between items-start">
-                  <div>
-                    <h5 class="font-semibold text-slate-800">Policy Review & Strategy</h5>
-                    <p class="text-sm text-slate-600 mt-1">Review existing policies and optimize your insurance strategy</p>
-                    <div class="flex items-center mt-2 text-sm text-slate-500">
-                      <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                      </svg>
-                      45 minutes
-                    </div>
-                  </div>
-                  <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
-                </div>
-              </div>
+                </a>
+              )}
             </div>
+            <noscript>
+              <p class="text-center text-slate-600 text-sm">JavaScript is disabled. Book directly at <a class="underline" href={`https://cal.com/${calLink}`}>cal.com/{calLink}</a>.</p>
+            </noscript>
             
             <!-- Contact CTA -->
             <div class="bg-brand-50 rounded-lg p-4 text-center">
@@ -161,8 +179,8 @@ import { site } from '../content/site';
             <span class="text-slate-700">Video Call (Zoom/Teams)</span>
           </div>
           <div class="flex items-center">
-            <svg class="w-4 h-4 text-brand-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></span>
+            <svg class="w-4 h-4 text-brand-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
             </svg>
             <span class="text-slate-700">In-Person (Luthersville, GA area)</span>
           </div>
@@ -210,7 +228,7 @@ import { site } from '../content/site';
   
   /* Override Cal.com colors to match brand */
   :global(.cal-scheduling-container cal-inline) {
-    --cal-brand-color: #1a62db;
+    /* brand color driven by inline CSS var on container */
     --cal-brand-text-color: #ffffff;
     --cal-border-color: #e2e8f0;
     --cal-text-color: #1e293b;
@@ -230,6 +248,8 @@ import { site } from '../content/site';
 </style>
 
 <!-- Cal.com Embed Stylesheet (recommended by Cal.com) -->
+<link rel="preconnect" href="https://app.cal.com" crossorigin>
+<link rel="dns-prefetch" href="https://app.cal.com">
 <link rel="stylesheet" href="https://app.cal.com/embed/embed.css" />
 
 <!-- Cal.com Integration Script -->
@@ -277,13 +297,13 @@ import { site } from '../content/site';
 
   document.head.appendChild(script);
   
-  // Enhance fallback cards to open Cal overlay if script loads
+  // Enhance quick-launch buttons to open Cal overlay if script loads
   document.addEventListener('click', function(e) {
-    const card = e.target.closest('.cal-fallback .border');
-    if (!card) return;
-    if (window.Cal) {
-      // Example: open default event list overlay; adjust if you prefer a specific event type
-      window.Cal('open', { calLink: 'josh-byrom-d3jwh7' });
+    const btn = e.target.closest('[data-cal-link]');
+    if (!btn) return;
+    const link = btn.getAttribute('data-cal-link');
+    if (window.Cal && link) {
+      window.Cal('open', { calLink: link });
       e.preventDefault();
     }
   });
