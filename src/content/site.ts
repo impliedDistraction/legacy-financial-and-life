@@ -5,6 +5,22 @@ export const site = {
   email: 'Beth@legacyf-l.com',
   cityState: 'Luthersville, GA', // TODO: confirm spellings/details
   tagline: 'Trusted. Personal. Protective. Strategic.',
+  // Scheduling (Cal.com) configuration — set username when available
+  cal: {
+  // Temporarily use Josh's Cal.com username; replace with client username when ready
+  username: 'josh-byrom-d3jwh7',
+    // Optional: set a primary event type slug to deep-link a single event (username/<slug>)
+    primaryEventTypeSlug: '',
+    // Brand color for Cal embed (falls back to brand blue if missing)
+    brandColor: '#1a62db',
+    // Optional curated event types to show as quick actions (overlay launchers)
+    // Populate slug after Cal username is known
+    eventTypes: [
+      // Example:
+      // { title: 'Discovery Call', slug: 'discovery', duration: '30 min', description: 'Initial conversation to understand your goals.' },
+      // { title: 'Policy Review', slug: 'policy-review', duration: '45 min', description: 'Review and optimize your existing coverage.' }
+    ] as Array<{ title: string; slug: string; duration: string; description: string }>
+  },
   // Brand assets - updated with real company assets
   branding: {
   // Mapped to images present in /public/images
