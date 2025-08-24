@@ -58,7 +58,7 @@ import { site } from '../content/site';
             <img
               src={`${site.hero.enhanced.backgroundImage}-800w.jpg`}
               srcset={`${site.hero.enhanced.backgroundImage}-400w.jpg 400w, ${site.hero.enhanced.backgroundImage}-800w.jpg 800w, ${site.hero.enhanced.backgroundImage}-1200w.jpg 1200w`}
-              alt={site.team.headshotAlt ?? site.branding.ogAlt ?? 'Hero image'}
+              alt={site.hero.enhanced.backgroundImageAlt ?? 'Hero image'}
               class="rounded-2xl shadow-2xl border border-slate-200 w-full hover-scale object-cover max-h-[520px] sm:max-h-[640px]"
               sizes="(max-width: 640px) 90vw, (max-width: 1024px) 50vw, 600px"
               width="800"

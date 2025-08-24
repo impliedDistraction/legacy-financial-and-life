@@ -35,7 +35,8 @@ export const site = {
     sub: 'Customized life insurance solutions designed to protect loved ones, grow wealth, and bring peace of mind—today and tomorrow.',
     cta: 'Book a Free Consultation',
     enhanced: {
-  backgroundImage: '/images/professional-image-of-both-beth-and-tim',
+      backgroundImage: '/images/stock-image-elderly-man-kissing-elderly-woman-smiling-happy',
+      backgroundImageAlt: 'Happy elderly couple embracing - representing legacy protection and family security',
       features: [
         'Over $75M in assets managed',
         '300+ policies sold in 2 years', 
