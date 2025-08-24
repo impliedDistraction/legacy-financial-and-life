@@ -1,7 +1,13 @@
 ---
 import { site } from '../content/site';
 import SEO from '../components/SEO.astro';
-const { title = 'Legacy Financial & Life', description = 'Life insurance and retirement strategies built on clarity and respect.' } = Astro.props;
+
+export interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title = 'Legacy Financial & Life', description = 'Life insurance and retirement strategies built on clarity and respect.' } = Astro.props ?? {};
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -12,7 +18,9 @@ const { title = 'Legacy Financial & Life', description = 'Life insurance and ret
     <link rel="icon" href={site.branding.favicon}>
   </head>
   <body>
-    <main class="min-h-dvh">{Astro.slots.default ? <slot /> : null}</main>
+    <main class="min-h-dvh">
+      <slot />
+    </main>
   <script src="/scripts/animations.js" defer></script>
   </body>
 </html>
