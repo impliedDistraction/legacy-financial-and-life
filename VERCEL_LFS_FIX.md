@@ -1,5 +1,23 @@
 # Vercel Git LFS Configuration Fix
 
+**DEPRECATED**: This LFS configuration was attempted but ultimately replaced with direct git storage. See `LFS_TO_GIT_MIGRATION.md` for the final solution.
+
+## Status: Replaced with Direct Git Storage
+
+While this LFS configuration worked locally and was technically correct, it continued to cause deployment issues on Vercel. The repository has been migrated to store images directly in git without LFS to ensure reliable deployments.
+
+For the current image storage approach, see:
+- `LFS_TO_GIT_MIGRATION.md` - Details of the migration and current setup
+- `.gitattributes` - Updated to remove LFS tracking
+- `package.json` - Simplified without LFS scripts
+- `vercel.json` - Simplified without LFS configuration
+
+---
+
+*The following documentation is preserved for reference but is no longer active:*
+
+---
+
 This document explains the fix for the image loading issue on Vercel deployment where images work locally but fail to load on the deployed site.
 
 ## Problem
