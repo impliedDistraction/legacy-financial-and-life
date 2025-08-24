@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
   "dev": "astro dev",
-  "prebuild": "bash scripts/ensure-lfs.sh || sh scripts/ensure-lfs.sh || true",
+  "prebuild": "bash scripts/ensure-lfs.sh || sh scripts/ensure-lfs.sh || echo 'LFS checkout failed, but continuing with build'",
   "build": "astro build",
     "preview": "astro preview",
   "postinstall": "git lfs install && git lfs fetch --all && git lfs checkout || echo 'Git LFS not available; skipping'",

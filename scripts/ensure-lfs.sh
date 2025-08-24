@@ -13,6 +13,29 @@ use_git_lfs() {
   git lfs install || true
   git lfs fetch --all || true
   git lfs checkout || true
+  
+  # Verify that images were properly checked out (not LFS pointers)
+  echo "[ensure-lfs] Verifying image checkout..."
+  IMAGE_COUNT=0
+  POINTER_COUNT=0
+  
+  if [ -d "public/images" ]; then
+    while IFS= read -r -d '' file; do
+      IMAGE_COUNT=$((IMAGE_COUNT + 1))
+      # Check if file contains LFS pointer text
+      if head -1 "$file" 2>/dev/null | grep -q "version https://git-lfs.github.com" 2>/dev/null; then
+        POINTER_COUNT=$((POINTER_COUNT + 1))
+        echo "[ensure-lfs] WARNING: $file is still an LFS pointer!"
+      fi
+    done < <(find public/images -name "*.jpg" -o -name "*.png" -o -name "*.webp" -print0 2>/dev/null || true)
+    
+    echo "[ensure-lfs] Found $IMAGE_COUNT image files, $POINTER_COUNT are still LFS pointers"
+    
+    if [ "$POINTER_COUNT" -gt 0 ]; then
+      echo "[ensure-lfs] ERROR: Some images are still LFS pointers. Deployment may have image loading issues."
+      return 1
+    fi
+  fi
 }
 
 if git lfs version >/dev/null 2>&1; then
