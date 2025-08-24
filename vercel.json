@@ -1,7 +1,6 @@
 {
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD || echo 'changes'",
   "functions": {
     "api/**": {
       "memory": 128,
