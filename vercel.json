@@ -2,9 +2,6 @@
   "buildCommand": "npm run build",
   "installCommand": "npm ci",
   "ignoreCommand": "git diff --quiet HEAD^ HEAD || echo 'changes'",
-  "git": {
-    "lfs": true
-  },
   "functions": {
     "api/**": {
       "memory": 128,
