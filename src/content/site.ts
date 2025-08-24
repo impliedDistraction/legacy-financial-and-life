@@ -7,8 +7,8 @@ export const site = {
   tagline: 'Trusted. Personal. Protective. Strategic.',
   // Scheduling (Cal.com) configuration — set username when available
   cal: {
-    // Set this to the client's Cal.com username tomorrow, e.g. "legacy-financial-life"
-    username: '',
+  // Temporarily use Josh's Cal.com username; replace with client username when ready
+  username: 'josh-byrom-d3jwh7',
     // Optional: set a primary event type slug to deep-link a single event (username/<slug>)
     primaryEventTypeSlug: '',
     // Brand color for Cal embed (falls back to brand blue if missing)
