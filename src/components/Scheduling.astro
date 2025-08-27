@@ -1,26 +1,9 @@
 ---
 import { site } from '../content/site';
 
-// Derive Cal.com settings from site content
-const calUsername = site.cal?.username?.trim?.() || '';
-const calBrandColor = site.cal?.brandColor || '#1a62db';
-const calPrimaryEventTypeSlug = site.cal?.primaryEventTypeSlug?.trim?.() || '';
-
-// Build calLink — if primary event type provided, deep-link to it; else list view for user
-const calLink = calUsername
-  ? (calPrimaryEventTypeSlug ? `${calUsername}/${calPrimaryEventTypeSlug}` : calUsername)
-  : 'josh-byrom-d3jwh7'; // temporary fallback until client username is provided
-
-// Event launcher cards — only when explicitly configured
-const hasQuickEvents = Array.isArray(site.cal?.eventTypes) && site.cal.eventTypes.length > 0;
-const quickEvents = hasQuickEvents
-  ? site.cal!.eventTypes.map((e) => ({
-      title: e.title,
-      description: e.description,
-      duration: e.duration,
-      calLink: calUsername ? `${calUsername}/${e.slug}` : `josh-byrom-d3jwh7/${e.slug}`
-    }))
-  : [];
+// Derive Calendly settings from site content
+const calendlyUrl = site.scheduling?.calendlyUrl || 'https://calendly.com/bethandtim-legacy';
+const brandColor = site.scheduling?.brandColor || '#1a62db';
 ---
 
 <section id="schedule" class="mx-auto max-w-6xl px-4 py-12 sm:py-16">
@@ -32,90 +15,54 @@ const quickEvents = hasQuickEvents
   <div class="grid gap-8 lg:grid-cols-2 items-start">
     <!-- Scheduling Widget Column -->
     <div class="rounded-2xl border border-slate-200 p-6 sm:p-8 hover-lift">
-  <h3 class="text-xl font-semibold mb-4">Book Your Appointment</h3>
+      <h3 class="text-xl font-semibold mb-4">Book Your Appointment</h3>
       
-      <!-- Cal.com Scheduling Widget -->
-  <div class="cal-scheduling-container rounded-lg border border-slate-200 overflow-hidden bg-white" style={`--cal-brand-color: ${calBrandColor}`}>
+      <!-- Calendly Scheduling Widget -->
+      <div class="calendly-scheduling-container rounded-lg border border-slate-200 overflow-hidden bg-white">
+        <!-- Calendly Embed -->
+        <div class="calendly-inline-widget" data-url={calendlyUrl} style="min-width:320px;height:660px;"></div>
         
-        
-        <!-- Cal.com Embed -->
-        <div class="p-4">
-          <cal-inline 
-            calLink={calLink}
-            style="width:100%;height:660px;overflow:hidden"
-            config={JSON.stringify({
-              layout: 'month_view',
-              theme: 'light',
-              hideEventTypeDetails: false,
-              styles: { branding: { brandColor: calBrandColor } }
-            })}>
-          </cal-inline>
+        <!-- Fallback Content (shown when Calendly is not available) -->
+        <div class="calendly-fallback space-y-6" style="display: none;">
+          <div class="text-center py-8">
+            <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg class="w-8 h-8 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+            </div>
+            <h4 class="text-lg font-semibold text-slate-800 mb-2">Schedule Your Consultation</h4>
+            <p class="text-slate-600 mb-6">Click the button below to open our scheduling page</p>
+          </div>
           
-          <!-- Fallback Content (shown when Cal.com is not available) -->
-          <div class="cal-fallback space-y-6">
-            <div class="text-center py-8">
-              <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg class="w-8 h-8 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
-              </div>
-              <h4 class="text-lg font-semibold text-slate-800 mb-2">Schedule Your Consultation</h4>
-              <p class="text-slate-600 mb-6">Choose from our available consultation options</p>
-            </div>
-            
-            <!-- Quick launch event types -->
-            <div class="space-y-3">
-              {hasQuickEvents ? (
-                quickEvents.map((evt) => (
-                  <a href={`https://cal.com/${evt.calLink}`} target="_blank" rel="noopener noreferrer" class="block w-full text-left border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer group" data-cal-link={evt.calLink}>
-                    <div class="flex justify-between items-start">
-                      <div>
-                        <h5 class="font-semibold text-slate-800 group-hover:text-slate-900">{evt.title}</h5>
-                        <p class="text-sm text-slate-600 mt-1">{evt.description}</p>
-                        <div class="flex items-center mt-2 text-sm text-slate-500">
-                          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                          </svg>
-                          {evt.duration}
-                        </div>
-                      </div>
-                      <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
-                    </div>
-                  </a>
-                ))
-              ) : (
-                <a href={`https://cal.com/${calLink}`} target="_blank" rel="noopener noreferrer" class="block w-full text-left border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer group" data-cal-link={calLink}>
-                  <div class="flex justify-between items-start">
-                    <div>
-                      <h5 class="font-semibold text-slate-800 group-hover:text-slate-900">Find a time that works</h5>
-                      <p class="text-sm text-slate-600 mt-1">Open our live calendar to pick a time</p>
-                      <div class="flex items-center mt-2 text-sm text-slate-500">
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        30–60 minutes
-                      </div>
-                    </div>
-                    <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
+          <!-- Direct Calendly Link -->
+          <div class="space-y-3">
+            <a href={calendlyUrl} target="_blank" rel="noopener noreferrer" class="block w-full text-left border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer group">
+              <div class="flex justify-between items-start">
+                <div>
+                  <h5 class="font-semibold text-slate-800 group-hover:text-slate-900">Schedule with Tim & Beth</h5>
+                  <p class="text-sm text-slate-600 mt-1">Open our Calendly page to pick a time that works for you</p>
+                  <div class="flex items-center mt-2 text-sm text-slate-500">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    30–60 minutes
                   </div>
-                </a>
-              )}
-            </div>
-            <noscript>
-              <p class="text-center text-slate-600 text-sm">JavaScript is disabled. Book directly at <a class="underline" href={`https://cal.com/${calLink}`}>cal.com/{calLink}</a>.</p>
-            </noscript>
-            
-            <!-- Contact CTA -->
-            <div class="bg-brand-50 rounded-lg p-4 text-center">
-              <p class="text-brand-800 text-sm mb-3">Ready to schedule? Contact us directly:</p>
-              <div class="flex flex-col sm:flex-row gap-2 justify-center">
-                <a href={`tel:${site.phone}`} class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                  Call {site.phone}
-                </a>
-                <a href={`mailto:${site.email}`} class="bg-white border border-brand-200 text-brand-700 hover:bg-brand-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                  Email {site.email}
-                </a>
+                </div>
+                <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
               </div>
+            </a>
+          </div>
+          
+          <!-- Contact CTA -->
+          <div class="bg-brand-50 rounded-lg p-4 text-center">
+            <p class="text-brand-800 text-sm mb-3">Ready to schedule? Contact us directly:</p>
+            <div class="flex flex-col sm:flex-row gap-2 justify-center">
+              <a href={`tel:${site.phone}`} class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                Call {site.phone}
+              </a>
+              <a href={`mailto:${site.email}`} class="bg-white border border-brand-200 text-brand-700 hover:bg-brand-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                Email {site.email}
+              </a>
             </div>
           </div>
         </div>
@@ -198,86 +145,51 @@ const quickEvents = hasQuickEvents
   </div>
 </section>
 
-<!-- Custom Styling for Cal.com Embed -->
+<!-- Custom Styling for Calendly Embed -->
 <style>
-  .cal-scheduling-container {
+  .calendly-scheduling-container {
     background: white;
     position: relative;
   }
   
   /* Custom styling to match site branding */
-  .cal-scheduling-container iframe {
+  .calendly-scheduling-container iframe {
     border-radius: 8px;
-  }
-  
-  /* Show fallback by default, hide when Cal.com loads */
-  .cal-fallback {
-    display: block;
-  }
-  
-  /* Hide fallback when Cal.com embed is ready */
-  .cal-scheduling-container[data-cal-ready="true"] .cal-fallback {
-    display: none;
-  }
-  
-  /* Override Cal.com colors to match brand */
-  :global(.cal-scheduling-container cal-inline) {
-    /* brand color driven by inline CSS var on container */
-    --cal-brand-text-color: #ffffff;
-    --cal-border-color: #e2e8f0;
-    --cal-text-color: #1e293b;
   }
   
   /* Responsive adjustments */
   @media (max-width: 768px) {
-    .cal-scheduling-container {
+    .calendly-scheduling-container {
       margin: -1rem;
       border-radius: 0;
     }
     
-    .cal-scheduling-container > div {
-      padding: 1rem;
+    .calendly-inline-widget {
+      min-width: 280px !important;
     }
   }
 </style>
 
-<!-- Cal.com Embed Stylesheet (recommended by Cal.com) -->
-<link rel="preconnect" href="https://app.cal.com" crossorigin>
-<link rel="dns-prefetch" href="https://app.cal.com">
-<link rel="stylesheet" href="https://app.cal.com/embed/embed.css" />
-
-<!-- Cal.com Integration Script -->
+<!-- Calendly Integration Script -->
 <script>
-  // @ts-nocheck
-  // Bootstrap Cal namespace BEFORE loading embed.js to avoid undefined errors
-  (function(C){
-    const q = function(){ (C.Cal.q = C.Cal.q || []).push(arguments) };
-    C.Cal = C.Cal || function(){ q.apply(null, arguments); };
-  })(window);
-  // Required init per Cal.com embed docs
-  window.Cal('init', { origin: 'https://app.cal.com' });
-
-  // Load Cal.com embed script
+  // Load Calendly embed script
   const script = document.createElement('script');
-  script.src = 'https://app.cal.com/embed/embed.js';
+  script.src = 'https://assets.calendly.com/assets/external/widget.js';
   script.async = true;
   script.defer = true;
 
   script.onload = function() {
-    const container = document.querySelector('.cal-scheduling-container');
-    if (container) container.setAttribute('data-cal-ready', 'true');
-    console.log('Cal.com embed script loaded');
-
-    if (window.Cal) {
-      // Listen for booking events
-      window.Cal('on', {
-        action: 'bookingSuccessful',
-        callback: function(event) {
-          console.log('Booking successful:', event);
-          if (typeof gtag !== 'undefined') {
+    console.log('Calendly embed script loaded');
+    
+    // Track successful bookings if analytics available
+    if (typeof gtag !== 'undefined') {
+      // Listen for Calendly events
+      window.addEventListener('message', function(e) {
+        if (e.data.event && e.data.event.indexOf('calendly') === 0) {
+          if (e.data.event === 'calendly.event_scheduled') {
             gtag('event', 'schedule_consultation', {
               event_category: 'engagement',
-              event_label: 'cal_com_booking'
+              event_label: 'calendly_booking'
             });
           }
         }
@@ -286,19 +198,14 @@ const quickEvents = hasQuickEvents
   };
 
   script.onerror = function() {
-    console.log('Cal.com embed script failed to load, fallback content will remain visible');
+    console.log('Calendly embed script failed to load, showing fallback content');
+    const fallback = document.querySelector('.calendly-fallback');
+    const widget = document.querySelector('.calendly-inline-widget');
+    if (fallback && widget) {
+      widget.style.display = 'none';
+      fallback.style.display = 'block';
+    }
   };
 
   document.head.appendChild(script);
-  
-  // Enhance quick-launch buttons to open Cal overlay if script loads
-  document.addEventListener('click', function(e) {
-    const btn = e.target.closest('[data-cal-link]');
-    if (!btn) return;
-    const link = btn.getAttribute('data-cal-link');
-    if (window.Cal && link) {
-      window.Cal('open', { calLink: link });
-      e.preventDefault();
-    }
-  });
 </script>
