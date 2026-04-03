@@ -45,14 +45,17 @@ import '../styles/tailwind.css';
         </a>
       </div>
       <div class="flex justify-center">
-        <img
-          src="/images/fb-crest-logo.jpeg"
-          alt="Legacy Financial & Life crest"
-          class="w-64 sm:w-80 drop-shadow-2xl"
-          width="320"
-          height="400"
-          loading="eager"
-        />
+        <div class="relative">
+          <div class="absolute inset-0 bg-gradient-to-br from-amber-400/20 to-brand-400/20 rounded-full blur-3xl scale-110"></div>
+          <img
+            src="/images/fb-crest-logo.jpeg"
+            alt="Legacy Financial & Life crest"
+            class="relative w-64 sm:w-80 mix-blend-lighten drop-shadow-[0_0_40px_rgba(212,175,55,0.3)]"
+            width="320"
+            height="400"
+            loading="eager"
+          />
+        </div>
       </div>
     </div>
   </section>
