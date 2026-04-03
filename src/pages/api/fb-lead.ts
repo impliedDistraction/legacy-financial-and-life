@@ -5,6 +5,15 @@ export const prerender = false;
 
 const RECIPIENTS = ['tim@legacyf-l.com', 'beth@legacyf-l.com'];
 
+const INTEREST_LABELS: Record<string, string> = {
+  'term-life': 'Term Life Insurance',
+  'whole-life': 'Whole Life Insurance',
+  'final-expense': 'Final Expense / Burial Coverage',
+  'retirement': 'Retirement Planning',
+  'wealth': 'Generational Wealth Strategies',
+  'not-sure': 'Not sure yet — help me decide',
+};
+
 export const POST: APIRoute = async ({ request, redirect }) => {
   const resendKey = import.meta.env.RESEND_API_KEY;
   if (!resendKey) {
@@ -24,6 +33,8 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const phone = String(data.get('phone') ?? '').trim();
   const age = String(data.get('age') ?? '').trim();
   const interest = String(data.get('interest') ?? '').trim();
+  const interestLabel = INTEREST_LABELS[interest] ?? interest;
+  const firstName = escapeHtml(name.split(' ')[0]);
 
   // Basic server-side validation
   if (!name || !email) {
@@ -37,38 +48,165 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 
   const resend = new Resend(resendKey);
 
-  // Build a clean lead notification email
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #1a62db; border-bottom: 2px solid #1a62db; padding-bottom: 8px;">
-        New Facebook Lead
-      </h2>
-      <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
-        <tr><td style="padding: 8px 0; font-weight: bold; width: 140px;">Name</td><td>${escapeHtml(name)}</td></tr>
-        <tr><td style="padding: 8px 0; font-weight: bold;">Email</td><td><a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></td></tr>
-        ${phone ? `<tr><td style="padding: 8px 0; font-weight: bold;">Phone</td><td><a href="tel:${escapeHtml(phone)}">${escapeHtml(phone)}</a></td></tr>` : ''}
-        ${age ? `<tr><td style="padding: 8px 0; font-weight: bold;">Age Range</td><td>${escapeHtml(age)}</td></tr>` : ''}
-        ${interest ? `<tr><td style="padding: 8px 0; font-weight: bold;">Interest</td><td>${escapeHtml(interest)}</td></tr>` : ''}
-      </table>
-      <p style="margin-top: 24px; padding: 12px; background: #eff8ff; border-radius: 8px; font-size: 14px; color: #183f8a;">
-        This lead came from the Facebook campaign landing page (<code>/free-quote</code>).
-      </p>
-      <!-- HOOK: Persist this lead to a database or CRM here -->
+  // ── Internal lead notification email (to Tim & Beth) ──────────────
+  const internalHtml = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
+      <div style="background: linear-gradient(135deg, #1e3a5f 0%, #1a62db 100%); border-radius: 12px 12px 0 0; padding: 24px 28px;">
+        <h2 style="margin: 0; color: #ffffff; font-size: 22px;">New Quote Request</h2>
+        <p style="margin: 6px 0 0; color: #bfdbfe; font-size: 14px;">Facebook campaign · /free-quote</p>
+      </div>
+      <div style="border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px; padding: 24px 28px;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; width: 140px; border-bottom: 1px solid #f1f5f9;">Name</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(name)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Email</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">
+              <a href="mailto:${escapeHtml(email)}" style="color: #1a62db;">${escapeHtml(email)}</a>
+            </td>
+          </tr>
+          ${phone ? `
+          <tr>
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Phone</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">
+              <a href="tel:${escapeHtml(phone)}" style="color: #1a62db;">${escapeHtml(phone)}</a>
+            </td>
+          </tr>` : ''}
+          ${age ? `
+          <tr>
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Age Range</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(age)}</td>
+          </tr>` : ''}
+          ${interest ? `
+          <tr>
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Interest</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(interestLabel)}</td>
+          </tr>` : ''}
+        </table>
+        <p style="margin: 20px 0 0; padding: 14px; background: #eff6ff; border-radius: 8px; font-size: 13px; color: #1e40af;">
+          A confirmation email was automatically sent to the lead. Reply directly to this email to reach <strong>${firstName}</strong>.
+        </p>
+      </div>
+    </div>
+  `;
+
+  // ── Confirmation email (to the person who submitted the form) ─────
+  const confirmationHtml = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #1e3a5f 0%, #1a62db 100%); border-radius: 12px 12px 0 0; padding: 32px 28px; text-align: center;">
+        <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 700;">Thank You, ${firstName}!</h1>
+        <p style="margin: 10px 0 0; color: #bfdbfe; font-size: 16px;">We received your free quote request</p>
+      </div>
+
+      <div style="border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px; padding: 28px;">
+        <p style="font-size: 16px; line-height: 1.6; color: #334155; margin-top: 0;">
+          You're one step closer to protecting your family and securing your future. A licensed professional from our team will personally review your information and reach out shortly — no pressure, just answers.
+        </p>
+
+        <!-- What happens next -->
+        <h2 style="font-size: 18px; color: #0f172a; margin: 28px 0 16px; font-weight: 700;">What Happens Next?</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 12px 14px; vertical-align: top; width: 36px;">
+              <div style="width: 28px; height: 28px; background: #dbeafe; border-radius: 50%; text-align: center; line-height: 28px; font-weight: 700; color: #1a62db; font-size: 14px;">1</div>
+            </td>
+            <td style="padding: 12px 0; color: #475569; font-size: 15px; line-height: 1.5;">
+              <strong style="color: #0f172a;">We review your details</strong><br/>We'll identify the best options for your situation and budget.
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 14px; vertical-align: top;">
+              <div style="width: 28px; height: 28px; background: #dbeafe; border-radius: 50%; text-align: center; line-height: 28px; font-weight: 700; color: #1a62db; font-size: 14px;">2</div>
+            </td>
+            <td style="padding: 12px 0; color: #475569; font-size: 15px; line-height: 1.5;">
+              <strong style="color: #0f172a;">Tim or Beth will reach out</strong><br/>We'll discuss your quote and answer any questions you have.
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 14px; vertical-align: top;">
+              <div style="width: 28px; height: 28px; background: #dbeafe; border-radius: 50%; text-align: center; line-height: 28px; font-weight: 700; color: #1a62db; font-size: 14px;">3</div>
+            </td>
+            <td style="padding: 12px 0; color: #475569; font-size: 15px; line-height: 1.5;">
+              <strong style="color: #0f172a;">Find the right coverage</strong><br/>We'll help you choose a plan on your timeline — no rush, no hassle.
+            </td>
+          </tr>
+        </table>
+
+        ${interest ? `
+        <!-- What they're interested in -->
+        <div style="margin-top: 24px; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+          <p style="margin: 0; font-size: 14px; color: #166534;">
+            <strong>Your interest:</strong> ${escapeHtml(interestLabel)}
+          </p>
+        </div>
+        ` : ''}
+
+        <!-- CTA -->
+        <div style="margin-top: 28px; text-align: center;">
+          <p style="font-size: 14px; color: #64748b; margin: 0 0 12px;">Can't wait? Give us a call anytime:</p>
+          <a href="tel:7063335641" style="display: inline-block; background: #1a62db; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+            Call (706) 333-5641
+          </a>
+        </div>
+
+        <!-- Divider -->
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 28px 0;" />
+
+        <!-- About us -->
+        <table style="width: 100%;">
+          <tr>
+            <td style="vertical-align: top; padding-right: 16px;">
+              <p style="margin: 0 0 4px; font-weight: 700; color: #0f172a; font-size: 15px;">Tim &amp; Beth Byrd</p>
+              <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.5;">
+                Legacy Financial &amp; Life<br/>
+                Life, Medicare, Estate Planning &amp; Retirement Strategists<br/>
+                Licensed in Georgia · Serving families since 2009
+              </p>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Footer -->
+      <div style="text-align: center; padding: 20px 28px;">
+        <p style="font-size: 12px; color: #94a3b8; margin: 0; line-height: 1.6;">
+          &copy; ${new Date().getFullYear()} Legacy Financial &amp; Life. All rights reserved.<br/>
+          Licensed in GA. This email is for informational purposes. Policies and features vary by carrier and state.
+        </p>
+      </div>
     </div>
   `;
 
   try {
-    const { error } = await resend.emails.send({
-      from: 'Legacy F&L Leads <leads@legacyfinancial.app>',
-      to: RECIPIENTS,
-      subject: `New FB Lead: ${name}`,
-      html,
-      replyTo: email,
-    });
+    // Send both emails concurrently
+    const [internalResult, confirmationResult] = await Promise.all([
+      resend.emails.send({
+        from: 'Legacy F&L Leads <leads@legacyfinancial.app>',
+        to: RECIPIENTS,
+        subject: `New Quote Request: ${name}`,
+        html: internalHtml,
+        replyTo: email,
+      }),
+      resend.emails.send({
+        from: 'Legacy Financial & Life <hello@legacyfinancial.app>',
+        to: [email],
+        subject: `${firstName}, we received your quote request!`,
+        html: confirmationHtml,
+        replyTo: 'beth@legacyf-l.com',
+      }),
+    ]);
 
-    if (error) {
-      console.error('Resend error:', error);
+    if (internalResult.error) {
+      console.error('Resend internal email error:', internalResult.error);
       return redirect('/form-error', 302);
+    }
+
+    if (confirmationResult.error) {
+      // Log but don't block — the lead notification already went through
+      console.error('Resend confirmation email error:', confirmationResult.error);
     }
   } catch (err) {
     console.error('Email send failed:', err);
