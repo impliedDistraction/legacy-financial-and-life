@@ -1,1 +1,0 @@
-import"./hoisted.DYVzsaiE.js";(function(){const e=()=>{const t=window.location.hash;if(!t)return;const o=document.querySelector(t);o&&o.scrollIntoView({behavior:"smooth",block:"start"})};document.readyState==="loading"?document.addEventListener("DOMContentLoaded",e,{once:!0}):requestAnimationFrame(e),window.addEventListener("hashchange",e)})();
