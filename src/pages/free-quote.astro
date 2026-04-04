@@ -15,12 +15,7 @@ import '../styles/tailwind.css';
         <img src={site.branding.logo} alt={site.branding.logoAlt} class="h-10 w-10 flex-shrink-0 object-contain" width="40" height="40" />
         <span class="font-bold text-lg text-slate-900 hidden sm:inline truncate">Legacy Financial & Life</span>
       </a>
-      <a
-        href={`tel:${site.phone}`}
-        class="text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
-      >
-        {site.phone}
-      </a>
+      <span class="text-sm font-medium text-brand-600">Get a Free Quote Today</span>
     </div>
   </header>
 
@@ -284,11 +279,7 @@ import '../styles/tailwind.css';
     <div class="mx-auto max-w-6xl px-4 text-center text-sm space-y-2">
       <p>&copy; {new Date().getFullYear()} Legacy Financial & Life. All rights reserved.</p>
       <p>{site.footerNote}</p>
-      <p>
-        <a href={`tel:${site.phone}`} class="hover:text-white transition-colors">{site.phone}</a>
-        &nbsp;·&nbsp;
-        <a href={`mailto:${site.email}`} class="hover:text-white transition-colors">{site.email}</a>
-      </p>
+
     </div>
   </footer>
 </Base>

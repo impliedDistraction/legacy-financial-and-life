@@ -5,6 +5,43 @@ export const prerender = false;
 
 const RECIPIENTS = ['tim@legacyf-l.com', 'beth@legacyf-l.com'];
 
+// ── Ringy CRM lead injection ───────────────────────────────────────
+// Requires two env vars from the client's Ringy account:
+//   RINGY_AUTH_TOKEN – API token from Ringy Dashboard → Settings → API
+//   RINGY_API_URL   – Lead injection endpoint (e.g. https://app.ringy.com/api/public/createLead)
+async function pushToRingy(lead: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  notes?: string;
+}): Promise<void> {
+  const token = import.meta.env.RINGY_AUTH_TOKEN;
+  const url = import.meta.env.RINGY_API_URL;
+
+  if (!token || !url) return; // silently skip when not configured
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      first_name: lead.firstName,
+      last_name: lead.lastName,
+      email: lead.email,
+      ...(lead.phone && { phone: lead.phone }),
+      ...(lead.notes && { notes: lead.notes }),
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Ringy API ${res.status}: ${body}`);
+  }
+}
+
 const INTEREST_LABELS: Record<string, string> = {
   'term-life': 'Term Life Insurance',
   'whole-life': 'Whole Life Insurance',
@@ -181,7 +218,19 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   `;
 
   try {
-    // Send both emails concurrently
+    // Split name into first/last for CRM
+    const nameParts = name.split(' ');
+    const crmFirstName = nameParts[0];
+    const crmLastName = nameParts.slice(1).join(' ') || '';
+
+    // Build a CRM note from form fields
+    const noteLines = [
+      'Source: Facebook campaign · /free-quote',
+      age ? `Age range: ${age}` : '',
+      interest ? `Interest: ${interestLabel}` : '',
+    ].filter(Boolean);
+
+    // Send emails + push to Ringy CRM concurrently
     const [internalResult, confirmationResult] = await Promise.all([
       resend.emails.send({
         from: 'Legacy F&L Leads <leads@legacyfinancial.app>',
@@ -197,6 +246,14 @@ export const POST: APIRoute = async ({ request, redirect }) => {
         html: confirmationHtml,
         replyTo: 'beth@legacyf-l.com',
       }),
+      // CRM push — fire-and-forget; failure is logged but never blocks the user
+      pushToRingy({
+        firstName: crmFirstName,
+        lastName: crmLastName,
+        email,
+        phone: phone || undefined,
+        notes: noteLines.join('\n'),
+      }).catch((err) => console.error('Ringy CRM push failed:', err)),
     ]);
 
     if (internalResult.error) {
@@ -212,8 +269,6 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     console.error('Email send failed:', err);
     return redirect('/form-error', 302);
   }
-
-  // TODO: Persist lead to database/CRM here before redirecting
 
   return redirect('/quote-success', 302);
 };
