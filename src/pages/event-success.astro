@@ -72,9 +72,9 @@ import '../styles/tailwind.css';
         <!-- Contact Info -->
         <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8">
           <p class="text-amber-800 text-sm">
-            <strong>Questions or need to update your registration?</strong> Call us at 
-            <a href={`tel:${site.phone}`} class="underline hover:text-amber-900">{site.phone}</a>
-            or email <a href={`mailto:${site.email}`} class="underline hover:text-amber-900">{site.email}</a>
+            <strong>Questions or need to update your registration?</strong>{' '}
+            {site.phone ? <>Call us at <a href={`tel:${site.phone}`} class="underline hover:text-amber-900">{site.phone}</a> or email </> : <>Email us at </>}
+            <a href={`mailto:${site.email}`} class="underline hover:text-amber-900">{site.email}</a>
           </p>
         </div>
         

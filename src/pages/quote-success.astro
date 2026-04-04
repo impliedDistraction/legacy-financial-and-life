@@ -12,12 +12,14 @@ import '../styles/tailwind.css';
         <img src={site.branding.logo} alt={site.branding.logoAlt} class="h-10 w-10 flex-shrink-0 object-contain" width="40" height="40" />
         <span class="font-bold text-lg text-slate-900 hidden sm:inline truncate">Legacy Financial & Life</span>
       </a>
-      <a
-        href={`tel:${site.phone}`}
-        class="text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
-      >
-        {site.phone}
-      </a>
+      {site.phone && (
+        <a
+          href={`tel:${site.phone}`}
+          class="text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
+        >
+          {site.phone}
+        </a>
+      )}
     </div>
   </header>
 
@@ -53,12 +55,14 @@ import '../styles/tailwind.css';
         </div>
       </div>
 
-      <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8">
-        <p class="text-amber-800 text-sm">
-          <strong>Can't wait?</strong> Call us now at
-          <a href={`tel:${site.phone}`} class="underline hover:text-amber-900">{site.phone}</a>
-        </p>
-      </div>
+      {site.phone && (
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8">
+          <p class="text-amber-800 text-sm">
+            <strong>Can't wait?</strong> Call us now at
+            <a href={`tel:${site.phone}`} class="underline hover:text-amber-900">{site.phone}</a>
+          </p>
+        </div>
+      )}
 
       <a
         href="/"

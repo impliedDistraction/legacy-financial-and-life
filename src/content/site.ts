@@ -1,7 +1,7 @@
 export const site = {
   name: 'Legacy Financial & Life',
   url: 'https://legacyf-l.com',
-  phone: '(706) 333-5641',
+  phone: '',
   email: 'Beth@legacyf-l.com',
   cityState: 'Luthersville, GA', // TODO: confirm spellings/details
   tagline: 'Trusted. Personal. Protective. Strategic.',

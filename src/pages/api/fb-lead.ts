@@ -144,14 +144,6 @@ export const POST: APIRoute = async ({ request, redirect }) => {
         </div>
         ` : ''}
 
-        <!-- CTA -->
-        <div style="margin-top: 28px; text-align: center;">
-          <p style="font-size: 14px; color: #64748b; margin: 0 0 12px;">Can't wait? Give us a call anytime:</p>
-          <a href="tel:7063335641" style="display: inline-block; background: #1a62db; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
-            Call (706) 333-5641
-          </a>
-        </div>
-
         <!-- Divider -->
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 28px 0;" />
 
