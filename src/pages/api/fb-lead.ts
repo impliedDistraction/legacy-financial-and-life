@@ -69,6 +69,8 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const email = String(data.get('email') ?? '').trim();
   const phone = String(data.get('phone') ?? '').trim();
   const age = String(data.get('age') ?? '').trim();
+  const beneficiary = String(data.get('beneficiary') ?? '').trim();
+  const state = String(data.get('state') ?? '').trim();
   const interest = String(data.get('interest') ?? '').trim();
   const interestLabel = INTEREST_LABELS[interest] ?? interest;
   const firstName = escapeHtml(name.split(' ')[0]);
@@ -113,8 +115,18 @@ export const POST: APIRoute = async ({ request, redirect }) => {
           </tr>` : ''}
           ${age ? `
           <tr>
-            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Age Range</td>
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Age</td>
             <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(age)}</td>
+          </tr>` : ''}
+          ${beneficiary ? `
+          <tr>
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Beneficiary</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(beneficiary)}</td>
+          </tr>` : ''}
+          ${state ? `
+          <tr>
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">State</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(state)}</td>
           </tr>` : ''}
           ${interest ? `
           <tr>
@@ -159,7 +171,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
               <div style="width: 28px; height: 28px; background: #dbeafe; border-radius: 50%; text-align: center; line-height: 28px; font-weight: 700; color: #1a62db; font-size: 14px;">2</div>
             </td>
             <td style="padding: 12px 0; color: #475569; font-size: 15px; line-height: 1.5;">
-              <strong style="color: #0f172a;">Tim or Beth will reach out</strong><br/>We'll discuss your quote and answer any questions you have.
+              <strong style="color: #0f172a;">A licensed professional will reach out</strong><br/>We'll discuss your quote and answer any questions you have.
             </td>
           </tr>
           <tr>
@@ -196,7 +208,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
         <table style="width: 100%;">
           <tr>
             <td style="vertical-align: top; padding-right: 16px;">
-              <p style="margin: 0 0 4px; font-weight: 700; color: #0f172a; font-size: 15px;">Tim &amp; Beth Byrd</p>
+              <p style="margin: 0 0 4px; font-weight: 700; color: #0f172a; font-size: 15px;">Your Insurance Team</p>
               <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.5;">
                 Legacy Financial &amp; Life<br/>
                 Life, Medicare, Estate Planning &amp; Retirement Strategists<br/>
@@ -226,7 +238,9 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     // Build a CRM note from form fields
     const noteLines = [
       'Source: Facebook campaign · /free-quote',
-      age ? `Age range: ${age}` : '',
+      age ? `Age: ${age}` : '',
+      beneficiary ? `Beneficiary: ${beneficiary}` : '',
+      state ? `State: ${state}` : '',
       interest ? `Interest: ${interestLabel}` : '',
     ].filter(Boolean);
 

@@ -11,10 +11,22 @@ import '../styles/tailwind.css';
   <!-- Minimal header — no nav links to keep conversion focus -->
   <header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
     <div class="mx-auto max-w-6xl flex items-center justify-between gap-4 px-4 py-3">
-      <a href="/" class="flex items-center gap-2 min-w-0" aria-label="Legacy Financial & Life home">
-        <img src={site.branding.logo} alt={site.branding.logoAlt} class="h-10 w-10 flex-shrink-0 object-contain" width="40" height="40" />
-        <span class="font-bold text-lg text-slate-900 hidden sm:inline truncate">Legacy Financial & Life</span>
-      </a>
+      <div class="flex items-center gap-3 min-w-0">
+        <a href="/" class="flex-shrink-0" aria-label="Legacy Financial & Life home">
+          <img src={site.branding.logo} alt={site.branding.logoAlt} class="h-10 w-10 object-contain" width="40" height="40" />
+        </a>
+        <span class="text-slate-300 text-lg select-none" aria-hidden="true">|</span>
+        <!-- Inline SVG logo — replace with <img> if client provides a file -->
+        <svg class="h-9 w-auto flex-shrink-0" viewBox="0 0 180 36" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lifetime Safeguard">
+          <title>Lifetime Safeguard</title>
+          <!-- Shield icon -->
+          <path d="M14 3 L26 7 V17 C26 24 20 30 14 33 C8 30 2 24 2 17 V7 Z" fill="#1a62db" opacity="0.15" stroke="#1a62db" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M10 17 L13 20 L19 13" stroke="#1a62db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <!-- Text -->
+          <text x="33" y="15" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="0.02em">LIFETIME</text>
+          <text x="33" y="29" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#1a62db" letter-spacing="0.05em">SAFEGUARD</text>
+        </svg>
+      </div>
       <span class="text-sm font-medium text-brand-600">Get a Free Quote Today</span>
     </div>
   </header>
@@ -208,20 +220,37 @@ import '../styles/tailwind.css';
         </label>
 
         <label class="grid gap-1">
-          <span class="text-sm font-medium text-slate-700">Age Range</span>
-          <select
+          <span class="text-sm font-medium text-slate-700">Age</span>
+          <input
+            type="number"
             name="age"
-            class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none bg-white"
-          >
-            <option value="">Select age range</option>
-            <option value="0-17">0–17</option>
-            <option value="18-30">18–30</option>
-            <option value="31-45">31–45</option>
-            <option value="46-55">46–55</option>
-            <option value="56-65">56–65</option>
-            <option value="66-75">66–75</option>
-            <option value="76-85">76–85</option>
-          </select>
+            min="0"
+            max="85"
+            placeholder="Your age"
+            class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+          />
+        </label>
+
+        <label class="grid gap-1">
+          <span class="text-sm font-medium text-slate-700">Beneficiary Name</span>
+          <input
+            type="text"
+            name="beneficiary"
+            autocomplete="off"
+            placeholder="Name of your beneficiary"
+            class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+          />
+        </label>
+
+        <label class="grid gap-1">
+          <span class="text-sm font-medium text-slate-700">State</span>
+          <input
+            type="text"
+            name="state"
+            autocomplete="address-level1"
+            placeholder="State you live in"
+            class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+          />
         </label>
 
         <label class="grid gap-1">
@@ -262,8 +291,7 @@ import '../styles/tailwind.css';
         👉 Take the first step toward peace of mind today.
       </p>
       <p class="mt-4 text-brand-200">
-        Tim Byrd · Legacy Financial & Life<br />
-        Life, Medicare, Estate Planning, Wealth and Retirement Strategist
+        Life, Medicare, Estate Planning, Wealth &amp; Retirement Strategies
       </p>
       <a
         href="#quote-form"
@@ -277,9 +305,7 @@ import '../styles/tailwind.css';
   <!-- Minimal Footer -->
   <footer class="bg-slate-900 text-slate-400 py-8">
     <div class="mx-auto max-w-6xl px-4 text-center text-sm space-y-2">
-      <p>&copy; {new Date().getFullYear()} Legacy Financial & Life. All rights reserved.</p>
       <p>{site.footerNote}</p>
-
     </div>
   </footer>
 </Base>
