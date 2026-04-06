@@ -68,15 +68,15 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const name = String(data.get('name') ?? '').trim();
   const email = String(data.get('email') ?? '').trim();
   const phone = String(data.get('phone') ?? '').trim();
-  const age = String(data.get('age') ?? '').trim();
+  const dob = String(data.get('dob') ?? '').trim();
   const beneficiary = String(data.get('beneficiary') ?? '').trim();
   const state = String(data.get('state') ?? '').trim();
   const interest = String(data.get('interest') ?? '').trim();
   const interestLabel = INTEREST_LABELS[interest] ?? interest;
   const firstName = escapeHtml(name.split(' ')[0]);
 
-  // Basic server-side validation
-  if (!name || !email) {
+  // Basic server-side validation — all fields required
+  if (!name || !email || !phone || !dob || !beneficiary || !state || !interest) {
     return redirect('/form-error', 302);
   }
 
@@ -106,33 +106,28 @@ export const POST: APIRoute = async ({ request, redirect }) => {
               <a href="mailto:${escapeHtml(email)}" style="color: #1a62db;">${escapeHtml(email)}</a>
             </td>
           </tr>
-          ${phone ? `
           <tr>
             <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Phone</td>
             <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">
               <a href="tel:${escapeHtml(phone)}" style="color: #1a62db;">${escapeHtml(phone)}</a>
             </td>
-          </tr>` : ''}
-          ${age ? `
+          </tr>
           <tr>
-            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Age</td>
-            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(age)}</td>
-          </tr>` : ''}
-          ${beneficiary ? `
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Date of Birth</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(dob)}</td>
+          </tr>
           <tr>
             <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Beneficiary</td>
             <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(beneficiary)}</td>
-          </tr>` : ''}
-          ${state ? `
+          </tr>
           <tr>
             <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">State</td>
             <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(state)}</td>
-          </tr>` : ''}
-          ${interest ? `
+          </tr>
           <tr>
             <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Interest</td>
             <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(interestLabel)}</td>
-          </tr>` : ''}
+          </tr>
         </table>
         <p style="margin: 20px 0 0; padding: 14px; background: #eff6ff; border-radius: 8px; font-size: 13px; color: #1e40af;">
           A confirmation email was automatically sent to the lead. Reply directly to this email to reach <strong>${firstName}</strong>.
@@ -184,14 +179,12 @@ export const POST: APIRoute = async ({ request, redirect }) => {
           </tr>
         </table>
 
-        ${interest ? `
         <!-- What they're interested in -->
         <div style="margin-top: 24px; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
           <p style="margin: 0; font-size: 14px; color: #166534;">
             <strong>Your interest:</strong> ${escapeHtml(interestLabel)}
           </p>
         </div>
-        ` : ''}
 
         <!-- CTA -->
         <div style="margin-top: 28px; text-align: center;">
@@ -238,11 +231,11 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     // Build a CRM note from form fields
     const noteLines = [
       'Source: Facebook campaign · /free-quote',
-      age ? `Age: ${age}` : '',
-      beneficiary ? `Beneficiary: ${beneficiary}` : '',
-      state ? `State: ${state}` : '',
-      interest ? `Interest: ${interestLabel}` : '',
-    ].filter(Boolean);
+      `DOB: ${dob}`,
+      `Beneficiary: ${beneficiary}`,
+      `State: ${state}`,
+      `Interest: ${interestLabel}`,
+    ];
 
     // Send emails + push to Ringy CRM concurrently
     const [internalResult, confirmationResult] = await Promise.all([

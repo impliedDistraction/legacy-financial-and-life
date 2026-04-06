@@ -184,10 +184,11 @@ import '../styles/tailwind.css';
         </label>
 
         <label class="grid gap-1">
-          <span class="text-sm font-medium text-slate-700">Phone Number</span>
+          <span class="text-sm font-medium text-slate-700">Phone Number <span class="text-red-500">*</span></span>
           <input
             type="tel"
             name="phone"
+            required
             autocomplete="tel"
             placeholder="(555) 123-4567"
             class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
@@ -195,22 +196,22 @@ import '../styles/tailwind.css';
         </label>
 
         <label class="grid gap-1">
-          <span class="text-sm font-medium text-slate-700">Age</span>
+          <span class="text-sm font-medium text-slate-700">Date of Birth <span class="text-red-500">*</span></span>
           <input
-            type="number"
-            name="age"
-            min="0"
-            max="85"
-            placeholder="Your age"
+            type="date"
+            name="dob"
+            required
+            autocomplete="bday"
             class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
           />
         </label>
 
         <label class="grid gap-1">
-          <span class="text-sm font-medium text-slate-700">Beneficiary Name</span>
+          <span class="text-sm font-medium text-slate-700">Beneficiary Name <span class="text-red-500">*</span></span>
           <input
             type="text"
             name="beneficiary"
+            required
             autocomplete="off"
             placeholder="Name of your beneficiary"
             class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
@@ -218,10 +219,11 @@ import '../styles/tailwind.css';
         </label>
 
         <label class="grid gap-1">
-          <span class="text-sm font-medium text-slate-700">State</span>
+          <span class="text-sm font-medium text-slate-700">State <span class="text-red-500">*</span></span>
           <input
             type="text"
             name="state"
+            required
             autocomplete="address-level1"
             placeholder="State you live in"
             class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
@@ -229,9 +231,10 @@ import '../styles/tailwind.css';
         </label>
 
         <label class="grid gap-1">
-          <span class="text-sm font-medium text-slate-700">I'm interested in…</span>
+          <span class="text-sm font-medium text-slate-700">I'm interested in… <span class="text-red-500">*</span></span>
           <select
             name="interest"
+            required
             class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none bg-white"
           >
             <option value="">Select an option</option>
