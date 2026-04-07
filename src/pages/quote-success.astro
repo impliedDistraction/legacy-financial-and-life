@@ -77,3 +77,24 @@ import '../styles/tailwind.css';
     </div>
   </footer>
 </Base>
+
+<script>
+  type VercelAnalyticsWindow = Window & {
+    va?: {
+      track: (eventName: string, properties?: Record<string, string>) => void;
+    };
+  };
+
+  const analyticsWindow = window as VercelAnalyticsWindow;
+  const successTracked = sessionStorage.getItem('quote_success_tracked');
+
+  if (successTracked !== 'true') {
+    const interest = sessionStorage.getItem('quote_interest') ?? 'unknown';
+
+    analyticsWindow.va?.track('quote_form_success', {
+      interest,
+    });
+
+    sessionStorage.setItem('quote_success_tracked', 'true');
+  }
+</script>

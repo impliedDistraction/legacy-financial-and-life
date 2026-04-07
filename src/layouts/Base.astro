@@ -1,5 +1,6 @@
 ---
 import { site } from '../content/site';
+import { Analytics } from '@vercel/analytics/astro';
 import SEO from '../components/SEO.astro';
 import Analytics from '@vercel/analytics/astro';
 
@@ -41,6 +42,7 @@ const { title = 'Legacy Financial & Life', description = 'Life insurance and ret
     <main class="min-h-dvh">
       <slot />
     </main>
-  <script src="/scripts/animations.js" defer></script>
+    <Analytics />
+    <script src="/scripts/animations.js" defer></script>
   </body>
 </html>
