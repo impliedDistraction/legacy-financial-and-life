@@ -5,7 +5,11 @@ import vercel from '@astrojs/vercel/serverless';
 export default defineConfig({
   site: 'https://legacyfinancial.app',
   output: 'hybrid',
-  adapter: vercel(),
+  adapter: vercel({
+    webAnalytics: {
+      enabled: true,
+    },
+  }),
   integrations: [tailwind({ applyBaseStyles: false })],
   prefetch: true
 });
