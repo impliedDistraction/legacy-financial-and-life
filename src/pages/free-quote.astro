@@ -2,6 +2,8 @@
 import Base from '../layouts/Base.astro';
 import { site } from '../content/site';
 import '../styles/tailwind.css';
+
+const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Michigan, Texas, Utah, Alabama, and Louisiana';
 ---
 
 <Base
@@ -66,7 +68,7 @@ import '../styles/tailwind.css';
             </div>
             <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
               <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Focus</p>
-              <p class="mt-2 text-base font-semibold text-white">Serving Georgia families</p>
+              <p class="mt-2 text-base font-semibold text-white">Licensed in 10 states</p>
             </div>
           </div>
         </div>
@@ -227,6 +229,9 @@ import '../styles/tailwind.css';
           <span class="flex items-center gap-1"><svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>No obligation</span>
           <span class="flex items-center gap-1"><svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Same-day response</span>
         </div>
+        <p class="mt-4 text-sm text-slate-500">
+          Licensed in {licensedStates}.
+        </p>
       </div>
 
       <form
@@ -340,6 +345,10 @@ import '../styles/tailwind.css';
             <strong class="text-slate-900">Consent Notice:</strong> By completing and submitting this form, you agree to be contacted by a licensed insurance professional via phone, text message, and email regarding your options. See our <a href="/privacy" class="underline text-brand-600 hover:text-brand-700">Privacy Policy</a>.
           </p>
         </div>
+
+        <p class="text-xs leading-relaxed text-slate-500">
+          Licensed in {licensedStates}. Policies and product availability vary by carrier and state.
+        </p>
       </form>
     </div>
   </section>
@@ -366,7 +375,7 @@ import '../styles/tailwind.css';
   <!-- Minimal Footer -->
   <footer class="bg-slate-900 text-slate-400 py-8">
     <div class="mx-auto max-w-md px-4 text-center text-xs leading-relaxed space-y-3">
-      <p>{site.footerNote}</p>
+      <p>Licensed in {licensedStates}. Policies and features vary by carrier and state.</p>
       <p><a href="/privacy" class="underline hover:text-white transition-colors">Privacy Policy</a></p>
     </div>
   </footer>
@@ -396,6 +405,7 @@ import '../styles/tailwind.css';
     form.addEventListener('submit', () => {
       const interest = (form.querySelector('select[name="interest"]') as HTMLSelectElement | null)?.value ?? 'unknown';
       sessionStorage.setItem('quote_interest', interest);
+      sessionStorage.removeItem('quote_success_tracked');
 
       analyticsWindow.va?.track('quote_form_submit_attempt', {
         interest,

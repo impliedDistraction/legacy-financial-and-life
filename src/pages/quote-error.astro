@@ -6,8 +6,7 @@ import '../styles/tailwind.css';
 const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Michigan, Texas, Utah, Alabama, and Louisiana';
 ---
 
-<Base title="Quote Request Received — Legacy Financial & Life" description="Thank you! Your free quote request has been submitted. We'll be in touch shortly.">
-  <!-- Minimal header matching free-quote page -->
+<Base title="Quote Submission Error — Legacy Financial & Life" description="There was an issue submitting your quote request. Please try again.">
   <header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
     <div class="mx-auto max-w-6xl flex items-center justify-between gap-4 px-4 py-3">
       <div class="flex items-center gap-3 min-w-0">
@@ -16,57 +15,61 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
         </a>
         <img src="/images/fb-crest-logo.jpeg" alt="Lifetime Safeguard logo" class="h-10 w-10 flex-shrink-0 object-contain" width="40" height="40" />
       </div>
-      <span class="text-sm font-medium text-brand-600">Quote Request Received</span>
+      <span class="text-sm font-medium text-brand-600">Quote Submission Issue</span>
     </div>
   </header>
 
-  <div class="min-h-[80vh] bg-gradient-to-br from-brand-50 to-white flex items-center justify-center px-4">
+  <div class="min-h-[80vh] bg-gradient-to-br from-red-50 to-white flex items-center justify-center px-4">
     <div class="max-w-2xl text-center py-20">
-      <!-- Success Icon -->
-      <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-8">
-        <svg class="w-12 h-12 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+      <div class="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-8">
+        <svg class="w-12 h-12 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z"></path>
         </svg>
       </div>
 
-      <h1 class="text-4xl font-bold text-slate-900 mb-4">You're All Set!</h1>
+      <h1 class="text-4xl font-bold text-slate-900 mb-4">We Couldn't Submit That Yet</h1>
       <p class="text-xl text-slate-700 mb-8">
-        Your free quote request has been submitted. A licensed professional from our team will reach out shortly — no pressure, just answers.
+        There was an issue sending your quote request. Please try again and we'll pick it up from there.
       </p>
 
       <div class="bg-white rounded-xl border border-slate-200 p-6 mb-8 shadow-lg text-left">
-        <h2 class="text-lg font-semibold text-slate-900 mb-4">What happens next?</h2>
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">What to do next</h2>
         <div class="space-y-3">
           <div class="flex items-start space-x-3">
             <span class="flex-shrink-0 w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-sm font-medium text-brand-700">1</span>
-            <p class="text-slate-700">We review your information and identify the best options for your situation</p>
+            <p class="text-slate-700">Go back to the quote form and submit it again.</p>
           </div>
           <div class="flex items-start space-x-3">
             <span class="flex-shrink-0 w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-sm font-medium text-brand-700">2</span>
-            <p class="text-slate-700">Tim or Beth will personally reach out to discuss your quote</p>
+            <p class="text-slate-700">Double-check your email address and phone number before sending.</p>
           </div>
           <div class="flex items-start space-x-3">
             <span class="flex-shrink-0 w-6 h-6 bg-brand-100 rounded-full flex items-center justify-center text-sm font-medium text-brand-700">3</span>
-            <p class="text-slate-700">We'll help you find the right coverage — on your timeline, no rush</p>
+            <p class="text-slate-700">Once it goes through, we'll follow up with the next step.</p>
           </div>
         </div>
       </div>
 
       <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-8">
         <p class="text-amber-800 text-sm">
-          <strong>What to do now:</strong> Keep an eye on your inbox. We'll follow up shortly with the next step.
-        </p>
-        <p class="mt-2 text-amber-800 text-sm">
           <strong>Licensed states:</strong> {licensedStates}
         </p>
       </div>
 
-      <a
-        href="/"
-        class="inline-block rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold transition-colors"
-      >
-        Visit Our Website
-      </a>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a
+          href="/free-quote#quote-form"
+          class="rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold transition-colors"
+        >
+          Try Again
+        </a>
+        <a
+          href="/"
+          class="rounded-lg border border-brand-600 text-brand-600 hover:bg-brand-50 px-6 py-3 font-semibold transition-colors"
+        >
+          Return Home
+        </a>
+      </div>
     </div>
   </div>
 
@@ -78,24 +81,3 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
     </div>
   </footer>
 </Base>
-
-<script>
-  type VercelAnalyticsWindow = Window & {
-    va?: {
-      track: (eventName: string, properties?: Record<string, string>) => void;
-    };
-  };
-
-  const analyticsWindow = window as VercelAnalyticsWindow;
-  const successTracked = sessionStorage.getItem('quote_success_tracked');
-
-  if (successTracked !== 'true') {
-    const interest = sessionStorage.getItem('quote_interest') ?? 'unknown';
-
-    analyticsWindow.va?.track('quote_form_success', {
-      interest,
-    });
-
-    sessionStorage.setItem('quote_success_tracked', 'true');
-  }
-</script>

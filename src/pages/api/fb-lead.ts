@@ -6,6 +6,7 @@ import { buildEmailMetadata, buildTrackedUrl, getMonitoredReplyTo, syncResendCon
 export const prerender = false;
 
 const RECIPIENTS = ['tim@legacyf-l.com', 'beth@legacyf-l.com'];
+const LICENSED_STATES = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Michigan, Texas, Utah, Alabama, and Louisiana';
 
 // ── Ringy CRM lead injection ───────────────────────────────────────
 // Requires two env vars from the client's Ringy account:
@@ -55,14 +56,14 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const resendKey = import.meta.env.RESEND_API_KEY;
   if (!resendKey) {
     console.error('RESEND_API_KEY is not set');
-    return redirect('/form-error', 302);
+    return redirect('/quote-error', 302);
   }
 
   let data: FormData;
   try {
     data = await request.formData();
   } catch {
-    return redirect('/form-error', 302);
+    return redirect('/quote-error', 302);
   }
 
   const name = String(data.get('name') ?? '').trim();
@@ -78,12 +79,12 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 
   // Basic server-side validation — all fields required
   if (!name || !email || !phone || !dob || !beneficiary || !state || !interest) {
-    return redirect('/form-error', 302);
+    return redirect('/quote-error', 302);
   }
 
   // Simple email format check
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return redirect('/form-error', 302);
+    return redirect('/quote-error', 302);
   }
 
   const resend = new Resend(resendKey);
@@ -211,10 +212,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
         </div>
 
         <div style="margin-top: 8px; text-align: center;">
-          <p style="font-size: 14px; color: #64748b; margin: 0 0 12px;">Can't wait? Give us a call anytime:</p>
-          <a href="tel:7063335641" style="display: inline-block; background: #1a62db; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
-            Call ${escapeHtml(site.phone)}
-          </a>
+          <p style="font-size: 14px; color: #64748b; margin: 0;">Keep an eye on your inbox. We'll follow up shortly with the next step.</p>
         </div>
 
         <!-- Divider -->
@@ -228,7 +226,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
               <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.5;">
                 Legacy Financial &amp; Life<br/>
                 Life, Medicare, Estate Planning &amp; Retirement Strategists<br/>
-                Licensed in Georgia · Serving families since 2009
+                Licensed in ${escapeHtml(LICENSED_STATES)}
               </p>
             </td>
           </tr>
@@ -239,7 +237,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       <div style="text-align: center; padding: 20px 28px;">
         <p style="font-size: 12px; color: #94a3b8; margin: 0; line-height: 1.6;">
           &copy; ${new Date().getFullYear()} Legacy Financial &amp; Life. All rights reserved.<br/>
-          Licensed in GA. This email is for informational purposes. Policies and features vary by carrier and state.<br/>
+          Licensed in ${escapeHtml(LICENSED_STATES)}. This email is for informational purposes. Policies and features vary by carrier and state.<br/>
           <a href="${escapeHtml(privacyUrl)}" style="color: #64748b;">Privacy Policy</a>
         </p>
       </div>
@@ -306,7 +304,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 
     if (internalResult.error) {
       console.error('Resend internal email error:', internalResult.error);
-      return redirect('/form-error', 302);
+      return redirect('/quote-error', 302);
     }
 
     if (confirmationResult.error) {
@@ -315,7 +313,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     }
   } catch (err) {
     console.error('Email send failed:', err);
-    return redirect('/form-error', 302);
+    return redirect('/quote-error', 302);
   }
 
   return redirect('/quote-success', 302);
