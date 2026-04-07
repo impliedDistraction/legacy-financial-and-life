@@ -1,0 +1,116 @@
+---
+import Base from '../layouts/Base.astro';
+import { site } from '../content/site';
+import '../styles/tailwind.css';
+---
+
+<Base title="Privacy Policy — Legacy Financial & Life" description="Privacy policy for Legacy Financial & Life. Learn how we collect, use, and protect your personal information.">
+  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
+    <div class="mx-auto max-w-6xl flex items-center justify-between gap-4 px-4 py-3">
+      <a href="/" class="flex items-center gap-2 min-w-0" aria-label="Legacy Financial & Life home">
+        <img src={site.branding.logo} alt={site.branding.logoAlt} class="h-10 w-10 flex-shrink-0 object-contain" width="40" height="40" />
+        <span class="font-bold text-lg text-slate-900 hidden sm:inline truncate">{site.name}</span>
+      </a>
+      <a href="/" class="text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors">
+        &larr; Back to Home
+      </a>
+    </div>
+  </header>
+
+  <section class="mx-auto max-w-3xl px-4 py-16 sm:py-20">
+    <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">Privacy Policy</h1>
+    <p class="text-sm text-slate-500 mb-10">Effective Date: April 7, 2026</p>
+
+    <div class="prose prose-slate max-w-none space-y-8 text-slate-700 leading-relaxed">
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900 mb-3">Who We Are</h2>
+        <p>
+          Legacy Financial &amp; Life ("we," "us," or "our") is a licensed insurance agency based in {site.cityState}. We specialize in life insurance, retirement planning, estate planning, and financial protection services.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900 mb-3">Information We Collect</h2>
+        <p>When you submit a form on our website, we may collect the following information:</p>
+        <ul class="list-disc pl-6 mt-2 space-y-1">
+          <li>Full name</li>
+          <li>Email address</li>
+          <li>Phone number</li>
+          <li>Date of birth</li>
+          <li>Beneficiary name</li>
+          <li>State of residence</li>
+          <li>Insurance interest or service preference</li>
+        </ul>
+        <p class="mt-3">
+          We also use Meta (Facebook) Pixel technology on certain pages. The Meta Pixel collects anonymized browsing data (such as page views) to help us measure the effectiveness of our advertising and deliver relevant ads. No personally identifiable form data is shared with Meta through the pixel.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900 mb-3">How We Use Your Information</h2>
+        <p>
+          The personal information you provide is collected <strong>solely for the purpose of providing you with an insurance quote</strong> and connecting you with a licensed professional from our team. Specifically, we use your information to:
+        </p>
+        <ul class="list-disc pl-6 mt-2 space-y-1">
+          <li>Respond to your quote request or inquiry</li>
+          <li>Contact you by phone, email, or text regarding your insurance options</li>
+          <li>Provide personalized policy recommendations</li>
+        </ul>
+      </div>
+
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900 mb-3">We Do Not Sell or Share Your Information</h2>
+        <p>
+          <strong>We do not sell, rent, trade, or otherwise share your personal information with third parties for marketing purposes.</strong> Your data is used exclusively by Legacy Financial &amp; Life to service your request. We may use trusted service providers (such as email delivery and CRM platforms) strictly to fulfill your inquiry — these providers are contractually obligated to protect your data and may not use it for any other purpose.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900 mb-3">Data Security</h2>
+        <p>
+          We take reasonable administrative and technical measures to protect your personal information from unauthorized access, loss, or misuse. Form submissions are transmitted securely and stored only as long as necessary to fulfill your request.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900 mb-3">Cookies &amp; Tracking</h2>
+        <p>
+          Our website may use cookies and similar tracking technologies, including the Meta (Facebook) Pixel, to analyze site traffic and measure advertising performance. These tools collect anonymized, aggregate data and do not capture the personal details you enter into our forms. You can manage your cookie preferences through your browser settings.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900 mb-3">Your Rights</h2>
+        <p>
+          You may request access to, correction of, or deletion of your personal information at any time by contacting us at <a href={`mailto:${site.email}`} class="text-brand-600 hover:text-brand-700 underline">{site.email}</a> or by calling <a href={`tel:${site.phone.replace(/[^0-9]/g, '')}`} class="text-brand-600 hover:text-brand-700 underline">{site.phone}</a>.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900 mb-3">Changes to This Policy</h2>
+        <p>
+          We may update this privacy policy from time to time. Any changes will be posted on this page with an updated effective date.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="text-xl font-semibold text-slate-900 mb-3">Contact Us</h2>
+        <p>
+          If you have questions about this privacy policy or how your information is handled, please contact us:
+        </p>
+        <ul class="list-none pl-0 mt-2 space-y-1">
+          <li><strong>{site.name}</strong></li>
+          <li>Email: <a href={`mailto:${site.email}`} class="text-brand-600 hover:text-brand-700 underline">{site.email}</a></li>
+          <li>Phone: <a href={`tel:${site.phone.replace(/[^0-9]/g, '')}`} class="text-brand-600 hover:text-brand-700 underline">{site.phone}</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="bg-slate-900 text-slate-400 py-8">
+    <div class="mx-auto max-w-6xl px-4 text-center text-sm space-y-2">
+      <p>&copy; {new Date().getFullYear()} {site.name}. All rights reserved.</p>
+      <p>{site.footerNote}</p>
+    </div>
+  </footer>
+</Base>

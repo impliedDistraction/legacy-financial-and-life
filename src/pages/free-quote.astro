@@ -238,10 +238,8 @@ import '../styles/tailwind.css';
             class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none bg-white"
           >
             <option value="">Select an option</option>
-            <option value="term-life">Term Life Insurance</option>
             <option value="whole-life">Whole Life Insurance</option>
             <option value="final-expense">Final Expense / Burial Coverage</option>
-            <option value="retirement">Retirement Planning</option>
             <option value="wealth">Generational Wealth Strategies</option>
             <option value="not-sure">Not sure — help me decide</option>
           </select>
@@ -256,7 +254,7 @@ import '../styles/tailwind.css';
 
         <!-- Consent Notice -->
         <p class="text-xs text-slate-500 leading-relaxed">
-          ⚠️ <strong>Consent Notice:</strong> By completing and submitting this form, you agree to be contacted by a licensed insurance professional via phone, text message, and email regarding your options.
+          ⚠️ <strong>Consent Notice:</strong> By completing and submitting this form, you agree to be contacted by a licensed insurance professional via phone, text message, and email regarding your options. See our <a href="/privacy" class="underline text-brand-600 hover:text-brand-700">Privacy Policy</a>.
         </p>
       </form>
     </div>
@@ -284,6 +282,7 @@ import '../styles/tailwind.css';
   <footer class="bg-slate-900 text-slate-400 py-8">
     <div class="mx-auto max-w-6xl px-4 text-center text-sm space-y-2">
       <p>{site.footerNote}</p>
+      <p><a href="/privacy" class="underline hover:text-white transition-colors">Privacy Policy</a></p>
     </div>
   </footer>
 </Base>

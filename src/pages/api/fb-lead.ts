@@ -43,10 +43,8 @@ async function pushToRingy(lead: {
 }
 
 const INTEREST_LABELS: Record<string, string> = {
-  'term-life': 'Term Life Insurance',
   'whole-life': 'Whole Life Insurance',
   'final-expense': 'Final Expense / Burial Coverage',
-  'retirement': 'Retirement Planning',
   'wealth': 'Generational Wealth Strategies',
   'not-sure': 'Not sure yet — help me decide',
 };
