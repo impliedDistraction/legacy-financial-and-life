@@ -22,28 +22,92 @@ import '../styles/tailwind.css';
   </header>
 
   <!-- Hero -->
-  <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 text-white py-20 sm:py-28">
-    <div class="mx-auto max-w-3xl px-4 text-center">
-      <h1 class="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight">
-        Life Insurance That<br />Actually Makes Sense
-      </h1>
+  <section class="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-brand-900 text-white py-20 sm:py-28">
+    <div class="absolute inset-0 opacity-40" aria-hidden="true">
+      <div class="absolute left-[-6rem] top-[-4rem] h-56 w-56 rounded-full bg-brand-500/20 blur-3xl"></div>
+      <div class="absolute bottom-[-5rem] right-[-3rem] h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl"></div>
+      <div class="absolute inset-x-0 top-0 h-px bg-white/10"></div>
+    </div>
 
-      <p class="mt-5 text-base text-slate-400 leading-relaxed max-w-md mx-auto">
-        We’ll walk you through your options, answer your questions, and help you find something that fits&nbsp;— on your timeline.
-      </p>
-      <a
-        href="#quote-form"
-        class="mt-10 inline-block rounded-lg bg-brand-600 hover:bg-brand-500 text-white px-8 py-4 font-semibold text-lg transition-colors shadow-lg shadow-brand-600/25"
-      >
-        Get Your Free Quote &darr;
-      </a>
-      <!-- Trust stats -->
-      <div class="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-400">
-        <span>Licensed since 2009</span>
-        <span class="hidden sm:inline text-slate-600" aria-hidden="true">&middot;</span>
-        <span>300+ policies written</span>
-        <span class="hidden sm:inline text-slate-600" aria-hidden="true">&middot;</span>
-        <span>Serving Georgia families</span>
+    <div class="relative mx-auto max-w-6xl px-4">
+      <div class="grid items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_22rem] lg:gap-14">
+        <div class="max-w-3xl">
+          <p class="inline-flex items-center rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-200">
+            Straightforward coverage guidance
+          </p>
+
+          <h1 class="mt-6 text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
+            Life Insurance That Fits Your Family, Budget, and Timeline
+          </h1>
+
+          <p class="mt-6 max-w-2xl text-lg leading-relaxed text-slate-300 sm:text-xl">
+            Request a quote, see what your options look like, and decide from a place of clarity instead of pressure. We keep the process simple and explain what matters.
+          </p>
+
+          <div class="mt-9 flex flex-col gap-4 sm:flex-row sm:items-center">
+            <a
+              href="#quote-form"
+              data-quote-cta="hero-primary"
+              class="inline-flex items-center justify-center rounded-lg bg-brand-600 px-8 py-4 text-lg font-semibold text-white shadow-lg shadow-brand-700/30 transition-colors hover:bg-brand-500"
+            >
+              Get Your Free Quote
+            </a>
+            <p class="text-sm text-slate-300">No obligation. No pushy follow-up. Just clear options.</p>
+          </div>
+
+          <div class="mt-10 grid gap-3 text-sm sm:grid-cols-3">
+            <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Experience</p>
+              <p class="mt-2 text-base font-semibold text-white">Licensed since 2009</p>
+            </div>
+            <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Track Record</p>
+              <p class="mt-2 text-base font-semibold text-white">300+ policies written</p>
+            </div>
+            <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
+              <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Focus</p>
+              <p class="mt-2 text-base font-semibold text-white">Serving Georgia families</p>
+            </div>
+          </div>
+        </div>
+
+        <aside class="rounded-3xl border border-white/10 bg-white/[0.08] p-6 shadow-2xl shadow-slate-950/30 backdrop-blur-sm">
+          <div class="flex items-center gap-3">
+            <img src="/images/quote-icons/shield-check.svg" alt="" class="h-12 w-12" width="48" height="48" />
+            <div>
+              <p class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-300">What to Expect</p>
+              <p class="mt-1 text-lg font-semibold text-white">A short, clear next step</p>
+            </div>
+          </div>
+
+          <ol class="mt-6 space-y-4 text-sm text-slate-300">
+            <li class="flex gap-3">
+              <span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/10 font-semibold text-white">1</span>
+              <div>
+                <p class="font-semibold text-white">Fill out one short form</p>
+                <p class="mt-1 leading-relaxed text-slate-400">Basic details help narrow the coverage that actually fits.</p>
+              </div>
+            </li>
+            <li class="flex gap-3">
+              <span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/10 font-semibold text-white">2</span>
+              <div>
+                <p class="font-semibold text-white">Review your options</p>
+                <p class="mt-1 leading-relaxed text-slate-400">Whole life, IUL, and final expense are compared in plain language.</p>
+              </div>
+            </li>
+            <li class="flex gap-3">
+              <span class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-white/10 font-semibold text-white">3</span>
+              <div>
+                <p class="font-semibold text-white">Move forward only if it makes sense</p>
+                <p class="mt-1 leading-relaxed text-slate-400">You decide on timing after you understand the tradeoffs.</p>
+              </div>
+            </li>
+          </ol>
+
+          <div class="mt-6 rounded-2xl border border-brand-400/20 bg-brand-400/10 px-4 py-4 text-sm text-slate-200">
+            Most people can get started without a medical exam, and the form typically takes about two minutes.
+          </div>
+        </aside>
       </div>
     </div>
   </section>
@@ -54,7 +118,7 @@ import '../styles/tailwind.css';
       <div class="grid md:grid-cols-2 gap-12 items-start">
         <div>
           <div class="flex items-center gap-3 mb-6">
-            <span class="text-3xl">✅</span>
+            <img src="/images/quote-icons/shield-check.svg" alt="" class="h-12 w-12" width="48" height="48" />
             <h2 class="text-3xl font-bold text-slate-900">Here's What We Offer</h2>
           </div>
           <ul class="space-y-4 text-slate-700 text-lg">
@@ -81,15 +145,15 @@ import '../styles/tailwind.css';
           <h3 class="mt-8 font-semibold text-slate-900 text-lg">Options include:</h3>
           <div class="mt-4 grid sm:grid-cols-3 gap-4">
             <div class="rounded-xl border border-slate-200 p-4 text-center hover:border-brand-300 hover-lift transition-colors">
-              <span class="text-2xl">💰</span>
+              <img src="/images/quote-icons/whole-life.svg" alt="" class="mx-auto h-14 w-14" width="56" height="56" />
               <p class="mt-2 font-medium text-slate-900">Whole Life Insurance</p>
             </div>
             <div class="rounded-xl border border-slate-200 p-4 text-center hover:border-brand-300 hover-lift transition-colors">
-              <span class="text-2xl">📈</span>
+              <img src="/images/quote-icons/indexed-life.svg" alt="" class="mx-auto h-14 w-14" width="56" height="56" />
               <p class="mt-2 font-medium text-slate-900">Indexed Universal Life</p>
             </div>
             <div class="rounded-xl border border-slate-200 p-4 text-center hover:border-brand-300 hover-lift transition-colors">
-              <span class="text-2xl">🤝</span>
+              <img src="/images/quote-icons/final-expense.svg" alt="" class="mx-auto h-14 w-14" width="56" height="56" />
               <p class="mt-2 font-medium text-slate-900">Final Expense &amp; Burial</p>
             </div>
           </div>
@@ -98,27 +162,27 @@ import '../styles/tailwind.css';
         <!-- Build More Than Protection -->
         <div>
           <div class="flex items-center gap-3 mb-6">
-            <span class="text-3xl">💡</span>
+            <img src="/images/quote-icons/strategy.svg" alt="" class="h-12 w-12" width="48" height="48" />
             <h2 class="text-3xl font-bold text-slate-900">It's Not Just a Policy</h2>
           </div>
           <p class="text-slate-600 mb-6 text-lg">The right coverage can do more than you think:</p>
           <ul class="space-y-4">
             <li class="flex items-start gap-4 bg-brand-50 rounded-lg p-4">
-              <span class="text-2xl">🏛️</span>
+              <img src="/images/quote-icons/legacy-building.svg" alt="" class="h-12 w-12 flex-shrink-0" width="48" height="48" />
               <div>
                 <p class="font-semibold text-slate-900">Leave Something Behind</p>
                 <p class="text-sm text-slate-600">Build wealth your kids and grandkids actually benefit from</p>
               </div>
             </li>
             <li class="flex items-start gap-4 bg-brand-50 rounded-lg p-4">
-              <span class="text-2xl">🔒</span>
+              <img src="/images/quote-icons/safe-growth.svg" alt="" class="h-12 w-12 flex-shrink-0" width="48" height="48" />
               <div>
                 <p class="font-semibold text-slate-900">Steady Growth You Can Count On</p>
                 <p class="text-sm text-slate-600">Safe money strategies that don't keep you up at night</p>
               </div>
             </li>
             <li class="flex items-start gap-4 bg-brand-50 rounded-lg p-4">
-              <span class="text-2xl">📈</span>
+              <img src="/images/quote-icons/retirement.svg" alt="" class="h-12 w-12 flex-shrink-0" width="48" height="48" />
               <div>
                 <p class="font-semibold text-slate-900">Retire on Your Terms</p>
                 <p class="text-sm text-slate-600">Tax-smart strategies so you actually enjoy the years you've earned</p>
@@ -151,7 +215,7 @@ import '../styles/tailwind.css';
   <section id="quote-form" class="bg-white py-16 sm:py-20 scroll-mt-20">
     <div class="mx-auto max-w-2xl px-4">
       <div class="text-center mb-10">
-        <span class="text-4xl">📩</span>
+        <img src="/images/quote-icons/contact.svg" alt="" class="mx-auto h-16 w-16" width="64" height="64" />
         <h2 class="mt-4 text-3xl sm:text-4xl font-bold text-slate-900">
           Let's Find the Right Fit
         </h2>
@@ -270,9 +334,12 @@ import '../styles/tailwind.css';
         </button>
 
         <!-- Consent Notice -->
-        <p class="text-xs text-slate-500 leading-relaxed">
-          ⚠️ <strong>Consent Notice:</strong> By completing and submitting this form, you agree to be contacted by a licensed insurance professional via phone, text message, and email regarding your options. See our <a href="/privacy" class="underline text-brand-600 hover:text-brand-700">Privacy Policy</a>.
-        </p>
+        <div class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+          <img src="/images/quote-icons/notice.svg" alt="" class="mt-0.5 h-8 w-8 flex-shrink-0" width="32" height="32" />
+          <p>
+            <strong class="text-slate-900">Consent Notice:</strong> By completing and submitting this form, you agree to be contacted by a licensed insurance professional via phone, text message, and email regarding your options. See our <a href="/privacy" class="underline text-brand-600 hover:text-brand-700">Privacy Policy</a>.
+          </p>
+        </div>
       </form>
     </div>
   </section>
@@ -288,6 +355,7 @@ import '../styles/tailwind.css';
       </p>
       <a
         href="#quote-form"
+        data-quote-cta="closer-primary"
         class="mt-8 inline-block rounded-lg bg-white text-brand-700 hover:bg-brand-50 px-8 py-4 font-semibold text-lg transition-colors"
       >
         Get Your Free Quote
@@ -305,11 +373,34 @@ import '../styles/tailwind.css';
 </Base>
 
 <script>
+  type VercelAnalyticsWindow = Window & {
+    va?: {
+      track: (eventName: string, properties?: Record<string, string>) => void;
+    };
+  };
+
   // Simple client-side loading state for the form
   const form = document.querySelector('#quote-form form') as HTMLFormElement | null;
   const btn = form?.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+  const analyticsWindow = window as VercelAnalyticsWindow;
+
+  document.querySelectorAll('[data-quote-cta]').forEach((element) => {
+    element.addEventListener('click', () => {
+      analyticsWindow.va?.track('quote_cta_click', {
+        location: element.getAttribute('data-quote-cta') ?? 'unknown',
+      });
+    });
+  });
+
   if (form && btn) {
     form.addEventListener('submit', () => {
+      const interest = (form.querySelector('select[name="interest"]') as HTMLSelectElement | null)?.value ?? 'unknown';
+      sessionStorage.setItem('quote_interest', interest);
+
+      analyticsWindow.va?.track('quote_form_submit_attempt', {
+        interest,
+      });
+
       btn.disabled = true;
       btn.textContent = 'Sending…';
       btn.classList.add('opacity-70', 'cursor-wait');
