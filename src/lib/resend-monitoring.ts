@@ -47,6 +47,13 @@ const TEMPLATE_CONFIG: Record<EmailTemplateKey, { campaign: string; source: stri
 
 const DEFAULT_ALERT_FROM = 'Legacy Financial Alerts <hello@legacyfinancial.app>';
 
+type ContactSyncInput = {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  properties?: Record<string, string | number | null>;
+};
+
 export function buildTrackedUrl(
   target: string,
   template: Exclude<EmailTemplateKey, 'resend_alert'>,
@@ -104,7 +111,86 @@ export function getMonitoredReplyTo(recipients: string[]): string | string[] | u
   return uniqueRecipients.length === 1 ? uniqueRecipients[0] : uniqueRecipients;
 }
 
+export async function syncResendContact(input: ContactSyncInput): Promise<boolean> {
+  const resendKey = import.meta.env.RESEND_API_KEY;
+  const email = normalizeEmail(input.email);
+
+  if (!resendKey || !email) {
+    return false;
+  }
+
+  const resend = new Resend(resendKey);
+  const segmentId = import.meta.env.RESEND_CONTACT_SEGMENT_ID?.trim();
+  const topicId = import.meta.env.RESEND_CONTACT_TOPIC_ID?.trim();
+  const properties = sanitizeContactProperties(input.properties);
+
+  const existingContact = await resend.contacts.get({ email });
+
+  if (existingContact.error?.name === 'not_found') {
+    const createResult = await resend.contacts.create({
+      email,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      properties,
+    });
+
+    if (createResult.error) {
+      throw new Error(`Failed to create Resend contact: ${createResult.error.message}`);
+    }
+  } else if (existingContact.error) {
+    throw new Error(`Failed to fetch Resend contact: ${existingContact.error.message}`);
+  } else {
+    const updateResult = await resend.contacts.update({
+      email,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      properties,
+    });
+
+    if (updateResult.error) {
+      throw new Error(`Failed to update Resend contact: ${updateResult.error.message}`);
+    }
+  }
+
+  const syncTasks: Array<Promise<unknown>> = [];
+
+  if (segmentId) {
+    syncTasks.push(resend.contacts.segments.add({ email, segmentId }));
+  }
+
+  if (topicId) {
+    syncTasks.push(
+      resend.contacts.topics.update({
+        email,
+        topics: [{ id: topicId, subscription: 'opt_in' }],
+      }),
+    );
+  }
+
+  const syncResults = await Promise.allSettled(syncTasks);
+  const syncFailures = syncResults.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+
+  if (syncFailures.length > 0) {
+    throw new Error(
+      syncFailures
+        .map((failure) => (failure.reason instanceof Error ? failure.reason.message : String(failure.reason)))
+        .join('; '),
+    );
+  }
+
+  return true;
+}
+
 export async function processResendWebhookEvent(event: ResendWebhookEvent): Promise<boolean> {
+  if (event.type === 'email.received') {
+    const contact = extractInboundContact(event);
+    if (contact) {
+      await syncResendContact(contact).catch((error) => {
+        console.error('Failed to sync inbound Resend contact', error);
+      });
+    }
+  }
+
   if (!ALERT_EVENT_TYPES.has(event.type) || isInternalAlertEvent(event)) {
     return false;
   }
@@ -288,6 +374,33 @@ function getReplyPreview(data: Record<string, unknown>): string | null {
   return rawText.replace(/\s+/g, ' ').trim().slice(0, 280);
 }
 
+function extractInboundContact(event: ResendWebhookEvent): ContactSyncInput | null {
+  const data = getEventData(event);
+  const fromValue = getStringValue(data.from);
+
+  if (!fromValue) {
+    return null;
+  }
+
+  const parsedAddress = parseEmailAddress(fromValue);
+  if (!parsedAddress) {
+    return null;
+  }
+
+  const parsedName = parseDisplayName(fromValue);
+  const [firstName, ...lastParts] = parsedName ? parsedName.split(/\s+/) : [];
+
+  return {
+    email: parsedAddress,
+    firstName: firstName || undefined,
+    lastName: lastParts.join(' ') || undefined,
+    properties: {
+      source: 'resend_inbound',
+      last_inbound_event_at: event.created_at ?? null,
+    },
+  };
+}
+
 function renderAlertHtml(intro: string, lines: string[], severity: AlertSeverity): string {
   const accent = severity === 'critical' ? '#b91c1c' : severity === 'warning' ? '#b45309' : '#0f766e';
   const rows = lines
@@ -344,6 +457,40 @@ function parseCsv(value: string | undefined): string[] {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function sanitizeContactProperties(
+  value: ContactSyncInput['properties'],
+): Record<string, string | number | null> | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const entries = Object.entries(value).filter(([, entryValue]) => {
+    return entryValue === null || typeof entryValue === 'string' || typeof entryValue === 'number';
+  });
+
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  return Object.fromEntries(entries);
+}
+
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function parseEmailAddress(value: string): string | null {
+  const bracketMatch = value.match(/<([^>]+)>/);
+  const candidate = bracketMatch?.[1] ?? value;
+  const normalized = normalizeEmail(candidate);
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) ? normalized : null;
+}
+
+function parseDisplayName(value: string): string {
+  return value.replace(/<[^>]+>/g, '').replace(/"/g, '').trim();
 }
 
 function sanitizeTagName(value: string): string {

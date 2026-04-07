@@ -8,6 +8,8 @@ interface ImportMetaEnv {
 	readonly RESEND_ALERT_FROM?: string;
 	readonly RESEND_ALERT_RECIPIENTS?: string;
 	readonly RESEND_ALERT_WEBHOOK_URL?: string;
+	readonly RESEND_CONTACT_SEGMENT_ID?: string;
+	readonly RESEND_CONTACT_TOPIC_ID?: string;
 	readonly RESEND_REPLY_MONITOR_ADDRESS?: string;
 	readonly RESEND_WEBHOOK_SECRET?: string;
 	readonly RINGY_API_URL?: string;

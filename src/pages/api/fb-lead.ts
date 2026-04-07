@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { Resend } from 'resend';
 import { site } from '../../content/site';
-import { buildEmailMetadata, buildTrackedUrl, getMonitoredReplyTo } from '../../lib/resend-monitoring';
+import { buildEmailMetadata, buildTrackedUrl, getMonitoredReplyTo, syncResendContact } from '../../lib/resend-monitoring';
 
 export const prerender = false;
 
@@ -289,6 +289,19 @@ export const POST: APIRoute = async ({ request, redirect }) => {
         phone: phone || undefined,
         notes: noteLines.join('\n'),
       }).catch((err) => console.error('Ringy CRM push failed:', err)),
+      syncResendContact({
+        email,
+        firstName: crmFirstName,
+        lastName: crmLastName || undefined,
+        properties: {
+          source: 'facebook_quote_form',
+          interest,
+          state,
+          beneficiary,
+          phone,
+          last_quote_request_at: new Date().toISOString(),
+        },
+      }).catch((err) => console.error('Resend contact sync failed:', err)),
     ]);
 
     if (internalResult.error) {

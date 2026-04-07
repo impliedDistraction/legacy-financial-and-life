@@ -56,6 +56,8 @@ Environment variables:
 - `RESEND_API_KEY`: required for the quote form and alert emails.
 - `RESEND_WEBHOOK_SECRET`: required by `/api/resend-webhook` to verify Resend signatures.
 - `RESEND_REPLY_MONITOR_ADDRESS`: optional inbound address for monitored replies. This must be an address on a domain configured for Resend receiving, for example `quotes@reply.legacyfinancial.app`.
+- `RESEND_CONTACT_SEGMENT_ID`: optional Resend segment to auto-enroll new lead and inbound contacts for broadcasts.
+- `RESEND_CONTACT_TOPIC_ID`: optional Resend topic to auto-opt-in new lead and inbound contacts.
 - `RESEND_ALERT_RECIPIENTS`: optional comma-separated alert recipients.
 - `RESEND_ALERT_WEBHOOK_URL`: optional outbound webhook for alert fan-out to Slack or another relay.
 - `RESEND_ALERT_FROM`: optional sender override for alert emails.
@@ -68,6 +70,7 @@ Resend dashboard setup:
 What this adds:
 - Consistent `utm_*` parameters on quote confirmation email links.
 - Consistent Resend tags and headers per quote email template.
+- Automatic Resend contact sync for quote leads and inbound received emails.
 - Verified webhook processing for failures, delivery delays, suppressions, complaints, and inbound replies.
 
 ## Customization
