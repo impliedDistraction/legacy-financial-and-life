@@ -1,5 +1,7 @@
 import type { APIRoute } from 'astro';
 import { Resend } from 'resend';
+import { site } from '../../content/site';
+import { buildEmailMetadata, buildTrackedUrl, getMonitoredReplyTo } from '../../lib/resend-monitoring';
 
 export const prerender = false;
 
@@ -71,7 +73,8 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const state = String(data.get('state') ?? '').trim();
   const interest = String(data.get('interest') ?? '').trim();
   const interestLabel = INTEREST_LABELS[interest] ?? interest;
-  const firstName = escapeHtml(name.split(' ')[0]);
+  const rawFirstName = name.split(' ')[0] ?? 'there';
+  const firstName = escapeHtml(rawFirstName);
 
   // Basic server-side validation — all fields required
   if (!name || !email || !phone || !dob || !beneficiary || !state || !interest) {
@@ -84,6 +87,18 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   }
 
   const resend = new Resend(resendKey);
+  const internalEmailMetadata = buildEmailMetadata('quote_internal', {
+    interest,
+    route: 'free_quote',
+  });
+  const confirmationEmailMetadata = buildEmailMetadata('quote_confirmation', {
+    interest,
+    route: 'free_quote',
+  });
+  const scheduleUrl = buildTrackedUrl('/schedule', 'quote_confirmation', 'schedule_cta');
+  const websiteUrl = buildTrackedUrl('/', 'quote_confirmation', 'site_cta');
+  const privacyUrl = buildTrackedUrl('/privacy', 'quote_confirmation', 'privacy_link');
+  const replyToRecipients = getMonitoredReplyTo(['beth@legacyf-l.com']);
 
   // ── Internal lead notification email (to Tim & Beth) ──────────────
   const internalHtml = `
@@ -186,9 +201,19 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 
         <!-- CTA -->
         <div style="margin-top: 28px; text-align: center;">
+          <p style="font-size: 14px; color: #334155; margin: 0 0 12px;">Want to move faster? Pick a time or reply to this email and we'll work around your schedule.</p>
+          <a href="${escapeHtml(scheduleUrl)}" style="display: inline-block; background: #0f172a; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; margin: 0 8px 12px;">
+            Schedule a Call
+          </a>
+          <a href="${escapeHtml(websiteUrl)}" style="display: inline-block; background: #eff6ff; color: #1d4ed8; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; margin: 0 8px 12px;">
+            Visit Our Website
+          </a>
+        </div>
+
+        <div style="margin-top: 8px; text-align: center;">
           <p style="font-size: 14px; color: #64748b; margin: 0 0 12px;">Can't wait? Give us a call anytime:</p>
           <a href="tel:7063335641" style="display: inline-block; background: #1a62db; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
-            Call (706) 333-5641
+            Call ${escapeHtml(site.phone)}
           </a>
         </div>
 
@@ -214,7 +239,8 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       <div style="text-align: center; padding: 20px 28px;">
         <p style="font-size: 12px; color: #94a3b8; margin: 0; line-height: 1.6;">
           &copy; ${new Date().getFullYear()} Legacy Financial &amp; Life. All rights reserved.<br/>
-          Licensed in GA. This email is for informational purposes. Policies and features vary by carrier and state.
+          Licensed in GA. This email is for informational purposes. Policies and features vary by carrier and state.<br/>
+          <a href="${escapeHtml(privacyUrl)}" style="color: #64748b;">Privacy Policy</a>
         </p>
       </div>
     </div>
@@ -243,13 +269,17 @@ export const POST: APIRoute = async ({ request, redirect }) => {
         subject: `New Quote Request: ${name}`,
         html: internalHtml,
         replyTo: email,
+        headers: internalEmailMetadata.headers,
+        tags: internalEmailMetadata.tags,
       }),
       resend.emails.send({
         from: 'Legacy Financial & Life <hello@legacyfinancial.app>',
         to: [email],
-        subject: `${firstName}, we received your quote request!`,
+        subject: `${rawFirstName}, we received your quote request!`,
         html: confirmationHtml,
-        replyTo: 'beth@legacyf-l.com',
+        replyTo: replyToRecipients,
+        headers: confirmationEmailMetadata.headers,
+        tags: confirmationEmailMetadata.tags,
       }),
       // CRM push — fire-and-forget; failure is logged but never blocks the user
       pushToRingy({
