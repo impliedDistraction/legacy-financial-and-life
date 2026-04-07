@@ -13,11 +13,13 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
   <!-- Minimal header — no nav links to keep conversion focus -->
   <header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
     <div class="mx-auto max-w-6xl flex items-center justify-between gap-4 px-4 py-3">
-      <div class="flex items-center gap-3 min-w-0">
-        <a href="/" class="flex-shrink-0" aria-label="Legacy Financial & Life home">
+      <div class="flex min-w-0 items-center gap-3">
+        <a href="/" class="flex h-10 w-10 flex-shrink-0 items-center justify-center" aria-label="Legacy Financial & Life home">
           <img src={site.branding.logo} alt={site.branding.logoAlt} class="h-10 w-10 object-contain" width="40" height="40" />
         </a>
-        <img src="/images/fb-crest-logo.jpeg" alt="Lifetime Safeguard logo" class="h-10 w-10 flex-shrink-0 object-contain" width="40" height="40" />
+        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-sm">
+          <img src="/images/fb-crest-logo.jpeg" alt="Lifetime Safeguard logo" class="h-10 w-10 object-contain scale-[1.28] -translate-y-0.5" width="40" height="40" />
+        </div>
       </div>
       <span class="text-sm font-medium text-brand-600">Free Quote — No Obligation</span>
     </div>
@@ -60,11 +62,11 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
           <div class="mt-10 grid gap-3 text-sm sm:grid-cols-3">
             <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
               <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Experience</p>
-              <p class="mt-2 text-base font-semibold text-white">Licensed since 2009</p>
+              <p class="mt-2 text-base font-semibold text-white">20+ years of combined experience</p>
             </div>
             <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
               <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Track Record</p>
-              <p class="mt-2 text-base font-semibold text-white">300+ policies written</p>
+              <p class="mt-2 text-base font-semibold text-white">1,000+ policies managed</p>
             </div>
             <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 backdrop-blur-sm">
               <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Focus</p>
