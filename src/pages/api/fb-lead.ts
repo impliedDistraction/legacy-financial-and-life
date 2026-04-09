@@ -67,7 +67,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   }
 
   const name = String(data.get('name') ?? '').trim();
-  const email = String(data.get('email') ?? '').trim();
+  const email = normalizeEmailAddress(String(data.get('email') ?? ''));
   const phone = String(data.get('phone') ?? '').trim();
   const dob = String(data.get('dob') ?? '').trim();
   const beneficiary = String(data.get('beneficiary') ?? '').trim();
@@ -326,4 +326,19 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function normalizeEmailAddress(value: string): string {
+  const trimmed = value.trim();
+  const atIndex = trimmed.lastIndexOf('@');
+
+  if (atIndex === -1) {
+    return trimmed;
+  }
+
+  const localPart = trimmed.slice(0, atIndex);
+  const domain = trimmed.slice(atIndex + 1);
+  const normalizedDomain = domain.toLowerCase().replace(/\.comn$/i, '.com');
+
+  return `${localPart}@${normalizedDomain}`;
 }

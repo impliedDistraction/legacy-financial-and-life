@@ -393,7 +393,23 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
   // Simple client-side loading state for the form
   const form = document.querySelector('#quote-form form') as HTMLFormElement | null;
   const btn = form?.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+  const emailInput = form?.querySelector('input[name="email"]') as HTMLInputElement | null;
   const analyticsWindow = window as VercelAnalyticsWindow;
+
+  const normalizeEmailAddress = (value: string): string => {
+    const trimmed = value.trim();
+    const atIndex = trimmed.lastIndexOf('@');
+
+    if (atIndex === -1) {
+      return trimmed;
+    }
+
+    const localPart = trimmed.slice(0, atIndex);
+    const domain = trimmed.slice(atIndex + 1);
+    const normalizedDomain = domain.toLowerCase().replace(/\.comn$/i, '.com');
+
+    return `${localPart}@${normalizedDomain}`;
+  };
 
   document.querySelectorAll('[data-quote-cta]').forEach((element) => {
     element.addEventListener('click', () => {
@@ -403,8 +419,24 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
     });
   });
 
+  if (emailInput) {
+    const normalizeEmailField = () => {
+      const normalizedEmail = normalizeEmailAddress(emailInput.value);
+      if (normalizedEmail !== emailInput.value.trim()) {
+        emailInput.value = normalizedEmail;
+      }
+    };
+
+    emailInput.addEventListener('blur', normalizeEmailField);
+    emailInput.addEventListener('change', normalizeEmailField);
+  }
+
   if (form && btn) {
     form.addEventListener('submit', () => {
+      if (emailInput) {
+        emailInput.value = normalizeEmailAddress(emailInput.value);
+      }
+
       const interest = (form.querySelector('select[name="interest"]') as HTMLSelectElement | null)?.value ?? 'unknown';
       sessionStorage.setItem('quote_interest', interest);
       sessionStorage.removeItem('quote_success_tracked');
