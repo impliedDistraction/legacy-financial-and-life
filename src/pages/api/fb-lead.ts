@@ -49,7 +49,7 @@ const INTEREST_LABELS: Record<string, string> = {
   'whole-life': 'Whole Life Insurance',
   'final-expense': 'Final Expense / Burial Coverage',
   'wealth': 'Generational Wealth Strategies',
-  'not-sure': 'Not sure yet — help me decide',
+  'not-sure': 'Need help deciding',
 };
 
 const TOBACCO_USE_LABELS: Record<string, string> = {
@@ -226,16 +226,16 @@ export const POST: APIRoute = async ({ request, redirect }) => {
           </tr>
         </table>
 
+        <div style="margin-top: 24px; padding: 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+          <p style="margin: 0; font-size: 14px; color: #1d4ed8; line-height: 1.6;">
+            Keep an eye on your inbox. We'll follow up shortly with the next step. If you need anything sooner, you can reply directly to this email.
+          </p>
+        </div>
+
         <!-- What they're interested in -->
         <div style="margin-top: 24px; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
           <p style="margin: 0; font-size: 14px; color: #166534;">
             <strong>Your interest:</strong> ${escapeHtml(interestLabel)}
-          </p>
-        </div>
-
-        <div style="margin-top: 24px; padding: 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
-          <p style="margin: 0; font-size: 14px; color: #1d4ed8; line-height: 1.6;">
-            Keep an eye on your inbox. We'll follow up shortly with the next step. If you need anything sooner, you can reply directly to this email.
           </p>
         </div>
       </div>
