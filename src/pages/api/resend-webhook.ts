@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { Resend } from 'resend';
+import { Webhook } from 'svix';
 import { processResendWebhookEvent } from '../../lib/resend-monitoring';
 
 export const prerender = false;
@@ -20,18 +20,14 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const payload = await request.text();
-  const resend = new Resend();
+  const webhook = new Webhook(webhookSecret);
 
   let event;
   try {
-    event = resend.webhooks.verify({
-      payload,
-      headers: {
-        id: svixId,
-        timestamp: svixTimestamp,
-        signature: svixSignature,
-      },
-      webhookSecret,
+    event = webhook.verify(payload, {
+      'svix-id': svixId,
+      'svix-timestamp': svixTimestamp,
+      'svix-signature': svixSignature,
     });
   } catch (error) {
     console.error('Invalid Resend webhook signature', error);

@@ -142,14 +142,16 @@ export async function syncResendContact(input: ContactSyncInput): Promise<boolea
   const existingContact = await getResendContactByEmail(resendKey, email);
 
   if (!existingContact) {
-    const createdContact = await createResendContact(resendKey, {
+    const createPayload = {
       email,
       firstName: input.firstName,
       lastName: input.lastName,
       properties,
       ...(segmentId ? { segments: [{ id: segmentId }] } : {}),
       ...(topicId ? { topics: [{ id: topicId, subscription: 'opt_in' as const }] } : {}),
-    });
+    };
+
+    const createdContact = await createResendContactWithFallback(resendKey, createPayload);
 
     console.info('Resend contact created', {
       email: maskEmail(email),
@@ -160,7 +162,7 @@ export async function syncResendContact(input: ContactSyncInput): Promise<boolea
     return true;
   }
 
-  const updatedContact = await updateResendContact(resendKey, {
+  const updatedContact = await updateResendContactWithFallback(resendKey, {
     email,
     firstName: input.firstName,
     lastName: input.lastName,
@@ -205,6 +207,34 @@ async function createResendContact(
   return response.data;
 }
 
+async function createResendContactWithFallback(
+  resendKey: string,
+  payload: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    properties?: Record<string, string | number | null>;
+    segments?: Array<{ id: string }>;
+    topics?: Array<{ id: string; subscription: 'opt_in' | 'opt_out' }>;
+  },
+): Promise<ResendContactRecord> {
+  try {
+    return await createResendContact(resendKey, payload);
+  } catch (error) {
+    if (!payload.properties || !isUndefinedResendPropertyError(error)) {
+      throw error;
+    }
+
+    console.warn('Resend contact create rejected custom properties; retrying without properties', {
+      email: maskEmail(payload.email),
+      propertyKeys: Object.keys(payload.properties),
+    });
+
+    const { properties: _properties, ...payloadWithoutProperties } = payload;
+    return createResendContact(resendKey, payloadWithoutProperties);
+  }
+}
+
 async function updateResendContact(
   resendKey: string,
   payload: {
@@ -221,6 +251,32 @@ async function updateResendContact(
     payload,
   );
   return response.data;
+}
+
+async function updateResendContactWithFallback(
+  resendKey: string,
+  payload: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    properties?: Record<string, string | number | null>;
+  },
+): Promise<ResendContactRecord> {
+  try {
+    return await updateResendContact(resendKey, payload);
+  } catch (error) {
+    if (!payload.properties || !isUndefinedResendPropertyError(error)) {
+      throw error;
+    }
+
+    console.warn('Resend contact update rejected custom properties; retrying without properties', {
+      email: maskEmail(payload.email),
+      propertyKeys: Object.keys(payload.properties),
+    });
+
+    const { properties: _properties, ...payloadWithoutProperties } = payload;
+    return updateResendContact(resendKey, payloadWithoutProperties);
+  }
 }
 
 async function resendContactsRequest<T>(
@@ -274,6 +330,14 @@ function buildResendApiErrorMessage(status: number, parsed: unknown, fallback: s
   const name = getStringValue(record?.name);
 
   return name ? `Resend API ${status} ${name}: ${message}` : `Resend API ${status}: ${message}`;
+}
+
+function isUndefinedResendPropertyError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /validation_error/i.test(error.message) && /properties do not exist/i.test(error.message);
 }
 
 function maskEmail(value: string): string {
