@@ -86,6 +86,17 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const rawFirstName = name.split(' ')[0] ?? 'there';
   const firstName = escapeHtml(rawFirstName);
 
+  console.info('Quote lead request received', {
+    route: 'free_quote',
+    emailDomain: getEmailDomain(email),
+    interest,
+    hasResendApiKey: Boolean(resendKey),
+    hasReplyMonitorAddress: Boolean(import.meta.env.RESEND_REPLY_MONITOR_ADDRESS?.trim()),
+    hasContactSegmentId: Boolean(import.meta.env.RESEND_CONTACT_SEGMENT_ID?.trim()),
+    hasContactTopicId: Boolean(import.meta.env.RESEND_CONTACT_TOPIC_ID?.trim()),
+    hasRingyConfig: Boolean(import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_API_URL?.trim()),
+  });
+
   // Basic server-side validation — all fields required
   if (!name || !email || !phone || !dob || !height || !weight || !beneficiary || !state || !interest || !tobaccoUse) {
     return redirect('/quote-error', 302);
@@ -330,6 +341,14 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       }).catch((err) => console.error('Resend contact sync failed:', err)),
     ]);
 
+    console.info('Quote lead pipeline results', {
+      route: 'free_quote',
+      internalEmailId: internalResult.data?.id ?? null,
+      internalEmailError: internalResult.error?.message ?? null,
+      confirmationEmailId: confirmationResult.data?.id ?? null,
+      confirmationEmailError: confirmationResult.error?.message ?? null,
+    });
+
     if (internalResult.error) {
       console.error('Resend internal email error:', internalResult.error);
       return redirect('/quote-error', 302);
@@ -369,6 +388,11 @@ function normalizeEmailAddress(value: string): string {
   const normalizedDomain = domain.toLowerCase().replace(/\.comn$/i, '.com');
 
   return `${localPart}@${normalizedDomain}`;
+}
+
+function getEmailDomain(value: string): string {
+  const atIndex = value.lastIndexOf('@');
+  return atIndex === -1 ? 'invalid' : value.slice(atIndex + 1).toLowerCase();
 }
 
 function buildDobValue(data: FormData): string {

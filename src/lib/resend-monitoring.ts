@@ -54,6 +54,11 @@ type ContactSyncInput = {
   properties?: Record<string, string | number | null>;
 };
 
+type ResendContactRecord = {
+  id: string;
+  email: string;
+};
+
 export function buildTrackedUrl(
   target: string,
   template: Exclude<EmailTemplateKey, 'resend_alert'>,
@@ -116,69 +121,170 @@ export async function syncResendContact(input: ContactSyncInput): Promise<boolea
   const email = normalizeEmail(input.email);
 
   if (!resendKey || !email) {
+    console.warn('Resend contact sync skipped', {
+      hasResendApiKey: Boolean(resendKey),
+      hasEmail: Boolean(email),
+    });
     return false;
   }
 
-  const resend = new Resend(resendKey);
   const segmentId = import.meta.env.RESEND_CONTACT_SEGMENT_ID?.trim();
   const topicId = import.meta.env.RESEND_CONTACT_TOPIC_ID?.trim();
   const properties = sanitizeContactProperties(input.properties);
 
-  const existingContact = await resend.contacts.get({ email });
+  console.info('Resend contact sync started', {
+    email: maskEmail(email),
+    hasSegmentId: Boolean(segmentId),
+    hasTopicId: Boolean(topicId),
+    propertyKeys: Object.keys(properties ?? {}),
+  });
 
-  if (existingContact.error?.name === 'not_found') {
-    const createResult = await resend.contacts.create({
+  const existingContact = await getResendContactByEmail(resendKey, email);
+
+  if (!existingContact) {
+    const createdContact = await createResendContact(resendKey, {
       email,
       firstName: input.firstName,
       lastName: input.lastName,
       properties,
+      ...(segmentId ? { segments: [{ id: segmentId }] } : {}),
+      ...(topicId ? { topics: [{ id: topicId, subscription: 'opt_in' as const }] } : {}),
     });
 
-    if (createResult.error) {
-      throw new Error(`Failed to create Resend contact: ${createResult.error.message}`);
-    }
-  } else if (existingContact.error) {
-    throw new Error(`Failed to fetch Resend contact: ${existingContact.error.message}`);
-  } else {
-    const updateResult = await resend.contacts.update({
-      email,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      properties,
+    console.info('Resend contact created', {
+      email: maskEmail(email),
+      contactId: createdContact.id,
+      segmentAttached: Boolean(segmentId),
+      topicAttached: Boolean(topicId),
     });
-
-    if (updateResult.error) {
-      throw new Error(`Failed to update Resend contact: ${updateResult.error.message}`);
-    }
+    return true;
   }
 
-  const syncTasks: Array<Promise<unknown>> = [];
+  const updatedContact = await updateResendContact(resendKey, {
+    email,
+    firstName: input.firstName,
+    lastName: input.lastName,
+    properties,
+  });
 
-  if (segmentId) {
-    syncTasks.push(resend.contacts.segments.add({ email, segmentId }));
-  }
+  console.info('Resend contact updated', {
+    email: maskEmail(email),
+    contactId: updatedContact.id,
+    segmentAttached: false,
+    topicAttached: false,
+  });
 
-  if (topicId) {
-    syncTasks.push(
-      resend.contacts.topics.update({
-        email,
-        topics: [{ id: topicId, subscription: 'opt_in' }],
-      }),
-    );
-  }
-
-  const syncResults = await Promise.allSettled(syncTasks);
-  const syncFailures = syncResults.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
-
-  if (syncFailures.length > 0) {
-    throw new Error(
-      syncFailures
-        .map((failure) => (failure.reason instanceof Error ? failure.reason.message : String(failure.reason)))
-        .join('; '),
-    );
+  if (segmentId || topicId) {
+    console.warn('Resend contact exists; segment/topic assignment is only applied on create with the current Contacts API integration', {
+      email: maskEmail(email),
+      hasSegmentId: Boolean(segmentId),
+      hasTopicId: Boolean(topicId),
+    });
   }
 
   return true;
+}
+
+async function getResendContactByEmail(resendKey: string, email: string): Promise<ResendContactRecord | null> {
+  const response = await resendContactsRequest<ResendContactRecord>(resendKey, 'GET', `/contacts/${encodeURIComponent(email)}`);
+  return response.status === 404 ? null : response.data;
+}
+
+async function createResendContact(
+  resendKey: string,
+  payload: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    properties?: Record<string, string | number | null>;
+    segments?: Array<{ id: string }>;
+    topics?: Array<{ id: string; subscription: 'opt_in' | 'opt_out' }>;
+  },
+): Promise<ResendContactRecord> {
+  const response = await resendContactsRequest<ResendContactRecord>(resendKey, 'POST', '/contacts', payload);
+  return response.data;
+}
+
+async function updateResendContact(
+  resendKey: string,
+  payload: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    properties?: Record<string, string | number | null>;
+  },
+): Promise<ResendContactRecord> {
+  const response = await resendContactsRequest<ResendContactRecord>(
+    resendKey,
+    'PATCH',
+    `/contacts/${encodeURIComponent(payload.email)}`,
+    payload,
+  );
+  return response.data;
+}
+
+async function resendContactsRequest<T>(
+  resendKey: string,
+  method: 'GET' | 'POST' | 'PATCH',
+  path: string,
+  body?: Record<string, unknown>,
+): Promise<{ data: T; status: number }> {
+  const response = await fetch(`https://api.resend.com${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${resendKey}`,
+      'Content-Type': 'application/json',
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+  const responseText = await response.text();
+  const parsed = parseJsonResponse(responseText);
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      return { data: null as T, status: 404 };
+    }
+
+    throw new Error(buildResendApiErrorMessage(response.status, parsed, responseText));
+  }
+
+  return {
+    data: parsed as T,
+    status: response.status,
+  };
+}
+
+function parseJsonResponse(value: string): unknown {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function buildResendApiErrorMessage(status: number, parsed: unknown, fallback: string): string {
+  const record = getNestedRecord(parsed);
+  const fallbackMessage = fallback.trim() || 'Unknown Resend API error';
+  const message = getStringValue(record?.message) ?? getStringValue(record?.error) ?? fallbackMessage;
+  const name = getStringValue(record?.name);
+
+  return name ? `Resend API ${status} ${name}: ${message}` : `Resend API ${status}: ${message}`;
+}
+
+function maskEmail(value: string): string {
+  const [localPart, domain = 'unknown'] = value.split('@');
+
+  if (!localPart) {
+    return `***@${domain}`;
+  }
+
+  const visible = localPart.slice(0, 2);
+  return `${visible}${'*'.repeat(Math.max(localPart.length - visible.length, 1))}@${domain}`;
 }
 
 export async function processResendWebhookEvent(event: ResendWebhookEvent): Promise<boolean> {
