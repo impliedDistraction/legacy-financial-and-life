@@ -7,21 +7,14 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
 ---
 
 <Base
-  title="Free Life Insurance Quote — Legacy Financial & Life"
+  title="Free Life Insurance Quote"
   description="Get a free, no-obligation life insurance quote. Coverage for ages 0–85, no medical exams in most cases. Whole life, IUL, and final expense options."
 >
   <!-- Minimal header — no nav links to keep conversion focus -->
   <header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
     <div class="mx-auto max-w-6xl flex items-center justify-between gap-4 px-4 py-3">
-      <div class="flex min-w-0 items-center gap-3">
-        <a href="/" class="flex h-10 w-10 flex-shrink-0 items-center justify-center" aria-label="Legacy Financial & Life home">
-          <img src={site.branding.logo} alt={site.branding.logoAlt} class="h-10 w-10 object-contain" width="40" height="40" />
-        </a>
-        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-sm">
-          <img src="/images/fb-crest-logo.jpeg" alt="Lifetime Safeguard logo" class="h-10 w-10 object-contain scale-[1.28] -translate-y-0.5" width="40" height="40" />
-        </div>
-      </div>
-      <span class="text-sm font-medium text-brand-600">Free Quote — No Obligation</span>
+      <span class="text-sm font-medium text-brand-600">Free Quote Request</span>
+      <span class="text-xs text-slate-500">No obligation</span>
     </div>
   </header>
 
@@ -282,15 +275,15 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
 
         <label class="grid gap-1">
           <span class="text-sm font-medium text-slate-700">Date of Birth <span class="text-red-500">*</span></span>
-          <div class="grid grid-cols-3 gap-3">
-            <label class="grid gap-1">
+          <div class="grid gap-3 sm:grid-cols-3">
+            <label class="grid min-w-0 gap-1">
               <span class="sr-only">Birth month</span>
               <select
                 name="dobMonth"
                 required
                 autocomplete="bday-month"
                 aria-label="Birth month"
-                class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none bg-white"
+                class="w-full min-w-0 rounded-lg border border-slate-300 bg-white px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
               >
                 <option value="">Month</option>
                 <option value="01">Jan</option>
@@ -307,7 +300,7 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
                 <option value="12">Dec</option>
               </select>
             </label>
-            <label class="grid gap-1">
+            <label class="grid min-w-0 gap-1">
               <span class="sr-only">Birth day</span>
               <input
                 type="text"
@@ -319,10 +312,10 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
                 pattern="[0-9]{1,2}"
                 aria-label="Birth day"
                 placeholder="Day"
-                class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+                class="w-full min-w-0 rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
               />
             </label>
-            <label class="grid gap-1">
+            <label class="grid min-w-0 gap-1">
               <span class="sr-only">Birth year</span>
               <input
                 type="text"
@@ -334,7 +327,7 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
                 pattern="[0-9]{4}"
                 aria-label="Birth year"
                 placeholder="Year"
-                class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+                class="w-full min-w-0 rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
               />
             </label>
           </div>

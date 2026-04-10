@@ -120,9 +120,6 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     interest,
     route: 'free_quote',
   });
-  const scheduleUrl = buildTrackedUrl('/schedule', 'quote_confirmation', 'schedule_cta');
-  const websiteUrl = buildTrackedUrl('/', 'quote_confirmation', 'site_cta');
-  const privacyUrl = buildTrackedUrl('/privacy', 'quote_confirmation', 'privacy_link');
   const replyToRecipients = getMonitoredReplyTo(['beth@legacyf-l.com']);
 
   // ── Internal lead notification email (to Tim & Beth) ──────────────
@@ -236,46 +233,11 @@ export const POST: APIRoute = async ({ request, redirect }) => {
           </p>
         </div>
 
-        <!-- CTA -->
-        <div style="margin-top: 28px; text-align: center;">
-          <p style="font-size: 14px; color: #334155; margin: 0 0 12px;">Want to move faster? Pick a time or reply to this email and we'll work around your schedule.</p>
-          <a href="${escapeHtml(scheduleUrl)}" style="display: inline-block; background: #0f172a; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; margin: 0 8px 12px;">
-            Schedule a Call
-          </a>
-          <a href="${escapeHtml(websiteUrl)}" style="display: inline-block; background: #eff6ff; color: #1d4ed8; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; margin: 0 8px 12px;">
-            Visit Our Website
-          </a>
+        <div style="margin-top: 24px; padding: 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;">
+          <p style="margin: 0; font-size: 14px; color: #1d4ed8; line-height: 1.6;">
+            Keep an eye on your inbox. We'll follow up shortly with the next step. If you need anything sooner, you can reply directly to this email.
+          </p>
         </div>
-
-        <div style="margin-top: 8px; text-align: center;">
-          <p style="font-size: 14px; color: #64748b; margin: 0;">Keep an eye on your inbox. We'll follow up shortly with the next step.</p>
-        </div>
-
-        <!-- Divider -->
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 28px 0;" />
-
-        <!-- About us -->
-        <table style="width: 100%;">
-          <tr>
-            <td style="vertical-align: top; padding-right: 16px;">
-              <p style="margin: 0 0 4px; font-weight: 700; color: #0f172a; font-size: 15px;">Your Insurance Team</p>
-              <p style="margin: 0; font-size: 13px; color: #64748b; line-height: 1.5;">
-                Legacy Financial &amp; Life<br/>
-                Life, Medicare, Estate Planning &amp; Retirement Strategists<br/>
-                Licensed in ${escapeHtml(LICENSED_STATES)}
-              </p>
-            </td>
-          </tr>
-        </table>
-      </div>
-
-      <!-- Footer -->
-      <div style="text-align: center; padding: 20px 28px;">
-        <p style="font-size: 12px; color: #94a3b8; margin: 0; line-height: 1.6;">
-          &copy; ${new Date().getFullYear()} Legacy Financial &amp; Life. All rights reserved.<br/>
-          Licensed in ${escapeHtml(LICENSED_STATES)}. This email is for informational purposes. Policies and features vary by carrier and state.<br/>
-          <a href="${escapeHtml(privacyUrl)}" style="color: #64748b;">Privacy Policy</a>
-        </p>
       </div>
     </div>
   `;
