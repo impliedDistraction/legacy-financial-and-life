@@ -52,6 +52,11 @@ const INTEREST_LABELS: Record<string, string> = {
   'not-sure': 'Not sure yet — help me decide',
 };
 
+const TOBACCO_USE_LABELS: Record<string, string> = {
+  no: 'No',
+  yes: 'Yes',
+};
+
 export const POST: APIRoute = async ({ request, redirect }) => {
   const resendKey = import.meta.env.RESEND_API_KEY;
   if (!resendKey) {
@@ -70,20 +75,28 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const email = normalizeEmailAddress(String(data.get('email') ?? ''));
   const phone = String(data.get('phone') ?? '').trim();
   const dob = buildDobValue(data);
+  const height = buildHeightValue(data);
+  const weight = normalizeWeightValue(String(data.get('weight') ?? ''));
   const beneficiary = String(data.get('beneficiary') ?? '').trim();
   const state = String(data.get('state') ?? '').trim();
   const interest = String(data.get('interest') ?? '').trim();
   const interestLabel = INTEREST_LABELS[interest] ?? interest;
+  const tobaccoUse = String(data.get('tobaccoUse') ?? '').trim();
+  const tobaccoUseLabel = TOBACCO_USE_LABELS[tobaccoUse] ?? tobaccoUse;
   const rawFirstName = name.split(' ')[0] ?? 'there';
   const firstName = escapeHtml(rawFirstName);
 
   // Basic server-side validation — all fields required
-  if (!name || !email || !phone || !dob || !beneficiary || !state || !interest) {
+  if (!name || !email || !phone || !dob || !height || !weight || !beneficiary || !state || !interest || !tobaccoUse) {
     return redirect('/quote-error', 302);
   }
 
   // Simple email format check
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return redirect('/quote-error', 302);
+  }
+
+  if (!TOBACCO_USE_LABELS[tobaccoUse]) {
     return redirect('/quote-error', 302);
   }
 
@@ -129,6 +142,18 @@ export const POST: APIRoute = async ({ request, redirect }) => {
           <tr>
             <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Date of Birth</td>
             <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(dob)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Height</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(height)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Weight</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(weight)} lbs</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Tobacco Use</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(tobaccoUseLabel)}</td>
           </tr>
           <tr>
             <td style="padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #f1f5f9;">Beneficiary</td>
@@ -254,6 +279,9 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     const noteLines = [
       'Source: Facebook campaign · /free-quote',
       `DOB: ${dob}`,
+      `Height: ${height}`,
+      `Weight: ${weight} lbs`,
+      `Tobacco Use: ${tobaccoUseLabel}`,
       `Beneficiary: ${beneficiary}`,
       `State: ${state}`,
       `Interest: ${interestLabel}`,
@@ -375,4 +403,38 @@ function buildDobValue(data: FormData): string {
   }
 
   return `${String(monthNumber).padStart(2, '0')}/${String(dayNumber).padStart(2, '0')}/${year}`;
+}
+
+function buildHeightValue(data: FormData): string {
+  const feet = String(data.get('heightFeet') ?? '').trim();
+  const inches = String(data.get('heightInches') ?? '').trim();
+
+  if (!/^\d$/.test(feet) || !/^\d{1,2}$/.test(inches)) {
+    return '';
+  }
+
+  const feetNumber = Number(feet);
+  const inchesNumber = Number(inches);
+
+  if (feetNumber < 4 || feetNumber > 7 || inchesNumber < 0 || inchesNumber > 11) {
+    return '';
+  }
+
+  return `${feetNumber} ft ${inchesNumber} in`;
+}
+
+function normalizeWeightValue(value: string): string {
+  const digitsOnly = value.trim().replace(/\D/g, '');
+
+  if (!/^\d{2,3}$/.test(digitsOnly)) {
+    return '';
+  }
+
+  const weightNumber = Number(digitsOnly);
+
+  if (weightNumber < 50 || weightNumber > 999) {
+    return '';
+  }
+
+  return String(weightNumber);
 }

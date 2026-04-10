@@ -341,6 +341,79 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
           <p class="text-sm text-slate-500">Enter month, day, and 4-digit birth year.</p>
         </label>
 
+        <label class="grid gap-1">
+          <span class="text-sm font-medium text-slate-700">Height <span class="text-red-500">*</span></span>
+          <div class="grid grid-cols-2 gap-3 sm:max-w-sm">
+            <label class="grid gap-1">
+              <span class="sr-only">Height in feet</span>
+              <select
+                name="heightFeet"
+                required
+                aria-label="Height in feet"
+                class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none bg-white"
+              >
+                <option value="">Feet</option>
+                <option value="4">4 ft</option>
+                <option value="5">5 ft</option>
+                <option value="6">6 ft</option>
+                <option value="7">7 ft</option>
+              </select>
+            </label>
+            <label class="grid gap-1">
+              <span class="sr-only">Height in inches</span>
+              <select
+                name="heightInches"
+                required
+                aria-label="Height in inches"
+                class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none bg-white"
+              >
+                <option value="">Inches</option>
+                <option value="0">0 in</option>
+                <option value="1">1 in</option>
+                <option value="2">2 in</option>
+                <option value="3">3 in</option>
+                <option value="4">4 in</option>
+                <option value="5">5 in</option>
+                <option value="6">6 in</option>
+                <option value="7">7 in</option>
+                <option value="8">8 in</option>
+                <option value="9">9 in</option>
+                <option value="10">10 in</option>
+                <option value="11">11 in</option>
+              </select>
+            </label>
+          </div>
+          <p class="text-sm text-slate-500">Select your height in feet and inches.</p>
+        </label>
+
+        <label class="grid gap-1">
+          <span class="text-sm font-medium text-slate-700">Weight (lbs) <span class="text-red-500">*</span></span>
+          <input
+            type="text"
+            name="weight"
+            required
+            inputmode="numeric"
+            maxlength="3"
+            pattern="[0-9]{2,3}"
+            placeholder="Weight in pounds"
+            class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+          />
+          <p class="text-sm text-slate-500">Enter your current weight in pounds.</p>
+        </label>
+
+        <label class="grid gap-1">
+          <span class="text-sm font-medium text-slate-700">Do you currently use tobacco or nicotine products? <span class="text-red-500">*</span></span>
+          <select
+            name="tobaccoUse"
+            required
+            class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none bg-white"
+          >
+            <option value="">Select an option</option>
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </label>
+
         <!-- Your coverage -->
         <p class="text-xs font-semibold uppercase tracking-wider text-slate-400 mt-2 pt-4 border-t border-slate-100">Your Coverage</p>
 
