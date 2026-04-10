@@ -282,13 +282,63 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
 
         <label class="grid gap-1">
           <span class="text-sm font-medium text-slate-700">Date of Birth <span class="text-red-500">*</span></span>
-          <input
-            type="date"
-            name="dob"
-            required
-            autocomplete="bday"
-            class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
-          />
+          <div class="grid grid-cols-3 gap-3">
+            <label class="grid gap-1">
+              <span class="sr-only">Birth month</span>
+              <select
+                name="dobMonth"
+                required
+                autocomplete="bday-month"
+                aria-label="Birth month"
+                class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none bg-white"
+              >
+                <option value="">Month</option>
+                <option value="01">Jan</option>
+                <option value="02">Feb</option>
+                <option value="03">Mar</option>
+                <option value="04">Apr</option>
+                <option value="05">May</option>
+                <option value="06">Jun</option>
+                <option value="07">Jul</option>
+                <option value="08">Aug</option>
+                <option value="09">Sep</option>
+                <option value="10">Oct</option>
+                <option value="11">Nov</option>
+                <option value="12">Dec</option>
+              </select>
+            </label>
+            <label class="grid gap-1">
+              <span class="sr-only">Birth day</span>
+              <input
+                type="text"
+                name="dobDay"
+                required
+                autocomplete="bday-day"
+                inputmode="numeric"
+                maxlength="2"
+                pattern="[0-9]{1,2}"
+                aria-label="Birth day"
+                placeholder="Day"
+                class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+              />
+            </label>
+            <label class="grid gap-1">
+              <span class="sr-only">Birth year</span>
+              <input
+                type="text"
+                name="dobYear"
+                required
+                autocomplete="bday-year"
+                inputmode="numeric"
+                maxlength="4"
+                pattern="[0-9]{4}"
+                aria-label="Birth year"
+                placeholder="Year"
+                class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
+              />
+            </label>
+          </div>
+          <p class="text-sm text-slate-500">Enter month, day, and 4-digit birth year.</p>
         </label>
 
         <!-- Your coverage -->
@@ -301,9 +351,10 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
             name="beneficiary"
             required
             autocomplete="off"
-            placeholder="Name of your beneficiary"
+            placeholder="Full beneficiary name"
             class="rounded-lg border border-slate-300 px-4 py-3 transition-all hover:border-brand-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none"
           />
+          <p class="text-sm text-slate-500">Enter the full name of the person you want listed as beneficiary.</p>
         </label>
 
         <label class="grid gap-1">

@@ -69,7 +69,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const name = String(data.get('name') ?? '').trim();
   const email = normalizeEmailAddress(String(data.get('email') ?? ''));
   const phone = String(data.get('phone') ?? '').trim();
-  const dob = String(data.get('dob') ?? '').trim();
+  const dob = buildDobValue(data);
   const beneficiary = String(data.get('beneficiary') ?? '').trim();
   const state = String(data.get('state') ?? '').trim();
   const interest = String(data.get('interest') ?? '').trim();
@@ -341,4 +341,38 @@ function normalizeEmailAddress(value: string): string {
   const normalizedDomain = domain.toLowerCase().replace(/\.comn$/i, '.com');
 
   return `${localPart}@${normalizedDomain}`;
+}
+
+function buildDobValue(data: FormData): string {
+  const directDob = String(data.get('dob') ?? '').trim();
+  if (directDob) {
+    return directDob;
+  }
+
+  const month = String(data.get('dobMonth') ?? '').trim();
+  const day = String(data.get('dobDay') ?? '').trim();
+  const year = String(data.get('dobYear') ?? '').trim();
+
+  if (!month || !day || !year) {
+    return '';
+  }
+
+  if (!/^\d{1,2}$/.test(month) || !/^\d{1,2}$/.test(day) || !/^\d{4}$/.test(year)) {
+    return '';
+  }
+
+  const monthNumber = Number(month);
+  const dayNumber = Number(day);
+  const yearNumber = Number(year);
+
+  if (monthNumber < 1 || monthNumber > 12 || dayNumber < 1 || yearNumber < 1900) {
+    return '';
+  }
+
+  const maxDay = new Date(yearNumber, monthNumber, 0).getDate();
+  if (dayNumber > maxDay) {
+    return '';
+  }
+
+  return `${String(monthNumber).padStart(2, '0')}/${String(dayNumber).padStart(2, '0')}/${year}`;
 }
