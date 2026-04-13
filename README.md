@@ -62,6 +62,10 @@ Environment variables:
 - `RESEND_ALERT_WEBHOOK_URL`: optional outbound webhook for alert fan-out to Slack or another relay.
 - `RESEND_ALERT_FROM`: optional sender override for alert emails.
 
+Current production contact sync IDs:
+- `RESEND_CONTACT_SEGMENT_ID=8aca73ce-937c-49e2-a1db-b7d18beef750`
+- `RESEND_CONTACT_TOPIC_ID=ad459268-9afc-4719-9487-664f8d1fb8c8`
+
 Resend dashboard setup:
 1. Enable receiving on the reply domain if you want reply monitoring.
 2. Point your Resend webhook at `https://your-domain/api/resend-webhook`.
@@ -71,6 +75,7 @@ What this adds:
 - Consistent `utm_*` parameters on quote confirmation email links.
 - Consistent Resend tags and headers per quote email template.
 - Automatic Resend contact sync for quote leads and inbound received emails.
+- Automatic creation of missing Resend contact-property definitions before syncing lead metadata.
 - Verified webhook processing for failures, delivery delays, suppressions, complaints, and inbound replies.
 
 ## Customization

@@ -56,7 +56,15 @@ type ContactSyncInput = {
 
 type ResendContactRecord = {
   id: string;
-  email: string;
+  email?: string;
+};
+
+type ResendContactPropertyType = 'string' | 'number';
+
+type ResendContactPropertyRecord = {
+  id: string;
+  key: string;
+  type: ResendContactPropertyType;
 };
 
 export function buildTrackedUrl(
@@ -139,7 +147,12 @@ export async function syncResendContact(input: ContactSyncInput): Promise<boolea
     propertyKeys: Object.keys(properties ?? {}),
   });
 
+  if (properties) {
+    await ensureResendContactProperties(resendKey, properties);
+  }
+
   const existingContact = await getResendContactByEmail(resendKey, email);
+  let contactId: string;
 
   if (!existingContact) {
     const createPayload = {
@@ -147,17 +160,18 @@ export async function syncResendContact(input: ContactSyncInput): Promise<boolea
       firstName: input.firstName,
       lastName: input.lastName,
       properties,
-      ...(segmentId ? { segments: [{ id: segmentId }] } : {}),
-      ...(topicId ? { topics: [{ id: topicId, subscription: 'opt_in' as const }] } : {}),
     };
 
     const createdContact = await createResendContactWithFallback(resendKey, createPayload);
+    contactId = createdContact.id;
+
+    const membership = await syncResendContactMemberships(resendKey, email, segmentId, topicId);
 
     console.info('Resend contact created', {
       email: maskEmail(email),
       contactId: createdContact.id,
-      segmentAttached: Boolean(segmentId),
-      topicAttached: Boolean(topicId),
+      segmentAttached: membership.segmentAttached,
+      topicAttached: membership.topicAttached,
     });
     return true;
   }
@@ -169,20 +183,15 @@ export async function syncResendContact(input: ContactSyncInput): Promise<boolea
     properties,
   });
 
+  contactId = updatedContact.id;
+  const membership = await syncResendContactMemberships(resendKey, email, segmentId, topicId);
+
   console.info('Resend contact updated', {
     email: maskEmail(email),
-    contactId: updatedContact.id,
-    segmentAttached: false,
-    topicAttached: false,
+    contactId,
+    segmentAttached: membership.segmentAttached,
+    topicAttached: membership.topicAttached,
   });
-
-  if (segmentId || topicId) {
-    console.warn('Resend contact exists; segment/topic assignment is only applied on create with the current Contacts API integration', {
-      email: maskEmail(email),
-      hasSegmentId: Boolean(segmentId),
-      hasTopicId: Boolean(topicId),
-    });
-  }
 
   return true;
 }
@@ -225,13 +234,24 @@ async function createResendContactWithFallback(
       throw error;
     }
 
-    console.warn('Resend contact create rejected custom properties; retrying without properties', {
+    await ensureResendContactProperties(resendKey, payload.properties);
+
+    console.warn('Resend contact create rejected custom properties; retrying after syncing property definitions', {
       email: maskEmail(payload.email),
       propertyKeys: Object.keys(payload.properties),
     });
 
-    const { properties: _properties, ...payloadWithoutProperties } = payload;
-    return createResendContact(resendKey, payloadWithoutProperties);
+    try {
+      return await createResendContact(resendKey, payload);
+    } catch (retryError) {
+      console.warn('Resend contact create still rejected custom properties; retrying without properties', {
+        email: maskEmail(payload.email),
+        propertyKeys: Object.keys(payload.properties),
+      });
+
+      const { properties: _properties, ...payloadWithoutProperties } = payload;
+      return createResendContact(resendKey, payloadWithoutProperties);
+    }
   }
 }
 
@@ -269,14 +289,155 @@ async function updateResendContactWithFallback(
       throw error;
     }
 
-    console.warn('Resend contact update rejected custom properties; retrying without properties', {
+    await ensureResendContactProperties(resendKey, payload.properties);
+
+    console.warn('Resend contact update rejected custom properties; retrying after syncing property definitions', {
       email: maskEmail(payload.email),
       propertyKeys: Object.keys(payload.properties),
     });
 
-    const { properties: _properties, ...payloadWithoutProperties } = payload;
-    return updateResendContact(resendKey, payloadWithoutProperties);
+    try {
+      return await updateResendContact(resendKey, payload);
+    } catch (retryError) {
+      console.warn('Resend contact update still rejected custom properties; retrying without properties', {
+        email: maskEmail(payload.email),
+        propertyKeys: Object.keys(payload.properties),
+      });
+
+      const { properties: _properties, ...payloadWithoutProperties } = payload;
+      return updateResendContact(resendKey, payloadWithoutProperties);
+    }
   }
+}
+
+async function syncResendContactMemberships(
+  resendKey: string,
+  email: string,
+  segmentId?: string,
+  topicId?: string,
+): Promise<{ segmentAttached: boolean; topicAttached: boolean }> {
+  const tasks: Array<Promise<void>> = [];
+
+  if (segmentId) {
+    tasks.push(addResendContactToSegment(resendKey, email, segmentId));
+  }
+
+  if (topicId) {
+    tasks.push(updateResendContactTopics(resendKey, email, [{ id: topicId, subscription: 'opt_in' }]));
+  }
+
+  if (tasks.length === 0) {
+    return {
+      segmentAttached: false,
+      topicAttached: false,
+    };
+  }
+
+  const results = await Promise.allSettled(tasks);
+  const segmentAttached = segmentId
+    ? results[segmentId && topicId ? 0 : 0]?.status === 'fulfilled'
+    : false;
+  const topicAttached = topicId
+    ? results[segmentId && topicId ? 1 : 0]?.status === 'fulfilled'
+    : false;
+
+  const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+  if (failures.length > 0) {
+    throw new Error(
+      failures
+        .map((failure) => (failure.reason instanceof Error ? failure.reason.message : String(failure.reason)))
+        .join('; '),
+    );
+  }
+
+  return {
+    segmentAttached,
+    topicAttached,
+  };
+}
+
+async function ensureResendContactProperties(
+  resendKey: string,
+  properties: Record<string, string | number | null>,
+): Promise<void> {
+  const propertyDefinitions = buildResendPropertyDefinitions(properties);
+
+  if (propertyDefinitions.length === 0) {
+    return;
+  }
+
+  const existingProperties = await listResendContactProperties(resendKey);
+  const existingKeys = new Set(existingProperties.map((property) => property.key));
+  const missingProperties = propertyDefinitions.filter((property) => !existingKeys.has(property.key));
+
+  if (missingProperties.length === 0) {
+    return;
+  }
+
+  const results = await Promise.allSettled(
+    missingProperties.map((property) => createResendContactProperty(resendKey, property)),
+  );
+
+  const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+  const unexpectedFailures = failures.filter((failure) => !isDuplicateResendResourceError(failure.reason));
+
+  if (unexpectedFailures.length > 0) {
+    throw new Error(
+      unexpectedFailures
+        .map((failure) => (failure.reason instanceof Error ? failure.reason.message : String(failure.reason)))
+        .join('; '),
+    );
+  }
+}
+
+function buildResendPropertyDefinitions(
+  properties: Record<string, string | number | null>,
+): Array<{ key: string; type: ResendContactPropertyType; fallbackValue: string | number }> {
+  return Object.entries(properties)
+    .filter(([, value]) => typeof value === 'string' || typeof value === 'number')
+    .map(([key, value]) => ({
+      key,
+      type: typeof value === 'number' ? 'number' : 'string',
+      fallbackValue: typeof value === 'number' ? 0 : '',
+    }));
+}
+
+async function listResendContactProperties(resendKey: string): Promise<ResendContactPropertyRecord[]> {
+  const response = await resendContactsRequest<{ data?: ResendContactPropertyRecord[] }>(
+    resendKey,
+    'GET',
+    '/contact-properties',
+  );
+
+  return Array.isArray(response.data?.data) ? response.data.data : [];
+}
+
+async function createResendContactProperty(
+  resendKey: string,
+  payload: { key: string; type: ResendContactPropertyType; fallbackValue: string | number },
+): Promise<void> {
+  await resendContactsRequest<{ id: string }>(resendKey, 'POST', '/contact-properties', payload);
+}
+
+async function addResendContactToSegment(resendKey: string, email: string, segmentId: string): Promise<void> {
+  await resendContactsRequest<{ id: string }>(
+    resendKey,
+    'POST',
+    `/contacts/${encodeURIComponent(email)}/segments/${encodeURIComponent(segmentId)}`,
+  );
+}
+
+async function updateResendContactTopics(
+  resendKey: string,
+  email: string,
+  topics: Array<{ id: string; subscription: 'opt_in' | 'opt_out' }>,
+): Promise<void> {
+  await resendContactsRequest<{ id: string }>(
+    resendKey,
+    'PATCH',
+    `/contacts/${encodeURIComponent(email)}/topics`,
+    { topics },
+  );
 }
 
 async function resendContactsRequest<T>(
@@ -338,6 +499,14 @@ function isUndefinedResendPropertyError(error: unknown): boolean {
   }
 
   return /validation_error/i.test(error.message) && /properties do not exist/i.test(error.message);
+}
+
+function isDuplicateResendResourceError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /already exists|conflict/i.test(error.message);
 }
 
 function maskEmail(value: string): string {
@@ -631,13 +800,13 @@ function parseCsv(value: string | undefined): string[] {
 
 function sanitizeContactProperties(
   value: ContactSyncInput['properties'],
-): Record<string, string | number | null> | undefined {
+): Record<string, string | number> | undefined {
   if (!value) {
     return undefined;
   }
 
   const entries = Object.entries(value).filter(([, entryValue]) => {
-    return entryValue === null || typeof entryValue === 'string' || typeof entryValue === 'number';
+    return typeof entryValue === 'string' || typeof entryValue === 'number';
   });
 
   if (entries.length === 0) {
