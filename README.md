@@ -98,12 +98,15 @@ Lead events are correlated with a shared `tracking_id` generated in the browser 
 
 Supabase setup:
 1. Run the schema in [supabase/lead_flow_events.sql](supabase/lead_flow_events.sql).
+	If you already ran it earlier, rerun it so the idempotent `recipient_email` and `provider_event_at` columns are added.
 2. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in Vercel.
 3. Optionally set `SUPABASE_LEAD_ANALYTICS_TABLE` if you want a different table name.
 
 Notes:
 - This implementation uses Vercel custom events for funnel measurement. It does not currently wire up the separate Vercel Flags product.
 - For lead-generation reporting, event properties already capture the practical "flag flip" states such as validation passed, contact synced, email sent, delivery confirmed, and handoff ready.
+- `occurred_at` is the canonical event time used for funnel ordering. For provider-backed events such as Resend webhooks, `provider_event_at` preserves the original provider timestamp as a dedicated query field.
+- `lead_email` is the person who submitted or replied when that identity is known. `recipient_email` is the actual delivery recipient, which keeps internal notification emails from being mistaken for leads.
 
 ## Customization
 

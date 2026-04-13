@@ -166,6 +166,11 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     tracking_id: trackingId,
   });
   const replyToRecipients = getMonitoredReplyTo(['beth@legacyf-l.com']);
+  const analyticsHeaders = {
+    'X-Legacy-Tracking-Id': trackingId,
+    'X-Legacy-Lead-Email': email,
+    'X-Legacy-Route': 'free_quote',
+  };
 
   // ── Internal lead notification email (to Tim & Beth) ──────────────
   const internalHtml = `
@@ -317,7 +322,10 @@ export const POST: APIRoute = async ({ request, redirect }) => {
         subject: `New Quote Request: ${name}`,
         html: internalHtml,
         replyTo: email,
-        headers: internalEmailMetadata.headers,
+        headers: {
+          ...internalEmailMetadata.headers,
+          ...analyticsHeaders,
+        },
         tags: internalEmailMetadata.tags,
       }),
       resend.emails.send({
@@ -326,7 +334,10 @@ export const POST: APIRoute = async ({ request, redirect }) => {
         subject: `${rawFirstName}, we received your quote request!`,
         html: confirmationHtml,
         replyTo: replyToRecipients,
-        headers: confirmationEmailMetadata.headers,
+        headers: {
+          ...confirmationEmailMetadata.headers,
+          ...analyticsHeaders,
+        },
         tags: confirmationEmailMetadata.tags,
       }),
       // CRM push — fire-and-forget; failure is logged but never blocks the user

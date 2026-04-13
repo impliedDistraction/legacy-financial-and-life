@@ -18,6 +18,24 @@ create table if not exists public.lead_flow_events (
   created_at timestamptz not null default now()
 );
 
+alter table public.lead_flow_events
+  add column if not exists recipient_email text;
+
+alter table public.lead_flow_events
+  add column if not exists provider_event_at timestamptz;
+
+comment on column public.lead_flow_events.occurred_at is
+  'Time the event happened in the app or upstream provider flow.';
+
+comment on column public.lead_flow_events.created_at is
+  'Time the analytics row was inserted into Supabase.';
+
+comment on column public.lead_flow_events.recipient_email is
+  'Actual recipient for delivery-oriented events. This is separate from lead_email.';
+
+comment on column public.lead_flow_events.provider_event_at is
+  'Original upstream provider timestamp when available, such as a Resend webhook event timestamp.';
+
 create index if not exists lead_flow_events_tracking_id_idx
   on public.lead_flow_events (tracking_id, occurred_at desc);
 
@@ -26,6 +44,9 @@ create index if not exists lead_flow_events_event_name_idx
 
 create index if not exists lead_flow_events_lead_email_idx
   on public.lead_flow_events (lead_email, occurred_at desc);
+
+create index if not exists lead_flow_events_recipient_email_idx
+  on public.lead_flow_events (recipient_email, occurred_at desc);
 
 create index if not exists lead_flow_events_stage_idx
   on public.lead_flow_events (stage, occurred_at desc);

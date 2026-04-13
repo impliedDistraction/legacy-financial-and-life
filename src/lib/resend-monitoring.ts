@@ -574,24 +574,42 @@ export async function processResendWebhookEvent(event: ResendWebhookEvent): Prom
 async function trackResendWebhookEvent(event: ResendWebhookEvent): Promise<void> {
   const data = getEventData(event);
   const tags = getResendEventTags(data.tags);
+  const headers = getResendEventHeaders(data.headers);
   const emailId = getStringValue(data.email_id) ?? getStringValue(data.id) ?? undefined;
+  const template = getStringValue(tags.template) ?? getStringValue(headers['X-Legacy-Template']) ?? undefined;
+  const recipientEmails = getTrackedEmails(data.to);
+  const recipientEmail = recipientEmails[0];
+  const leadEmail =
+    getStringValue(headers['X-Legacy-Lead-Email'])
+    ?? getStringValue(tags.lead_email)
+    ?? (template === 'quote_confirmation' ? recipientEmail : undefined)
+    ?? (event.type === 'email.received' ? parseEmailAddress(getStringValue(data.from) ?? '') ?? undefined : undefined);
+  const trackingId =
+    getStringValue(headers['X-Legacy-Tracking-Id'])
+    ?? getStringValue(tags.tracking_id)
+    ?? emailId;
 
   await trackLeadEvent({
-    trackingId: getStringValue(tags.tracking_id) ?? emailId,
-    route: normalizeTrackedRoute(getStringValue(tags.route)),
+    trackingId,
+    route: normalizeTrackedRoute(getStringValue(headers['X-Legacy-Route']) ?? getStringValue(tags.route)),
     eventName: `resend_${event.type.replace(/\./g, '_')}`,
     source: 'webhook',
     stage: 'webhook',
     status: getWebhookEventStatus(event.type),
     ownerScope: getWebhookOwnerScope(event.type),
-    leadEmail: getPrimaryTrackedEmail(data.to),
+    leadEmail,
+    recipientEmail,
     provider: 'resend',
+    occurredAt: event.created_at ?? undefined,
+    providerEventAt: event.created_at ?? undefined,
     properties: {
       emailId,
-      template: getStringValue(tags.template) ?? undefined,
+      template,
       subject: getStringValue(data.subject) ?? undefined,
       tags,
-      createdAt: event.created_at ?? undefined,
+      recipient_email: recipientEmail,
+      recipient_emails: recipientEmails,
+      sender_email: parseEmailAddress(getStringValue(data.from) ?? '') ?? undefined,
     },
   });
 }
@@ -862,6 +880,24 @@ function getResendEventTags(value: unknown): Record<string, unknown> {
   return getNestedRecord(value) ?? {};
 }
 
+function getResendEventHeaders(value: unknown): Record<string, unknown> {
+  if (Array.isArray(value)) {
+    return Object.fromEntries(
+      value
+        .map((entry) => {
+          const record = getNestedRecord(entry);
+          const name = getStringValue(record?.name);
+          const headerValue = getStringValue(record?.value);
+
+          return name && headerValue ? [name, headerValue] : null;
+        })
+        .filter((entry): entry is [string, string] => Array.isArray(entry)),
+    );
+  }
+
+  return getNestedRecord(value) ?? {};
+}
+
 function normalizeTrackedRoute(value: string | null): string {
   if (!value) {
     return '/api/resend-webhook';
@@ -886,25 +922,28 @@ function getWebhookOwnerScope(eventType: string): 'legacy' | 'handoff' | 'client
   return eventType === 'email.received' ? 'client' : 'handoff';
 }
 
-function getPrimaryTrackedEmail(value: unknown): string | undefined {
+function getTrackedEmails(value: unknown): string[] {
   if (Array.isArray(value)) {
+    const results: string[] = [];
+
     for (const entry of value) {
       if (typeof entry === 'string') {
         const parsed = parseEmailAddress(entry);
         if (parsed) {
-          return parsed;
+          results.push(parsed);
         }
       }
     }
 
-    return undefined;
+    return results;
   }
 
   if (typeof value === 'string') {
-    return parseEmailAddress(value) ?? undefined;
+    const parsed = parseEmailAddress(value);
+    return parsed ? [parsed] : [];
   }
 
-  return undefined;
+  return [];
 }
 
 function parseCsv(value: string | undefined): string[] {

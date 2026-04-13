@@ -26,10 +26,12 @@ type LeadAnalyticsEventInput = {
   status: LeadAnalyticsStatus;
   ownerScope: LeadAnalyticsOwnerScope;
   leadEmail?: string;
+  recipientEmail?: string;
   leadPhone?: string;
   interest?: string;
   provider?: string;
   occurredAt?: string;
+  providerEventAt?: string;
   properties?: Record<string, unknown>;
 };
 
@@ -42,14 +44,17 @@ type LeadAnalyticsRecord = {
   status: LeadAnalyticsStatus;
   owner_scope: LeadAnalyticsOwnerScope;
   lead_email?: string;
+  recipient_email?: string;
   lead_phone?: string;
   interest?: string;
   provider?: string;
   occurred_at: string;
+  provider_event_at?: string;
   properties: Record<string, unknown>;
 };
 
 const DEFAULT_LEAD_ANALYTICS_TABLE = 'lead_flow_events';
+let hasWarnedMissingLeadAnalyticsConfig = false;
 
 export function getLeadTrackingId(value?: FormDataEntryValue | string | null): string {
   const candidate = typeof value === 'string' ? value.trim() : '';
@@ -67,6 +72,10 @@ export async function trackLeadEvent(input: LeadAnalyticsEventInput): Promise<bo
   const tableName = import.meta.env.SUPABASE_LEAD_ANALYTICS_TABLE?.trim() || DEFAULT_LEAD_ANALYTICS_TABLE;
 
   if (!supabaseUrl || !serviceRoleKey) {
+    if (!hasWarnedMissingLeadAnalyticsConfig) {
+      hasWarnedMissingLeadAnalyticsConfig = true;
+      console.warn('Supabase lead analytics disabled: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    }
     return false;
   }
 
@@ -79,10 +88,12 @@ export async function trackLeadEvent(input: LeadAnalyticsEventInput): Promise<bo
     status: input.status,
     owner_scope: input.ownerScope,
     lead_email: normalizeEmail(input.leadEmail),
+    recipient_email: normalizeEmail(input.recipientEmail),
     lead_phone: sanitizeText(input.leadPhone, 40) || undefined,
     interest: sanitizeText(input.interest, 80) || undefined,
     provider: sanitizeText(input.provider, 80) || undefined,
     occurred_at: input.occurredAt ?? new Date().toISOString(),
+    provider_event_at: input.providerEventAt ?? undefined,
     properties: sanitizeProperties(input.properties),
   };
 
