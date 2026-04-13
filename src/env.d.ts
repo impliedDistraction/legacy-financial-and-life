@@ -14,6 +14,9 @@ interface ImportMetaEnv {
 	readonly RESEND_WEBHOOK_SECRET?: string;
 	readonly RINGY_API_URL?: string;
 	readonly RINGY_AUTH_TOKEN?: string;
+	readonly SUPABASE_LEAD_ANALYTICS_TABLE?: string;
+	readonly SUPABASE_SERVICE_ROLE_KEY?: string;
+	readonly SUPABASE_URL?: string;
 }
 
 interface ImportMeta {

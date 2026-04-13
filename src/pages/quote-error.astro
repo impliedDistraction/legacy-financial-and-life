@@ -59,6 +59,7 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
       <div class="flex flex-col sm:flex-row gap-4 justify-center">
         <a
           href="/free-quote#quote-form"
+          data-quote-retry
           class="rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold transition-colors"
         >
           Try Again
@@ -81,3 +82,35 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
     </div>
   </footer>
 </Base>
+
+<script>
+  import { getQuoteInterest, trackQuoteAnalyticsEvent } from '../scripts/lead-analytics';
+
+  const errorTracked = sessionStorage.getItem('quote_error_tracked');
+
+  if (errorTracked !== 'true') {
+    trackQuoteAnalyticsEvent({
+      eventName: 'quote_form_error_viewed',
+      route: '/quote-error',
+      stage: 'error',
+      status: 'error',
+      ownerScope: 'legacy',
+      interest: getQuoteInterest(),
+    });
+
+    sessionStorage.setItem('quote_error_tracked', 'true');
+  }
+
+  document.querySelectorAll('[data-quote-retry]').forEach((element) => {
+    element.addEventListener('click', () => {
+      trackQuoteAnalyticsEvent({
+        eventName: 'quote_form_retry_click',
+        route: '/quote-error',
+        stage: 'error',
+        status: 'info',
+        ownerScope: 'legacy',
+        interest: getQuoteInterest(),
+      });
+    });
+  });
+</script>

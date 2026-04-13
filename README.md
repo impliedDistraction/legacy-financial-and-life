@@ -61,6 +61,9 @@ Environment variables:
 - `RESEND_ALERT_RECIPIENTS`: optional comma-separated alert recipients.
 - `RESEND_ALERT_WEBHOOK_URL`: optional outbound webhook for alert fan-out to Slack or another relay.
 - `RESEND_ALERT_FROM`: optional sender override for alert emails.
+- `SUPABASE_URL`: optional Supabase project URL for lead funnel analytics persistence.
+- `SUPABASE_SERVICE_ROLE_KEY`: optional server-only Supabase key used by API routes and webhook handlers to persist lead events.
+- `SUPABASE_LEAD_ANALYTICS_TABLE`: optional override for the analytics table name. Defaults to `lead_flow_events`.
 
 Current production contact sync IDs:
 - `RESEND_CONTACT_SEGMENT_ID=8aca73ce-937c-49e2-a1db-b7d18beef750`
@@ -77,6 +80,30 @@ What this adds:
 - Automatic Resend contact sync for quote leads and inbound received emails.
 - Automatic creation of missing Resend contact-property definitions before syncing lead metadata.
 - Verified webhook processing for failures, delivery delays, suppressions, complaints, and inbound replies.
+- Correlated lead-flow analytics across page interactions, API milestones, Resend delivery events, and handoff checkpoints.
+
+## Lead Funnel Analytics
+
+The quote flow now supports two analytics layers:
+- Vercel Analytics custom events for client-side funnel visibility on `/free-quote`, `/quote-success`, and `/quote-error`.
+- Optional Supabase persistence for a server-side lead ledger covering page events, API milestones, Resend contact sync, and webhook delivery/reply events.
+
+Lead events are correlated with a shared `tracking_id` generated in the browser and passed through the quote API and Resend email tags. This makes it possible to answer questions such as:
+- Did the visitor reach and start the quote form?
+- Did the quote request hit our API and validate successfully?
+- Was the contact synced into Resend?
+- Were internal and confirmation emails accepted?
+- Did Resend later mark those emails as sent, delivered, delayed, bounced, or replied to?
+- Where does the flow leave Legacy's ownership and move into client follow-up?
+
+Supabase setup:
+1. Run the schema in [supabase/lead_flow_events.sql](supabase/lead_flow_events.sql).
+2. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in Vercel.
+3. Optionally set `SUPABASE_LEAD_ANALYTICS_TABLE` if you want a different table name.
+
+Notes:
+- This implementation uses Vercel custom events for funnel measurement. It does not currently wire up the separate Vercel Flags product.
+- For lead-generation reporting, event properties already capture the practical "flag flip" states such as validation passed, contact synced, email sent, delivery confirmed, and handoff ready.
 
 ## Customization
 

@@ -69,22 +69,21 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
 </Base>
 
 <script>
-  type VercelAnalyticsWindow = Window & {
-    va?: {
-      track: (eventName: string, properties?: Record<string, string>) => void;
-    };
-  };
+  import { getQuoteInterest, markQuoteTrackingIdConsumed, trackQuoteAnalyticsEvent } from '../scripts/lead-analytics';
 
-  const analyticsWindow = window as VercelAnalyticsWindow;
   const successTracked = sessionStorage.getItem('quote_success_tracked');
 
   if (successTracked !== 'true') {
-    const interest = sessionStorage.getItem('quote_interest') ?? 'unknown';
-
-    analyticsWindow.va?.track('quote_form_success', {
-      interest,
+    trackQuoteAnalyticsEvent({
+      eventName: 'quote_form_success',
+      route: '/quote-success',
+      stage: 'handoff',
+      status: 'success',
+      ownerScope: 'handoff',
+      interest: getQuoteInterest(),
     });
 
     sessionStorage.setItem('quote_success_tracked', 'true');
+    markQuoteTrackingIdConsumed();
   }
 </script>

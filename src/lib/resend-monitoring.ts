@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { site } from '../content/site';
+import { trackLeadEvent } from './lead-analytics';
 
 type EmailTemplateKey = 'quote_internal' | 'quote_confirmation' | 'resend_alert';
 type AlertSeverity = 'info' | 'warning' | 'critical';
@@ -554,6 +555,8 @@ function maskEmail(value: string): string {
 }
 
 export async function processResendWebhookEvent(event: ResendWebhookEvent): Promise<boolean> {
+  await trackResendWebhookEvent(event);
+
   if (event.type === 'email.received') {
     const contact = extractInboundContact(event);
     if (contact) {
@@ -574,6 +577,31 @@ export async function processResendWebhookEvent(event: ResendWebhookEvent): Prom
 
   await dispatchMonitoringAlert(alert, event);
   return true;
+}
+
+async function trackResendWebhookEvent(event: ResendWebhookEvent): Promise<void> {
+  const data = getEventData(event);
+  const tags = getResendEventTags(data.tags);
+  const emailId = getStringValue(data.email_id) ?? getStringValue(data.id) ?? undefined;
+
+  await trackLeadEvent({
+    trackingId: getStringValue(tags.tracking_id) ?? emailId,
+    route: normalizeTrackedRoute(getStringValue(tags.route)),
+    eventName: `resend_${event.type.replace(/\./g, '_')}`,
+    source: 'webhook',
+    stage: 'webhook',
+    status: getWebhookEventStatus(event.type),
+    ownerScope: getWebhookOwnerScope(event.type),
+    leadEmail: getPrimaryTrackedEmail(data.to),
+    provider: 'resend',
+    properties: {
+      emailId,
+      template: getStringValue(tags.template) ?? undefined,
+      subject: getStringValue(data.subject) ?? undefined,
+      tags,
+      createdAt: event.created_at ?? undefined,
+    },
+  });
 }
 
 function buildMonitoringAlert(event: ResendWebhookEvent): MonitoringAlert | null {
@@ -729,8 +757,8 @@ async function sendAlertEmail(
 
 function isInternalAlertEvent(event: ResendWebhookEvent): boolean {
   const data = getEventData(event);
-  const tags = getNestedRecord(data.tags);
-  return getStringValue(tags?.template) === 'resend_alert';
+  const tags = getResendEventTags(data.tags);
+  return getStringValue(tags.template) === 'resend_alert';
 }
 
 function getEventData(event: ResendWebhookEvent): Record<string, unknown> {
@@ -802,7 +830,7 @@ function formatAddressList(value: unknown): string {
 }
 
 function formatTags(value: unknown): string {
-  const record = getNestedRecord(value);
+  const record = getResendEventTags(value);
   if (!record) {
     return '';
   }
@@ -822,6 +850,69 @@ function getNestedRecord(value: unknown): Record<string, unknown> | null {
 
 function getStringValue(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function getResendEventTags(value: unknown): Record<string, unknown> {
+  if (Array.isArray(value)) {
+    return Object.fromEntries(
+      value
+        .map((entry) => {
+          const record = getNestedRecord(entry);
+          const name = getStringValue(record?.name);
+          const tagValue = getStringValue(record?.value);
+
+          return name && tagValue ? [name, tagValue] : null;
+        })
+        .filter((entry): entry is [string, string] => Array.isArray(entry)),
+    );
+  }
+
+  return getNestedRecord(value) ?? {};
+}
+
+function normalizeTrackedRoute(value: string | null): string {
+  if (!value) {
+    return '/api/resend-webhook';
+  }
+
+  return `/${value.replace(/^\/+/, '').replace(/_/g, '-')}`;
+}
+
+function getWebhookEventStatus(eventType: string): 'success' | 'warning' | 'error' {
+  if (eventType === 'email.sent' || eventType === 'email.delivered' || eventType === 'email.clicked') {
+    return 'success';
+  }
+
+  if (eventType === 'email.delivery_delayed' || eventType === 'email.received') {
+    return 'warning';
+  }
+
+  return 'error';
+}
+
+function getWebhookOwnerScope(eventType: string): 'legacy' | 'handoff' | 'client' | 'external' {
+  return eventType === 'email.received' ? 'client' : 'handoff';
+}
+
+function getPrimaryTrackedEmail(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      if (typeof entry === 'string') {
+        const parsed = parseEmailAddress(entry);
+        if (parsed) {
+          return parsed;
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    return parseEmailAddress(value) ?? undefined;
+  }
+
+  return undefined;
 }
 
 function parseCsv(value: string | undefined): string[] {

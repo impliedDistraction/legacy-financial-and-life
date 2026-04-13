@@ -234,6 +234,8 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
         action="/api/fb-lead"
         class="grid gap-5 rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-lg"
       >
+        <input type="hidden" name="trackingId" value="" />
+
         <!-- About you -->
         <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">About You</p>
 
@@ -501,17 +503,39 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
 </Base>
 
 <script>
-  type VercelAnalyticsWindow = Window & {
-    va?: {
-      track: (eventName: string, properties?: Record<string, string>) => void;
-    };
-  };
+  import { prepareQuoteTrackingId, setQuoteInterest, trackQuoteAnalyticsEvent } from '../scripts/lead-analytics';
 
   // Simple client-side loading state for the form
   const form = document.querySelector('#quote-form form') as HTMLFormElement | null;
   const btn = form?.querySelector('button[type="submit"]') as HTMLButtonElement | null;
   const emailInput = form?.querySelector('input[name="email"]') as HTMLInputElement | null;
-  const analyticsWindow = window as VercelAnalyticsWindow;
+  const trackingIdInput = form?.querySelector('input[name="trackingId"]') as HTMLInputElement | null;
+  const formFields = form?.querySelectorAll('input, select, textarea') ?? [];
+  let formStarted = sessionStorage.getItem('quote_form_started_tracked') === 'true';
+
+  const ensureTrackingId = () => {
+    const trackingId = prepareQuoteTrackingId();
+    if (trackingIdInput) {
+      trackingIdInput.value = trackingId;
+    }
+    return trackingId;
+  };
+
+  ensureTrackingId();
+
+  if (sessionStorage.getItem('quote_page_view_tracked') !== 'true') {
+    trackQuoteAnalyticsEvent({
+      eventName: 'quote_form_viewed',
+      route: '/free-quote',
+      stage: 'landing',
+      status: 'info',
+      ownerScope: 'legacy',
+      properties: {
+        path: window.location.pathname,
+      },
+    });
+    sessionStorage.setItem('quote_page_view_tracked', 'true');
+  }
 
   const normalizeEmailAddress = (value: string): string => {
     const trimmed = value.trim();
@@ -530,10 +554,38 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
 
   document.querySelectorAll('[data-quote-cta]').forEach((element) => {
     element.addEventListener('click', () => {
-      analyticsWindow.va?.track('quote_cta_click', {
-        location: element.getAttribute('data-quote-cta') ?? 'unknown',
+      trackQuoteAnalyticsEvent({
+        eventName: 'quote_cta_click',
+        route: '/free-quote',
+        stage: 'landing',
+        status: 'info',
+        ownerScope: 'legacy',
+        properties: {
+          location: element.getAttribute('data-quote-cta') ?? 'unknown',
+        },
       });
     });
+  });
+
+  formFields.forEach((element) => {
+    element.addEventListener('focus', () => {
+      if (formStarted) {
+        return;
+      }
+
+      formStarted = true;
+      sessionStorage.setItem('quote_form_started_tracked', 'true');
+      trackQuoteAnalyticsEvent({
+        eventName: 'quote_form_started',
+        route: '/free-quote',
+        stage: 'form',
+        status: 'info',
+        ownerScope: 'legacy',
+        properties: {
+          first_field: (element as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).name || 'unknown',
+        },
+      });
+    }, { once: true });
   });
 
   if (emailInput) {
@@ -550,15 +602,23 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
 
   if (form && btn) {
     form.addEventListener('submit', () => {
+      ensureTrackingId();
+
       if (emailInput) {
         emailInput.value = normalizeEmailAddress(emailInput.value);
       }
 
       const interest = (form.querySelector('select[name="interest"]') as HTMLSelectElement | null)?.value ?? 'unknown';
-      sessionStorage.setItem('quote_interest', interest);
+      setQuoteInterest(interest);
       sessionStorage.removeItem('quote_success_tracked');
+      sessionStorage.removeItem('quote_error_tracked');
 
-      analyticsWindow.va?.track('quote_form_submit_attempt', {
+      trackQuoteAnalyticsEvent({
+        eventName: 'quote_form_submit_attempt',
+        route: '/free-quote',
+        stage: 'submission',
+        status: 'info',
+        ownerScope: 'legacy',
         interest,
       });
 

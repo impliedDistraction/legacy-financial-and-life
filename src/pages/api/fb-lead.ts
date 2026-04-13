@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { Resend } from 'resend';
 import { site } from '../../content/site';
+import { getLeadTrackingId, trackLeadEvent } from '../../lib/lead-analytics';
 import { buildEmailMetadata, buildTrackedUrl, getMonitoredReplyTo, syncResendContact } from '../../lib/resend-monitoring';
 
 export const prerender = false;
@@ -85,6 +86,31 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const tobaccoUseLabel = TOBACCO_USE_LABELS[tobaccoUse] ?? tobaccoUse;
   const rawFirstName = name.split(' ')[0] ?? 'there';
   const firstName = escapeHtml(rawFirstName);
+  const trackingId = getLeadTrackingId(data.get('trackingId'));
+  const routePath = '/free-quote';
+
+  const trackQuoteEvent = (
+    eventName: string,
+    stage: 'submission' | 'contact_sync' | 'email' | 'handoff' | 'error',
+    status: 'info' | 'success' | 'warning' | 'error',
+    ownerScope: 'legacy' | 'handoff' | 'client' | 'external',
+    properties: Record<string, unknown> = {},
+  ) => {
+    return trackLeadEvent({
+      trackingId,
+      route: routePath,
+      eventName,
+      source: 'server',
+      stage,
+      status,
+      ownerScope,
+      leadEmail: email || undefined,
+      leadPhone: phone || undefined,
+      interest: interest || undefined,
+      provider: 'legacy_financial',
+      properties,
+    });
+  };
 
   console.info('Quote lead request received', {
     route: 'free_quote',
@@ -97,17 +123,34 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     hasRingyConfig: Boolean(import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_API_URL?.trim()),
   });
 
+  await trackQuoteEvent('quote_request_received', 'submission', 'info', 'legacy', {
+    emailDomain: getEmailDomain(email),
+    hasReplyMonitorAddress: Boolean(import.meta.env.RESEND_REPLY_MONITOR_ADDRESS?.trim()),
+    hasContactSegmentId: Boolean(import.meta.env.RESEND_CONTACT_SEGMENT_ID?.trim()),
+    hasContactTopicId: Boolean(import.meta.env.RESEND_CONTACT_TOPIC_ID?.trim()),
+    hasRingyConfig: Boolean(import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_API_URL?.trim()),
+  });
+
   // Basic server-side validation — all fields required
   if (!name || !email || !phone || !dob || !height || !weight || !beneficiary || !state || !interest || !tobaccoUse) {
+    await trackQuoteEvent('quote_validation_failed', 'error', 'error', 'legacy', {
+      reason: 'missing_required_fields',
+    });
     return redirect('/quote-error', 302);
   }
 
   // Simple email format check
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    await trackQuoteEvent('quote_validation_failed', 'error', 'error', 'legacy', {
+      reason: 'invalid_email',
+    });
     return redirect('/quote-error', 302);
   }
 
   if (!TOBACCO_USE_LABELS[tobaccoUse]) {
+    await trackQuoteEvent('quote_validation_failed', 'error', 'error', 'legacy', {
+      reason: 'invalid_tobacco_use',
+    });
     return redirect('/quote-error', 302);
   }
 
@@ -115,10 +158,12 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const internalEmailMetadata = buildEmailMetadata('quote_internal', {
     interest,
     route: 'free_quote',
+    tracking_id: trackingId,
   });
   const confirmationEmailMetadata = buildEmailMetadata('quote_confirmation', {
     interest,
     route: 'free_quote',
+    tracking_id: trackingId,
   });
   const replyToRecipients = getMonitoredReplyTo(['beth@legacyf-l.com']);
 
@@ -247,6 +292,10 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     const nameParts = name.split(' ');
     const crmFirstName = nameParts[0];
     const crmLastName = nameParts.slice(1).join(' ') || '';
+    let resendContactStatus: 'success' | 'warning' = 'success';
+    let ringyStatus: 'skipped' | 'success' | 'warning' = import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_API_URL?.trim()
+      ? 'success'
+      : 'skipped';
 
     // Build a CRM note from form fields
     const noteLines = [
@@ -287,7 +336,13 @@ export const POST: APIRoute = async ({ request, redirect }) => {
         email,
         phone: phone || undefined,
         notes: noteLines.join('\n'),
-      }).catch((err) => console.error('Ringy CRM push failed:', err)),
+      }).catch(async (err) => {
+        ringyStatus = 'warning';
+        console.error('Ringy CRM push failed:', err);
+        await trackQuoteEvent('quote_ringy_push_failed', 'handoff', 'warning', 'handoff', {
+          reason: getErrorMessage(err),
+        });
+      }),
       syncResendContact({
         email,
         firstName: crmFirstName,
@@ -300,7 +355,13 @@ export const POST: APIRoute = async ({ request, redirect }) => {
           phone,
           last_quote_request_at: new Date().toISOString(),
         },
-      }).catch((err) => console.error('Resend contact sync failed:', err)),
+      }).catch(async (err) => {
+        resendContactStatus = 'warning';
+        console.error('Resend contact sync failed:', err);
+        await trackQuoteEvent('quote_resend_contact_sync_failed', 'contact_sync', 'warning', 'legacy', {
+          reason: getErrorMessage(err),
+        });
+      }),
     ]);
 
     console.info('Quote lead pipeline results', {
@@ -311,8 +372,49 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       confirmationEmailError: confirmationResult.error?.message ?? null,
     });
 
+    await Promise.all([
+      trackQuoteEvent(
+        internalResult.error ? 'quote_internal_email_failed' : 'quote_internal_email_sent',
+        'email',
+        internalResult.error ? 'error' : 'success',
+        internalResult.error ? 'legacy' : 'handoff',
+        {
+          template: 'quote_internal',
+          emailId: internalResult.data?.id ?? null,
+          provider: 'resend',
+        },
+      ),
+      trackQuoteEvent(
+        confirmationResult.error ? 'quote_confirmation_email_failed' : 'quote_confirmation_email_sent',
+        'email',
+        confirmationResult.error ? 'warning' : 'success',
+        confirmationResult.error ? 'legacy' : 'handoff',
+        {
+          template: 'quote_confirmation',
+          emailId: confirmationResult.data?.id ?? null,
+          provider: 'resend',
+        },
+      ),
+      resendContactStatus === 'success'
+        ? trackQuoteEvent('quote_resend_contact_synced', 'contact_sync', 'success', 'legacy', {
+            destination: 'resend_contacts',
+          })
+        : Promise.resolve(false),
+      ringyStatus === 'success'
+        ? trackQuoteEvent('quote_ringy_push_succeeded', 'handoff', 'success', 'handoff', {
+            destination: 'ringy',
+          })
+        : Promise.resolve(false),
+    ]);
+
     if (internalResult.error) {
       console.error('Resend internal email error:', internalResult.error);
+      await trackQuoteEvent('quote_pipeline_failed', 'error', 'error', 'legacy', {
+        reason: 'internal_email_send_failed',
+        confirmationEmailError: confirmationResult.error?.message ?? null,
+        resendContactStatus,
+        ringyStatus,
+      });
       return redirect('/quote-error', 302);
     }
 
@@ -320,8 +422,26 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       // Log but don't block — the lead notification already went through
       console.error('Resend confirmation email error:', confirmationResult.error);
     }
+
+    await trackQuoteEvent('quote_lead_handoff_ready', 'handoff', 'success', 'handoff', {
+      internalEmailId: internalResult.data?.id ?? null,
+      confirmationEmailId: confirmationResult.data?.id ?? null,
+      confirmationEmailStatus: confirmationResult.error ? 'warning' : 'success',
+      resendContactStatus,
+      ringyStatus,
+    });
+
+    await trackQuoteEvent('quote_pipeline_completed', 'handoff', confirmationResult.error ? 'warning' : 'success', 'handoff', {
+      internalEmailId: internalResult.data?.id ?? null,
+      confirmationEmailId: confirmationResult.data?.id ?? null,
+      resendContactStatus,
+      ringyStatus,
+    });
   } catch (err) {
     console.error('Email send failed:', err);
+    await trackQuoteEvent('quote_pipeline_failed', 'error', 'error', 'legacy', {
+      reason: getErrorMessage(err),
+    });
     return redirect('/quote-error', 302);
   }
 
@@ -355,6 +475,10 @@ function normalizeEmailAddress(value: string): string {
 function getEmailDomain(value: string): string {
   const atIndex = value.lastIndexOf('@');
   return atIndex === -1 ? 'invalid' : value.slice(atIndex + 1).toLowerCase();
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function buildDobValue(data: FormData): string {
