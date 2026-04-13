@@ -147,10 +147,6 @@ export async function syncResendContact(input: ContactSyncInput): Promise<boolea
     propertyKeys: Object.keys(properties ?? {}),
   });
 
-  if (properties) {
-    await ensureResendContactProperties(resendKey, properties);
-  }
-
   const existingContact = await getResendContactByEmail(resendKey, email);
   let contactId: string;
 
@@ -374,19 +370,16 @@ async function ensureResendContactProperties(
     return;
   }
 
-  const results = await Promise.allSettled(
-    missingProperties.map((property) => createResendContactProperty(resendKey, property)),
-  );
+  for (const property of missingProperties) {
+    try {
+      await createResendContactProperty(resendKey, property);
+    } catch (error) {
+      if (isDuplicateResendResourceError(error)) {
+        continue;
+      }
 
-  const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
-  const unexpectedFailures = failures.filter((failure) => !isDuplicateResendResourceError(failure.reason));
-
-  if (unexpectedFailures.length > 0) {
-    throw new Error(
-      unexpectedFailures
-        .map((failure) => (failure.reason instanceof Error ? failure.reason.message : String(failure.reason)))
-        .join('; '),
-    );
+      throw error;
+    }
   }
 }
 
@@ -446,6 +439,16 @@ async function resendContactsRequest<T>(
   path: string,
   body?: Record<string, unknown>,
 ): Promise<{ data: T; status: number }> {
+  return resendContactsRequestWithRetry(resendKey, method, path, body, 0);
+}
+
+async function resendContactsRequestWithRetry<T>(
+  resendKey: string,
+  method: 'GET' | 'POST' | 'PATCH',
+  path: string,
+  body: Record<string, unknown> | undefined,
+  attempt: number,
+): Promise<{ data: T; status: number }> {
   const response = await fetch(`https://api.resend.com${path}`, {
     method,
     headers: {
@@ -461,6 +464,11 @@ async function resendContactsRequest<T>(
   if (!response.ok) {
     if (response.status === 404) {
       return { data: null as T, status: 404 };
+    }
+
+    if (response.status === 429 && attempt < 4) {
+      await wait(getRetryDelayMs(response, attempt));
+      return resendContactsRequestWithRetry(resendKey, method, path, body, attempt + 1);
     }
 
     throw new Error(buildResendApiErrorMessage(response.status, parsed, responseText));
@@ -507,6 +515,31 @@ function isDuplicateResendResourceError(error: unknown): boolean {
   }
 
   return /already exists|conflict/i.test(error.message);
+}
+
+function getRetryDelayMs(response: Response, attempt: number): number {
+  const retryAfter = response.headers.get('retry-after');
+  const retryAfterSeconds = retryAfter ? Number(retryAfter) : Number.NaN;
+
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return retryAfterSeconds * 1000;
+  }
+
+  const resetHeader = response.headers.get('x-ratelimit-reset');
+  const resetSeconds = resetHeader ? Number(resetHeader) : Number.NaN;
+
+  if (Number.isFinite(resetSeconds) && resetSeconds > 0) {
+    const delayMs = resetSeconds * 1000 - Date.now();
+    if (delayMs > 0) {
+      return delayMs;
+    }
+  }
+
+  return 1000 * (attempt + 1);
+}
+
+async function wait(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function maskEmail(value: string): string {
