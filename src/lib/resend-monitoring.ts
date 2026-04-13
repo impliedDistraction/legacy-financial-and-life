@@ -313,38 +313,30 @@ async function syncResendContactMemberships(
   segmentId?: string,
   topicId?: string,
 ): Promise<{ segmentAttached: boolean; topicAttached: boolean }> {
-  const tasks: Array<Promise<void>> = [];
+  let segmentAttached = false;
+  let topicAttached = false;
+  const failures: string[] = [];
 
   if (segmentId) {
-    tasks.push(addResendContactToSegment(resendKey, email, segmentId));
+    try {
+      await addResendContactToSegment(resendKey, email, segmentId);
+      segmentAttached = true;
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+    }
   }
 
   if (topicId) {
-    tasks.push(updateResendContactTopics(resendKey, email, [{ id: topicId, subscription: 'opt_in' }]));
+    try {
+      await updateResendContactTopics(resendKey, email, [{ id: topicId, subscription: 'opt_in' }]);
+      topicAttached = true;
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : String(error));
+    }
   }
 
-  if (tasks.length === 0) {
-    return {
-      segmentAttached: false,
-      topicAttached: false,
-    };
-  }
-
-  const results = await Promise.allSettled(tasks);
-  const segmentAttached = segmentId
-    ? results[segmentId && topicId ? 0 : 0]?.status === 'fulfilled'
-    : false;
-  const topicAttached = topicId
-    ? results[segmentId && topicId ? 1 : 0]?.status === 'fulfilled'
-    : false;
-
-  const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
   if (failures.length > 0) {
-    throw new Error(
-      failures
-        .map((failure) => (failure.reason instanceof Error ? failure.reason.message : String(failure.reason)))
-        .join('; '),
-    );
+    throw new Error(failures.join('; '));
   }
 
   return {
