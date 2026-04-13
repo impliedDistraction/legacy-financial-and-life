@@ -3,6 +3,8 @@ import { Resend } from 'resend';
 import { site } from '../../content/site';
 import { getLeadTrackingId, trackLeadEvent } from '../../lib/lead-analytics';
 import { buildEmailMetadata, buildTrackedUrl, getMonitoredReplyTo, syncResendContact } from '../../lib/resend-monitoring';
+import { trackVercelEvent } from '../../lib/vercel-events';
+import { quoteFlowFlagKeys, resolveFlagValues } from '../../lib/flags';
 
 export const prerender = false;
 
@@ -130,6 +132,15 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     hasContactTopicId: Boolean(import.meta.env.RESEND_CONTACT_TOPIC_ID?.trim()),
     hasRingyConfig: Boolean(import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_API_URL?.trim()),
   });
+
+  // Fire Vercel custom event (non‑blocking, flag‑annotated)
+  const flagKeys = quoteFlowFlagKeys();
+  void trackVercelEvent('Quote Received', {
+    interest,
+    state,
+    source: 'fb-lead',
+    route: routePath,
+  }, flagKeys);
 
   // Basic server-side validation — all fields required
   if (!name || !email || !phone || !dob || !height || !weight || !beneficiary || !state || !interest || !tobaccoUse) {
@@ -448,6 +459,15 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       resendContactStatus,
       ringyStatus,
     });
+
+    // Vercel custom event: pipeline completed (flag‑annotated)
+    void trackVercelEvent('Quote Pipeline Completed', {
+      interest,
+      state,
+      confirmationOk: String(!confirmationResult.error),
+      ringyStatus,
+      resendContactStatus,
+    }, flagKeys);
   } catch (err) {
     console.error('Email send failed:', err);
     await trackQuoteEvent('quote_pipeline_failed', 'error', 'error', 'legacy', {

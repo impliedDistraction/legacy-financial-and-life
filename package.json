@@ -17,6 +17,7 @@
     "@astrojs/vercel": "^7.8.0",
     "@vercel/analytics": "^2.0.1",
     "astro": "^4.15.0",
+    "flags": "^4.0.6",
     "resend": "^4.0.0",
     "sharp": "^0.34.3",
     "svix": "^1.90.0"

@@ -17,6 +17,16 @@ interface ImportMetaEnv {
 	readonly SUPABASE_LEAD_ANALYTICS_TABLE?: string;
 	readonly SUPABASE_SERVICE_ROLE_KEY?: string;
 	readonly SUPABASE_URL?: string;
+
+	// Feature flags
+	readonly FLAGS_SECRET?: string;
+	readonly FLAG_QUOTE_FLOW_VARIANT?: string;
+	readonly FLAG_QUOTE_CONFIRMATION_VARIANT?: string;
+	readonly FLAG_RINGY_ENABLED?: string;
+
+	// Analytics dashboard auth
+	readonly ANALYTICS_ALLOWED_EMAILS?: string;
+	readonly ANALYTICS_SECRET?: string;
 }
 
 interface ImportMeta {

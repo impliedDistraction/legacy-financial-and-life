@@ -2,6 +2,8 @@
 import { site } from '../content/site';
 import Analytics from '@vercel/analytics/astro';
 import SEO from '../components/SEO.astro';
+import { safeJsonStringify } from 'flags';
+import { resolveFlagValues } from '../lib/flags';
 
 export interface Props {
   title?: string;
@@ -9,6 +11,9 @@ export interface Props {
 }
 
 const { title = 'Legacy Financial & Life', description = 'Life insurance and retirement strategies built on clarity and respect.' } = Astro.props ?? {};
+
+const flagValues = resolveFlagValues();
+const flagValuesJson = safeJsonStringify(flagValues);
 ---
 <!DOCTYPE html>
 <html lang="en">
@@ -18,6 +23,7 @@ const { title = 'Legacy Financial & Life', description = 'Life insurance and ret
     <SEO title={title} description={description} />
     <link rel="icon" href={site.branding.favicon}>
     <Analytics />
+    <script type="application/json" data-flag-values set:html={flagValuesJson}></script>
 
     <!-- Meta Pixel Code -->
     <script is:inline>
