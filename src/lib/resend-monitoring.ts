@@ -156,18 +156,18 @@ export async function syncResendContact(input: ContactSyncInput): Promise<boolea
       firstName: input.firstName,
       lastName: input.lastName,
       properties,
+      ...(segmentId ? { segments: [{ id: segmentId }] } : {}),
+      ...(topicId ? { topics: [{ id: topicId, subscription: 'opt_in' as const }] } : {}),
     };
 
     const createdContact = await createResendContactWithFallback(resendKey, createPayload);
     contactId = createdContact.id;
 
-    const membership = await syncResendContactMemberships(resendKey, email, segmentId, topicId);
-
     console.info('Resend contact created', {
       email: maskEmail(email),
       contactId: createdContact.id,
-      segmentAttached: membership.segmentAttached,
-      topicAttached: membership.topicAttached,
+      segmentAttached: Boolean(segmentId),
+      topicAttached: Boolean(topicId),
     });
     return true;
   }
@@ -429,7 +429,7 @@ async function updateResendContactTopics(
     resendKey,
     'PATCH',
     `/contacts/${encodeURIComponent(email)}/topics`,
-    { topics },
+    topics as unknown as Record<string, unknown>,
   );
 }
 
