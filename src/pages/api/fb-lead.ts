@@ -6,6 +6,7 @@ import { checkLeadDedup, isHoneypotTriggered, isRateLimited, isSubmissionTooFast
 import { buildEmailMetadata, buildTrackedUrl, getMonitoredReplyTo, syncResendContact } from '../../lib/resend-monitoring';
 import { trackVercelEvent } from '../../lib/vercel-events';
 import { quoteFlowFlagKeys, resolveFlagValues } from '../../lib/flags';
+import { scoreLeadQuality, type LeadScoreResult } from '../../lib/lead-scoring';
 
 export const prerender = false;
 
@@ -216,6 +217,34 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     return redirect('/quote-duplicate', 302);
   }
 
+  // ── Lead quality scoring ────────────────────────────────────────
+  const renderedMs = Number(String(data.get('_rendered') ?? ''));
+  const formFillMs = (!Number.isNaN(renderedMs) && renderedMs > 0) ? Date.now() - renderedMs : null;
+
+  const leadScore = await scoreLeadQuality({
+    email,
+    phone,
+    state,
+    clientIp,
+    userAgent: request.headers.get('user-agent') ?? '',
+    referrer: request.headers.get('referer') ?? '',
+    formFillMs,
+  });
+
+  await trackQuoteEvent('quote_lead_scored', 'submission', 'info', 'legacy', {
+    score: leadScore.score,
+    tier: leadScore.tier,
+    signals: Object.fromEntries(leadScore.signals.map(s => [s.signal, { points: s.points, max: s.maxPoints, detail: s.detail }])),
+    ipGeo: leadScore.ipGeo ?? null,
+  });
+
+  console.info('Lead quality score computed', {
+    trackingId,
+    score: leadScore.score,
+    tier: leadScore.tier,
+    emailDomain: getEmailDomain(email),
+  });
+
   const resend = new Resend(resendKey);
   const internalEmailMetadata = buildEmailMetadata('quote_internal', {
     interest,
@@ -288,6 +317,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
             <td style="padding: 10px 12px; border-bottom: 1px solid #f1f5f9;">${escapeHtml(interestLabel)}</td>
           </tr>
         </table>
+        ${buildLeadScoreBadge(leadScore)}
         <p style="margin: 20px 0 0; padding: 14px; background: #eff6ff; border-radius: 8px; font-size: 13px; color: #1e40af;">
           A confirmation email was automatically sent to the lead. Reply directly to this email to reach <strong>${firstName}</strong>.
         </p>
@@ -629,4 +659,39 @@ function normalizeWeightValue(value: string): string {
   }
 
   return String(weightNumber);
+}
+
+function buildLeadScoreBadge(result: LeadScoreResult): string {
+  const tierColors: Record<string, { bg: string; text: string; border: string; label: string }> = {
+    hot:  { bg: '#dcfce7', text: '#166534', border: '#bbf7d0', label: 'High Quality' },
+    warm: { bg: '#fef3c7', text: '#92400e', border: '#fde68a', label: 'Medium Quality' },
+    cold: { bg: '#fee2e2', text: '#991b1b', border: '#fecaca', label: 'Low Quality / Suspect' },
+  };
+  const t = tierColors[result.tier] ?? tierColors.cold;
+
+  const signalRows = result.signals.map(s =>
+    `<tr>
+       <td style="padding:4px 8px;font-size:12px;color:#475569;">${escapeHtml(s.signal.replace(/_/g, ' '))}</td>
+       <td style="padding:4px 8px;font-size:12px;font-weight:600;text-align:center;">${s.points}/${s.maxPoints}</td>
+       <td style="padding:4px 8px;font-size:11px;color:#64748b;">${escapeHtml(s.detail)}</td>
+     </tr>`
+  ).join('');
+
+  return `
+    <div style="margin:20px 0 0;padding:14px;background:${t.bg};border:1px solid ${t.border};border-radius:8px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:24px;font-weight:700;color:${t.text};">${result.score}/100</span>
+        <span style="font-size:13px;font-weight:600;color:${t.text};">${t.label}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr>
+          <th style="text-align:left;padding:4px 8px;font-size:11px;color:#94a3b8;text-transform:uppercase;">Signal</th>
+          <th style="text-align:center;padding:4px 8px;font-size:11px;color:#94a3b8;text-transform:uppercase;">Score</th>
+          <th style="text-align:left;padding:4px 8px;font-size:11px;color:#94a3b8;text-transform:uppercase;">Detail</th>
+        </tr></thead>
+        <tbody>${signalRows}</tbody>
+      </table>
+      ${result.ipGeo ? `<p style="margin:8px 0 0;font-size:11px;color:#64748b;">IP: ${escapeHtml(result.ipGeo.city)}, ${escapeHtml(result.ipGeo.region)}, ${escapeHtml(result.ipGeo.country)} · ${escapeHtml(result.ipGeo.org)}</p>` : ''}
+    </div>
+  `;
 }

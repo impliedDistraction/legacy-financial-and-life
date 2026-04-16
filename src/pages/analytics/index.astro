@@ -139,6 +139,24 @@ function relativeTime(iso: string): string {
 }
 
 const flagValues = resolveFlagValues();
+
+// Compute lead quality stats from scored events
+const scoredEvents = recentEvents.filter(e => e.event_name === 'quote_lead_scored' && typeof e.properties?.score === 'number');
+const avgScore = scoredEvents.length > 0
+  ? Math.round(scoredEvents.reduce((sum, e) => sum + (e.properties.score as number), 0) / scoredEvents.length)
+  : null;
+const hotLeads = scoredEvents.filter(e => (e.properties.tier as string) === 'hot').length;
+const warmLeads = scoredEvents.filter(e => (e.properties.tier as string) === 'warm').length;
+const coldLeads = scoredEvents.filter(e => (e.properties.tier as string) === 'cold').length;
+
+// Build a map of tracking_id -> score/tier for annotating the events table
+const scoreByTrackingId = new Map<string, { score: number; tier: string }>();
+for (const e of scoredEvents) {
+  scoreByTrackingId.set(e.tracking_id, {
+    score: e.properties.score as number,
+    tier: e.properties.tier as string,
+  });
+}
 ---
 
 <!DOCTYPE html>
@@ -186,6 +204,11 @@ const flagValues = resolveFlagValues();
     .badge-error{background:#fee2e2;color:#991b1b}
     .badge-warning{background:#fef3c7;color:#92400e}
     .badge-info{background:#dbeafe;color:#1e40af}
+    .badge-hot{background:#dcfce7;color:#166534}
+    .badge-warm{background:#fef3c7;color:#92400e}
+    .badge-cold{background:#fee2e2;color:#991b1b}
+    .score-bar{height:6px;border-radius:3px;background:#e2e8f0;overflow:hidden;width:60px;display:inline-block;vertical-align:middle;margin-left:4px}
+    .score-fill{height:100%;border-radius:3px}
     .mono{font-family:monospace;font-size:.75rem;color:#475569}
     .muted{color:#94a3b8}
 
@@ -236,6 +259,13 @@ const flagValues = resolveFlagValues();
         <span class="value" style={`color:${statusColor('warning')}`}>{warningCount}</span>
         <span class="sub">Of recent batch</span>
       </div>
+      {avgScore !== null && (
+        <div class="card">
+          <span class="label">Avg Lead Score</span>
+          <span class="value" style={`color:${avgScore >= 80 ? '#16a34a' : avgScore >= 50 ? '#d97706' : '#dc2626'}`}>{avgScore}/100</span>
+          <span class="sub">{hotLeads} hot · {warmLeads} warm · {coldLeads} cold</span>
+        </div>
+      )}
     </div>
 
     <!-- Pipeline funnel -->
@@ -288,6 +318,7 @@ const flagValues = resolveFlagValues();
               <th>Route</th>
               <th>Lead</th>
               <th>Interest</th>
+              <th>Quality</th>
               <th>Tracking ID</th>
             </tr>
           </thead>
@@ -304,6 +335,20 @@ const flagValues = resolveFlagValues();
                 <td class="mono">{evt.route}</td>
                 <td class="muted">{maskEmail(evt.lead_email)}</td>
                 <td>{evt.interest ?? <span class="muted">—</span>}</td>
+                <td>
+                  {(() => {
+                    const scoreInfo = scoreByTrackingId.get(evt.tracking_id);
+                    if (!scoreInfo) return <span class="muted">—</span>;
+                    const tierClass = `badge badge-${scoreInfo.tier}`;
+                    const barColor = scoreInfo.tier === 'hot' ? '#16a34a' : scoreInfo.tier === 'warm' ? '#d97706' : '#dc2626';
+                    return (
+                      <span>
+                        <span class={tierClass}>{scoreInfo.score}</span>
+                        <span class="score-bar"><span class="score-fill" style={`width:${scoreInfo.score}%;background:${barColor}`}></span></span>
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td class="mono" title={evt.tracking_id}>{evt.tracking_id.slice(0, 8)}…</td>
               </tr>
             ))}
