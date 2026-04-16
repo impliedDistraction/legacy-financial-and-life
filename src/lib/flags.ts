@@ -67,7 +67,7 @@ function resolveEnvString(key: string, fallback: string): string {
   // import.meta.env is only available inside Astro modules at build/runtime.
   // When this file is used inside an API route the env is populated by Vercel.
   try {
-    const val = (import.meta as any).env?.[key]?.trim();
+    const val = ((import.meta as any).env?.[key] ?? process.env[key])?.trim();
     return val || fallback;
   } catch {
     return fallback;
@@ -76,7 +76,7 @@ function resolveEnvString(key: string, fallback: string): string {
 
 function resolveBoolEnv(key: string, fallback: boolean): boolean {
   try {
-    const raw = (import.meta as any).env?.[key]?.trim()?.toLowerCase();
+    const raw = ((import.meta as any).env?.[key] ?? process.env[key])?.trim()?.toLowerCase();
     if (raw === 'true' || raw === '1') return true;
     if (raw === 'false' || raw === '0') return false;
     return fallback;

@@ -14,7 +14,7 @@ import { FLAG_DEFINITIONS } from '../../lib/flags';
 export const prerender = false;
 
 export const GET: APIRoute = async ({ request }) => {
-  const flagsSecret = import.meta.env.FLAGS_SECRET;
+  const flagsSecret = import.meta.env.FLAGS_SECRET ?? process.env.FLAGS_SECRET;
 
   // If FLAGS_SECRET isn't configured, return 404 to avoid leaking that the
   // endpoint exists but simply isn't set up yet.

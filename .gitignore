@@ -32,3 +32,4 @@ yarn-error.log*
 .astro/
 
 !public/images/README.md
+.vercel
