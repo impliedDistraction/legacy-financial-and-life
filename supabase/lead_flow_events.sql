@@ -50,3 +50,12 @@ create index if not exists lead_flow_events_recipient_email_idx
 
 create index if not exists lead_flow_events_stage_idx
   on public.lead_flow_events (stage, occurred_at desc);
+
+-- Phone-based dedup index (used by 30-day duplicate lead check)
+create index if not exists lead_flow_events_lead_phone_idx
+  on public.lead_flow_events (lead_phone, occurred_at desc);
+
+-- JSONB index for IP-based rate limiting (queries properties->>'client_ip')
+create index if not exists lead_flow_events_client_ip_idx
+  on public.lead_flow_events ((properties->>'client_ip'), occurred_at desc)
+  where event_name = 'quote_request_received';

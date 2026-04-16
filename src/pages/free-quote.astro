@@ -235,6 +235,14 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
         class="grid gap-5 rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-lg"
       >
         <input type="hidden" name="trackingId" value="" />
+        <input type="hidden" name="_rendered" value="" />
+        <!-- Anti-spam honeypot — invisible to real users -->
+        <div class="absolute -left-[9999px]" aria-hidden="true">
+          <label>
+            <span>Leave this blank</span>
+            <input type="text" name="website_url" tabindex="-1" autocomplete="off" />
+          </label>
+        </div>
 
         <!-- About you -->
         <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">About You</p>
@@ -510,8 +518,12 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
   const btn = form?.querySelector('button[type="submit"]') as HTMLButtonElement | null;
   const emailInput = form?.querySelector('input[name="email"]') as HTMLInputElement | null;
   const trackingIdInput = form?.querySelector('input[name="trackingId"]') as HTMLInputElement | null;
+  const renderedInput = form?.querySelector('input[name="_rendered"]') as HTMLInputElement | null;
   const formFields = form?.querySelectorAll('input, select, textarea') ?? [];
   let formStarted = sessionStorage.getItem('quote_form_started_tracked') === 'true';
+
+  // Set timing field for bot detection
+  if (renderedInput) renderedInput.value = String(Date.now());
 
   const ensureTrackingId = () => {
     const trackingId = prepareQuoteTrackingId();

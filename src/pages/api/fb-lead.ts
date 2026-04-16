@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { Resend } from 'resend';
 import { site } from '../../content/site';
 import { getLeadTrackingId, trackLeadEvent } from '../../lib/lead-analytics';
+import { checkLeadDedup, isHoneypotTriggered, isRateLimited, isSubmissionTooFast, normalizePhone } from '../../lib/lead-dedup';
 import { buildEmailMetadata, buildTrackedUrl, getMonitoredReplyTo, syncResendContact } from '../../lib/resend-monitoring';
 import { trackVercelEvent } from '../../lib/vercel-events';
 import { quoteFlowFlagKeys, resolveFlagValues } from '../../lib/flags';
@@ -77,6 +78,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const name = String(data.get('name') ?? '').trim();
   const email = normalizeEmailAddress(String(data.get('email') ?? ''));
   const phone = String(data.get('phone') ?? '').trim();
+  const phoneDigits = normalizePhone(phone); // digits-only for dedup and analytics
   const dob = buildDobValue(data);
   const height = buildHeightValue(data);
   const weight = normalizeWeightValue(String(data.get('weight') ?? ''));
@@ -107,7 +109,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       status,
       ownerScope,
       leadEmail: email || undefined,
-      leadPhone: phone || undefined,
+      leadPhone: phoneDigits || undefined,
       interest: interest || undefined,
       provider: 'legacy_financial',
       properties,
@@ -125,8 +127,14 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     hasRingyConfig: Boolean(import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_API_URL?.trim()),
   });
 
+  // Extract client IP early — used for rate-limiting and analytics
+  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || request.headers.get('x-real-ip')
+    || 'unknown';
+
   await trackQuoteEvent('quote_request_received', 'submission', 'info', 'legacy', {
     emailDomain: getEmailDomain(email),
+    client_ip: clientIp,
     hasReplyMonitorAddress: Boolean(import.meta.env.RESEND_REPLY_MONITOR_ADDRESS?.trim()),
     hasContactSegmentId: Boolean(import.meta.env.RESEND_CONTACT_SEGMENT_ID?.trim()),
     hasContactTopicId: Boolean(import.meta.env.RESEND_CONTACT_TOPIC_ID?.trim()),
@@ -163,6 +171,49 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       reason: 'invalid_tobacco_use',
     });
     return redirect('/quote-error', 302);
+  }
+
+  // ── Anti-spam checks ──────────────────────────────────────────────
+
+  // 1. Honeypot — bots fill hidden fields
+  if (isHoneypotTriggered(data)) {
+    console.info('Honeypot triggered — likely bot', { email: getEmailDomain(email) });
+    await trackQuoteEvent('quote_spam_blocked', 'submission', 'warning', 'legacy', {
+      reason: 'honeypot',
+    });
+    // Silently redirect to success so bots don't learn they were caught
+    return redirect('/quote-success', 302);
+  }
+
+  // 2. Timing — bots submit instantly
+  if (isSubmissionTooFast(data)) {
+    console.info('Form submitted too fast — likely bot', { email: getEmailDomain(email) });
+    await trackQuoteEvent('quote_spam_blocked', 'submission', 'warning', 'legacy', {
+      reason: 'too_fast',
+    });
+    return redirect('/quote-success', 302);
+  }
+
+  // 3. IP rate-limiting — prevent flood submissions
+  if (clientIp !== 'unknown' && await isRateLimited(clientIp)) {
+    console.info('Rate limit exceeded', { ip: clientIp });
+    await trackQuoteEvent('quote_spam_blocked', 'submission', 'warning', 'legacy', {
+      reason: 'rate_limited',
+    });
+    return redirect('/quote-error', 302);
+  }
+
+  // 4. 30-day duplicate check — same email or phone within window
+  const dedupResult = await checkLeadDedup(email, phone);
+  if (!dedupResult.allowed) {
+    console.info('Duplicate lead blocked', {
+      reason: dedupResult.reason,
+      emailDomain: getEmailDomain(email),
+    });
+    await trackQuoteEvent('quote_duplicate_blocked', 'submission', 'info', 'legacy', {
+      reason: dedupResult.reason,
+    });
+    return redirect('/quote-duplicate', 302);
   }
 
   const resend = new Resend(resendKey);
