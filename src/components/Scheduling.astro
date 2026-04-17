@@ -1,26 +1,7 @@
 ---
 import { site } from '../content/site';
 
-// Derive Cal.com settings from site content
-const calUsername = site.cal?.username?.trim?.() || '';
-const calBrandColor = site.cal?.brandColor || '#1a62db';
-const calPrimaryEventTypeSlug = site.cal?.primaryEventTypeSlug?.trim?.() || '';
-
-// Build calLink — if primary event type provided, deep-link to it; else list view for user
-const calLink = calUsername
-  ? (calPrimaryEventTypeSlug ? `${calUsername}/${calPrimaryEventTypeSlug}` : calUsername)
-  : 'josh-byrom-d3jwh7'; // temporary fallback until client username is provided
-
-// Event launcher cards — only when explicitly configured
-const hasQuickEvents = Array.isArray(site.cal?.eventTypes) && site.cal.eventTypes.length > 0;
-const quickEvents = hasQuickEvents
-  ? site.cal!.eventTypes.map((e) => ({
-      title: e.title,
-      description: e.description,
-      duration: e.duration,
-      calLink: calUsername ? `${calUsername}/${e.slug}` : `josh-byrom-d3jwh7/${e.slug}`
-    }))
-  : [];
+const bookingUrl = site.scheduling?.bookingUrl || 'https://app.ringy.com/book/legacy';
 ---
 
 <section id="schedule" class="mx-auto max-w-6xl px-4 py-12 sm:py-16">
@@ -32,92 +13,40 @@ const quickEvents = hasQuickEvents
   <div class="grid gap-8 lg:grid-cols-2 items-start">
     <!-- Scheduling Widget Column -->
     <div class="rounded-2xl border border-slate-200 p-6 sm:p-8 hover-lift">
-  <h3 class="text-xl font-semibold mb-4">Book Your Appointment</h3>
-      
-      <!-- Cal.com Scheduling Widget -->
-  <div class="cal-scheduling-container rounded-lg border border-slate-200 overflow-hidden bg-white" style={`--cal-brand-color: ${calBrandColor}`}>
-        
-        
-        <!-- Cal.com Embed -->
-        <div class="p-4">
-          <cal-inline 
-            calLink={calLink}
-            style="width:100%;height:660px;overflow:hidden"
-            config={JSON.stringify({
-              layout: 'month_view',
-              theme: 'light',
-              hideEventTypeDetails: false,
-              styles: { branding: { brandColor: calBrandColor } }
-            })}>
-          </cal-inline>
-          
-          <!-- Fallback Content (shown when Cal.com is not available) -->
-          <div class="cal-fallback space-y-6">
-            <div class="text-center py-8">
-              <div class="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg class="w-8 h-8 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                </svg>
-              </div>
-              <h4 class="text-lg font-semibold text-slate-800 mb-2">Schedule Your Consultation</h4>
-              <p class="text-slate-600 mb-6">Choose from our available consultation options</p>
-            </div>
-            
-            <!-- Quick launch event types -->
-            <div class="space-y-3">
-              {hasQuickEvents ? (
-                quickEvents.map((evt) => (
-                  <a href={`https://cal.com/${evt.calLink}`} target="_blank" rel="noopener noreferrer" class="block w-full text-left border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer group" data-cal-link={evt.calLink}>
-                    <div class="flex justify-between items-start">
-                      <div>
-                        <h5 class="font-semibold text-slate-800 group-hover:text-slate-900">{evt.title}</h5>
-                        <p class="text-sm text-slate-600 mt-1">{evt.description}</p>
-                        <div class="flex items-center mt-2 text-sm text-slate-500">
-                          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                          </svg>
-                          {evt.duration}
-                        </div>
-                      </div>
-                      <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
-                    </div>
-                  </a>
-                ))
-              ) : (
-                <a href={`https://cal.com/${calLink}`} target="_blank" rel="noopener noreferrer" class="block w-full text-left border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors cursor-pointer group" data-cal-link={calLink}>
-                  <div class="flex justify-between items-start">
-                    <div>
-                      <h5 class="font-semibold text-slate-800 group-hover:text-slate-900">Find a time that works</h5>
-                      <p class="text-sm text-slate-600 mt-1">Open our live calendar to pick a time</p>
-                      <div class="flex items-center mt-2 text-sm text-slate-500">
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                        30–60 minutes
-                      </div>
-                    </div>
-                    <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Free</span>
-                  </div>
-                </a>
-              )}
-            </div>
-            <noscript>
-              <p class="text-center text-slate-600 text-sm">JavaScript is disabled. Book directly at <a class="underline" href={`https://cal.com/${calLink}`}>cal.com/{calLink}</a>.</p>
-            </noscript>
-            
-            <!-- Contact CTA -->
-            <div class="bg-brand-50 rounded-lg p-4 text-center">
-              <p class="text-brand-800 text-sm mb-3">Ready to schedule? Contact us directly:</p>
-              <div class="flex flex-col sm:flex-row gap-2 justify-center">
-                <a href={`tel:${site.phone}`} class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                  Call {site.phone}
-                </a>
-                <a href={`mailto:${site.email}`} class="bg-white border border-brand-200 text-brand-700 hover:bg-brand-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                  Email {site.email}
-                </a>
-              </div>
-            </div>
+      <h3 class="text-xl font-semibold mb-4">Book Your Appointment</h3>
+
+      <div class="rounded-lg border border-slate-200 overflow-hidden bg-white">
+        <iframe
+          src={bookingUrl}
+          width="100%"
+          height="660"
+          style="border:0;"
+          loading="lazy"
+          title="Schedule an appointment with Legacy Financial & Life"
+          class="rounded-lg"
+        ></iframe>
+
+        <!-- Fallback for no-JS or embed issues -->
+        <noscript>
+          <div class="p-6 text-center">
+            <p class="text-slate-600 text-sm">Book your appointment directly at <a class="underline text-brand-600" href={bookingUrl}>{bookingUrl}</a>.</p>
           </div>
+        </noscript>
+      </div>
+
+      <!-- Direct link + contact fallback -->
+      <div class="mt-4 bg-brand-50 rounded-lg p-4 text-center">
+        <p class="text-brand-800 text-sm mb-3">Prefer a different way to connect?</p>
+        <div class="flex flex-col sm:flex-row gap-2 justify-center">
+          <a href={bookingUrl} target="_blank" rel="noopener noreferrer" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            Open Booking Page
+          </a>
+          <a href={`tel:${site.phone}`} class="bg-white border border-brand-200 text-brand-700 hover:bg-brand-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            Call {site.phone}
+          </a>
+          <a href={`mailto:${site.email}`} class="bg-white border border-brand-200 text-brand-700 hover:bg-brand-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            Email Us
+          </a>
         </div>
       </div>
     </div>

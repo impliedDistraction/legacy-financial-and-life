@@ -15,32 +15,48 @@ const LICENSED_STATES = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, M
 
 // ── Ringy CRM lead injection ───────────────────────────────────────
 // Requires two env vars from the client's Ringy account:
-//   RINGY_AUTH_TOKEN – API token from Ringy Dashboard → Settings → API
-//   RINGY_API_URL   – Lead injection endpoint (e.g. https://app.ringy.com/api/public/createLead)
+//   RINGY_AUTH_TOKEN – API auth token
+//   RINGY_SID       – API session/account ID
+// API docs: sid + authToken go in the POST body (not headers).
+// Endpoint: https://app.ringy.com/api/public/leads/new-lead
+const RINGY_API_URL = 'https://app.ringy.com/api/public/leads/new-lead';
+
 async function pushToRingy(lead: {
   firstName: string;
   lastName: string;
+  fullName: string;
   email: string;
   phone?: string;
   notes?: string;
+  state?: string;
+  dob?: string;
+  trackingId?: string;
 }): Promise<void> {
-  const token = import.meta.env.RINGY_AUTH_TOKEN;
-  const url = import.meta.env.RINGY_API_URL;
+  const authToken = import.meta.env.RINGY_AUTH_TOKEN;
+  const sid = import.meta.env.RINGY_SID;
 
-  if (!token || !url) return; // silently skip when not configured
+  if (!authToken || !sid) return; // silently skip when not configured
 
-  const res = await fetch(url, {
+  // Field names must match the API field values configured in the Ringy
+  // lead source mapping (Dashboard → Settings → Lead Sources).
+  const res = await fetch(RINGY_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
+      sid,
+      authToken,
       first_name: lead.firstName,
       last_name: lead.lastName,
+      full_name: lead.fullName,
       email: lead.email,
-      ...(lead.phone && { phone: lead.phone }),
+      ...(lead.phone && { phone_number: lead.phone }),
       ...(lead.notes && { notes: lead.notes }),
+      ...(lead.state && { state: lead.state }),
+      ...(lead.dob && { birthday: lead.dob }),
+      ...(lead.trackingId && { vendor_reference_id: lead.trackingId }),
+      lead_source: 'legacyfinancial.app/free-quote',
     }),
   });
 
@@ -125,7 +141,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     hasReplyMonitorAddress: Boolean(import.meta.env.RESEND_REPLY_MONITOR_ADDRESS?.trim()),
     hasContactSegmentId: Boolean(import.meta.env.RESEND_CONTACT_SEGMENT_ID?.trim()),
     hasContactTopicId: Boolean(import.meta.env.RESEND_CONTACT_TOPIC_ID?.trim()),
-    hasRingyConfig: Boolean(import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_API_URL?.trim()),
+    hasRingyConfig: Boolean(import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_SID?.trim()),
   });
 
   // Extract client IP early — used for rate-limiting and analytics
@@ -139,7 +155,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     hasReplyMonitorAddress: Boolean(import.meta.env.RESEND_REPLY_MONITOR_ADDRESS?.trim()),
     hasContactSegmentId: Boolean(import.meta.env.RESEND_CONTACT_SEGMENT_ID?.trim()),
     hasContactTopicId: Boolean(import.meta.env.RESEND_CONTACT_TOPIC_ID?.trim()),
-    hasRingyConfig: Boolean(import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_API_URL?.trim()),
+    hasRingyConfig: Boolean(import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_SID?.trim()),
   });
 
   // Fire Vercel custom event (non‑blocking, flag‑annotated)
@@ -374,6 +390,13 @@ export const POST: APIRoute = async ({ request, redirect }) => {
           </p>
         </div>
 
+        <!-- Schedule a call CTA -->
+        <div style="margin-top: 24px; padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center;">
+          <p style="margin: 0 0 12px; font-size: 15px; color: #0f172a; font-weight: 600;">Want to get started sooner?</p>
+          <p style="margin: 0 0 16px; font-size: 14px; color: #475569;">Pick a time that works for you and we'll call to discuss your options.</p>
+          <a href="${site.scheduling?.bookingUrl || 'https://app.ringy.com/book/legacy'}" style="display: inline-block; background: #1a62db; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none;">Schedule a Call</a>
+        </div>
+
         <!-- What they're interested in -->
         <div style="margin-top: 24px; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
           <p style="margin: 0; font-size: 14px; color: #166534;">
@@ -390,7 +413,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     const crmFirstName = nameParts[0];
     const crmLastName = nameParts.slice(1).join(' ') || '';
     let resendContactStatus: 'success' | 'warning' = 'success';
-    let ringyStatus: 'skipped' | 'success' | 'warning' = import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_API_URL?.trim()
+    let ringyStatus: 'skipped' | 'success' | 'warning' = import.meta.env.RINGY_AUTH_TOKEN?.trim() && import.meta.env.RINGY_SID?.trim()
       ? 'success'
       : 'skipped';
 
@@ -436,9 +459,13 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       pushToRingy({
         firstName: crmFirstName,
         lastName: crmLastName,
+        fullName: name,
         email,
         phone: phone || undefined,
         notes: noteLines.join('\n'),
+        state: state || undefined,
+        dob: dob || undefined,
+        trackingId: trackingId || undefined,
       }).catch(async (err) => {
         ringyStatus = 'warning';
         console.error('Ringy CRM push failed:', err);
