@@ -10,7 +10,7 @@ import { scoreLeadQuality, type LeadScoreResult } from '../../lib/lead-scoring';
 
 export const prerender = false;
 
-const RECIPIENTS = ['tim@legacyf-l.com', 'beth@legacyf-l.com', 'jarboi6677@gmail.com'];
+const RECIPIENTS = ['tim@legacyf-l.com', 'beth@legacyf-l.com'];
 const LICENSED_STATES = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Michigan, Texas, Utah, Alabama, and Louisiana';
 
 // ── Ringy CRM lead injection ───────────────────────────────────────

@@ -83,6 +83,11 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
       interest: getQuoteInterest(),
     });
 
+    // Fire Meta Pixel Lead conversion event for Facebook Ads attribution
+    if (typeof window.fbq === 'function') {
+      window.fbq('track', 'Lead');
+    }
+
     sessionStorage.setItem('quote_success_tracked', 'true');
     markQuoteTrackingIdConsumed();
   }

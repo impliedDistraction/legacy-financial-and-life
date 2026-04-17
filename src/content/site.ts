@@ -1,9 +1,9 @@
 export const site = {
   name: 'Legacy Financial & Life',
-  url: 'https://legacyf-l.com',
+  url: 'https://legacyfinancial.app',
   phone: '(706) 333-5641',
   email: 'Beth@legacyf-l.com',
-  cityState: 'Luthersville, GA', // TODO: confirm spellings/details
+  cityState: 'Luthersville, GA',
   tagline: 'Trusted. Personal. Protective. Strategic.',
   // Scheduling (Cal.com) configuration — set username when available
   cal: {
@@ -196,7 +196,7 @@ export const site = {
       parkingInfo: 'Free parking available on-site',
       notes: 'Accessible facility with on-site parking'
     },
-    isActive: true, // Set to false to hide event
+    isActive: false, // Set to false to hide event
     sessions: [
       {
         id: 'thu-2pm',
