@@ -8,6 +8,8 @@ export const site = {
   // Scheduling configuration — Ringy CRM booking page
   scheduling: {
     bookingUrl: 'https://app.ringy.com/book/legacy',
+    // On-domain redirect so email links match the sending domain (improves deliverability)
+    bookingRedirect: '/book',
     brandColor: '#1a62db',
   },
   // Brand assets - updated with real company assets

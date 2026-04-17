@@ -1,6 +1,13 @@
 {
   "buildCommand": "npm run build",
   "installCommand": "npm install",
+  "redirects": [
+    {
+      "source": "/book",
+      "destination": "https://app.ringy.com/book/legacy",
+      "statusCode": 302
+    }
+  ],
   "rewrites": [
     {
       "source": "/.well-known/vercel/flags",

@@ -394,7 +394,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
         <div style="margin-top: 24px; padding: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; text-align: center;">
           <p style="margin: 0 0 12px; font-size: 15px; color: #0f172a; font-weight: 600;">Want to get started sooner?</p>
           <p style="margin: 0 0 16px; font-size: 14px; color: #475569;">Pick a time that works for you and we'll call to discuss your options.</p>
-          <a href="${site.scheduling?.bookingUrl || 'https://app.ringy.com/book/legacy'}" style="display: inline-block; background: #1a62db; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none;">Schedule a Call</a>
+          <a href="${site.url}${site.scheduling?.bookingRedirect || '/book'}" style="display: inline-block; background: #1a62db; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; text-decoration: none;">Schedule a Call</a>
         </div>
 
         <!-- What they're interested in -->
@@ -417,16 +417,17 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       ? 'success'
       : 'skipped';
 
-    // Build a CRM note from form fields
+    // Build a CRM note from form fields.
+    // Keep concise — Ringy truncates the notes display.
+    // DOB, state, and name already populate dedicated Ringy fields,
+    // so only include info that doesn't have its own column.
     const noteLines = [
-      'Source: Facebook campaign · /free-quote',
-      `DOB: ${dob}`,
+      `Interest: ${interestLabel}`,
+      `Beneficiary: ${beneficiary}`,
+      `Tobacco: ${tobaccoUseLabel}`,
       `Height: ${height}`,
       `Weight: ${weight} lbs`,
-      `Tobacco Use: ${tobaccoUseLabel}`,
-      `Beneficiary: ${beneficiary}`,
-      `State: ${state}`,
-      `Interest: ${interestLabel}`,
+      `Source: /free-quote`,
     ];
 
     // Send emails + push to Ringy CRM concurrently
