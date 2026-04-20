@@ -17,6 +17,21 @@ type VercelAnalyticsWindow = Window & {
 const TRACKING_ID_KEY = 'quote_tracking_id';
 const TRACKING_ID_CONSUMED_KEY = 'quote_tracking_id_consumed';
 const QUOTE_INTEREST_KEY = 'quote_interest';
+const QUOTE_ATTRIBUTION_KEY = 'quote_attribution';
+
+const ATTRIBUTION_QUERY_KEYS = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_term',
+  'utm_content',
+  'gclid',
+  'fbclid',
+  'msclkid',
+  'ttclid',
+] as const;
+
+type QuoteAttribution = Record<string, string>;
 
 export function prepareQuoteTrackingId(): string {
   const existingId = sessionStorage.getItem(TRACKING_ID_KEY);
@@ -52,8 +67,49 @@ export function getQuoteInterest(): string {
   return sessionStorage.getItem(QUOTE_INTEREST_KEY) ?? 'unknown';
 }
 
+export function captureQuoteAttribution(): QuoteAttribution {
+  const stored = readStoredAttribution();
+  const url = new URL(window.location.href);
+  const next: QuoteAttribution = {
+    ...stored,
+    landing_path: stored.landing_path || window.location.pathname,
+    landing_url: stored.landing_url || truncate(url.toString(), 500),
+  };
+
+  const referrer = document.referrer.trim();
+  if (referrer) {
+    next.referrer = stored.referrer || truncate(referrer, 500);
+    next.referrer_host = stored.referrer_host || getHost(referrer);
+  }
+
+  ATTRIBUTION_QUERY_KEYS.forEach((key) => {
+    const value = url.searchParams.get(key)?.trim();
+    if (value) {
+      next[key] = truncate(value, 300);
+    }
+  });
+
+  next.attribution_source = resolveAttributionSource(next);
+  next.campaign_key = buildCampaignKey(next);
+
+  sessionStorage.setItem(QUOTE_ATTRIBUTION_KEY, JSON.stringify(next));
+  return next;
+}
+
+export function applyQuoteAttributionToForm(form: HTMLFormElement): void {
+  const attribution = captureQuoteAttribution();
+
+  Object.entries(attribution).forEach(([key, value]) => {
+    const input = form.querySelector(`input[name="${key}"]`) as HTMLInputElement | null;
+    if (input) {
+      input.value = value;
+    }
+  });
+}
+
 export function trackQuoteAnalyticsEvent(options: QuoteAnalyticsOptions): void {
   const trackingId = getQuoteTrackingId();
+  const attribution = captureQuoteAttribution();
   const properties = {
     tracking_id: trackingId,
     route: options.route,
@@ -61,6 +117,7 @@ export function trackQuoteAnalyticsEvent(options: QuoteAnalyticsOptions): void {
     status: options.status,
     owner_scope: options.ownerScope,
     ...(options.interest ? { interest: options.interest } : {}),
+    ...attribution,
     ...(options.properties ?? {}),
   };
 
@@ -91,4 +148,66 @@ export function trackQuoteAnalyticsEvent(options: QuoteAnalyticsOptions): void {
     body: payload,
     keepalive: true,
   });
+}
+
+function readStoredAttribution(): QuoteAttribution {
+  const raw = sessionStorage.getItem(QUOTE_ATTRIBUTION_KEY);
+
+  if (!raw) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) => typeof value === 'string' && value.trim().length > 0),
+    ) as QuoteAttribution;
+  } catch {
+    return {};
+  }
+}
+
+function buildCampaignKey(attribution: QuoteAttribution): string {
+  if (attribution.utm_campaign || attribution.utm_source || attribution.utm_medium) {
+    return [
+      attribution.utm_source || 'unknown-source',
+      attribution.utm_medium || 'unknown-medium',
+      attribution.utm_campaign || 'unknown-campaign',
+    ].join(' / ');
+  }
+
+  if (attribution.fbclid) return 'click-id / facebook';
+  if (attribution.gclid) return 'click-id / google';
+  if (attribution.msclkid) return 'click-id / microsoft';
+  if (attribution.ttclid) return 'click-id / tiktok';
+  if (attribution.referrer_host) return `referrer / ${attribution.referrer_host}`;
+  return 'direct';
+}
+
+function resolveAttributionSource(attribution: QuoteAttribution): string {
+  if (attribution.utm_campaign || attribution.utm_source || attribution.utm_medium) {
+    return 'utm';
+  }
+
+  if (attribution.fbclid || attribution.gclid || attribution.msclkid || attribution.ttclid) {
+    return 'click_id';
+  }
+
+  if (attribution.referrer_host) {
+    return 'referrer';
+  }
+
+  return 'direct';
+}
+
+function getHost(value: string): string {
+  try {
+    return new URL(value).host.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function truncate(value: string, maxLength: number): string {
+  return value.length <= maxLength ? value : value.slice(0, maxLength);
 }

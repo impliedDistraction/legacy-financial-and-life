@@ -59,6 +59,12 @@ type EventRow = {
   properties: Record<string, unknown>;
 };
 
+type CampaignScoreRow = {
+  tracking_id: string;
+  occurred_at: string;
+  properties: Record<string, unknown>;
+};
+
 type CountRow = { stage: string; status: string; count: number };
 
 // ── data fetching ───────────────────────────────────────────────────
@@ -70,6 +76,10 @@ const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 // Recent events (last 50)
 const recentEvents = await supabaseQuery<EventRow[]>(
   `${tableName}?select=id,tracking_id,route,event_name,source,stage,status,owner_scope,lead_email,interest,provider,occurred_at,properties&order=occurred_at.desc&limit=50`,
+) ?? [];
+
+const scoreEvents7d = await supabaseQuery<CampaignScoreRow[]>(
+  `${tableName}?select=tracking_id,occurred_at,properties&event_name=eq.quote_lead_scored&occurred_at=gte.${encodeURIComponent(weekAgo)}&order=occurred_at.desc&limit=250`,
 ) ?? [];
 
 // Stage counts (last 24h)
@@ -149,6 +159,63 @@ const hotLeads = scoredEvents.filter(e => (e.properties.tier as string) === 'hot
 const warmLeads = scoredEvents.filter(e => (e.properties.tier as string) === 'warm').length;
 const coldLeads = scoredEvents.filter(e => (e.properties.tier as string) === 'cold').length;
 
+const campaignStatsMap = new Map<string, {
+  campaignKey: string;
+  attributionSource: string;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+  count: number;
+  totalScore: number;
+  hot: number;
+  warm: number;
+  cold: number;
+}>();
+
+for (const event of scoreEvents7d) {
+  const score = typeof event.properties?.score === 'number'
+    ? event.properties.score
+    : typeof event.properties?.score === 'string'
+      ? Number(event.properties.score)
+      : null;
+
+  if (score === null || Number.isNaN(score)) {
+    continue;
+  }
+
+  const campaignKey = String(event.properties?.campaign_key ?? 'direct');
+  const existing = campaignStatsMap.get(campaignKey) ?? {
+    campaignKey,
+    attributionSource: String(event.properties?.attribution_source ?? 'direct'),
+    utmSource: String(event.properties?.utm_source ?? '—'),
+    utmMedium: String(event.properties?.utm_medium ?? '—'),
+    utmCampaign: String(event.properties?.utm_campaign ?? '—'),
+    count: 0,
+    totalScore: 0,
+    hot: 0,
+    warm: 0,
+    cold: 0,
+  };
+
+  existing.count += 1;
+  existing.totalScore += score;
+
+  const tier = String(event.properties?.tier ?? 'cold');
+  if (tier === 'hot') existing.hot += 1;
+  else if (tier === 'warm') existing.warm += 1;
+  else existing.cold += 1;
+
+  campaignStatsMap.set(campaignKey, existing);
+}
+
+const campaignStats = Array.from(campaignStatsMap.values())
+  .map((item) => ({
+    ...item,
+    averageScore: Math.round(item.totalScore / item.count),
+  }))
+  .sort((left, right) => right.count - left.count)
+  .slice(0, 8);
+
 // Build a map of tracking_id -> score/tier for annotating the events table
 const scoreByTrackingId = new Map<string, { score: number; tier: string }>();
 for (const e of scoredEvents) {
@@ -211,6 +278,8 @@ for (const e of scoredEvents) {
     .score-fill{height:100%;border-radius:3px}
     .mono{font-family:monospace;font-size:.75rem;color:#475569}
     .muted{color:#94a3b8}
+    .section{background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:1.5rem}
+    .section h2{font-size:.875rem;font-weight:700;padding:1rem 1.25rem .75rem;color:#334155;border-bottom:1px solid #f1f5f9}
 
     .empty{text-align:center;padding:3rem 1rem;color:#94a3b8}
 
@@ -284,6 +353,48 @@ for (const e of scoredEvents) {
       })}
     </div>
 
+    <div class="section">
+      <h2>Lead Score by Campaign (7d)</h2>
+      {campaignStats.length === 0 ? (
+        <div class="empty">
+          <p>No scored leads with attribution found yet.</p>
+        </div>
+      ) : (
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Campaign Key</th>
+                <th>Source</th>
+                <th>Medium</th>
+                <th>Campaign</th>
+                <th>Attr.</th>
+                <th>Leads</th>
+                <th>Avg Score</th>
+                <th>Tier Mix</th>
+              </tr>
+            </thead>
+            <tbody>
+              {campaignStats.map((row) => (
+                <tr>
+                  <td class="mono">{row.campaignKey}</td>
+                  <td>{row.utmSource}</td>
+                  <td>{row.utmMedium}</td>
+                  <td>{row.utmCampaign}</td>
+                  <td>{row.attributionSource}</td>
+                  <td>{row.count}</td>
+                  <td>
+                    <span class={`badge ${row.averageScore >= 80 ? 'badge-success' : row.averageScore >= 50 ? 'badge-warning' : 'badge-error'}`}>{row.averageScore}</span>
+                  </td>
+                  <td class="muted">{row.hot} hot · {row.warm} warm · {row.cold} cold</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+
     <!-- Active flags -->
     <div class="flags">
       <h2>Active Feature Flags (Vercel Web Analytics annotated)</h2>
@@ -318,6 +429,7 @@ for (const e of scoredEvents) {
               <th>Route</th>
               <th>Lead</th>
               <th>Interest</th>
+              <th>Campaign</th>
               <th>Quality</th>
               <th>Tracking ID</th>
             </tr>
@@ -335,6 +447,7 @@ for (const e of scoredEvents) {
                 <td class="mono">{evt.route}</td>
                 <td class="muted">{maskEmail(evt.lead_email)}</td>
                 <td>{evt.interest ?? <span class="muted">—</span>}</td>
+                <td class="mono">{String(evt.properties?.campaign_key ?? evt.properties?.utm_campaign ?? '—')}</td>
                 <td>
                   {(() => {
                     const scoreInfo = scoreByTrackingId.get(evt.tracking_id);

@@ -236,6 +236,21 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
       >
         <input type="hidden" name="trackingId" value="" />
         <input type="hidden" name="_rendered" value="" />
+        <input type="hidden" name="landing_path" value="" />
+        <input type="hidden" name="landing_url" value="" />
+        <input type="hidden" name="referrer" value="" />
+        <input type="hidden" name="referrer_host" value="" />
+        <input type="hidden" name="utm_source" value="" />
+        <input type="hidden" name="utm_medium" value="" />
+        <input type="hidden" name="utm_campaign" value="" />
+        <input type="hidden" name="utm_term" value="" />
+        <input type="hidden" name="utm_content" value="" />
+        <input type="hidden" name="gclid" value="" />
+        <input type="hidden" name="fbclid" value="" />
+        <input type="hidden" name="msclkid" value="" />
+        <input type="hidden" name="ttclid" value="" />
+        <input type="hidden" name="attribution_source" value="" />
+        <input type="hidden" name="campaign_key" value="" />
         <!-- Anti-spam honeypot — invisible to real users -->
         <div class="absolute -left-[9999px]" aria-hidden="true">
           <label>
@@ -511,7 +526,7 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
 </Base>
 
 <script>
-  import { prepareQuoteTrackingId, setQuoteInterest, trackQuoteAnalyticsEvent } from '../scripts/lead-analytics';
+  import { applyQuoteAttributionToForm, prepareQuoteTrackingId, setQuoteInterest, trackQuoteAnalyticsEvent } from '../scripts/lead-analytics';
 
   // Simple client-side loading state for the form
   const form = document.querySelector('#quote-form form') as HTMLFormElement | null;
@@ -534,6 +549,9 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
   };
 
   ensureTrackingId();
+  if (form) {
+    applyQuoteAttributionToForm(form);
+  }
 
   if (sessionStorage.getItem('quote_page_view_tracked') !== 'true') {
     trackQuoteAnalyticsEvent({
@@ -615,6 +633,7 @@ const licensedStates = 'Ohio, Georgia, Oklahoma, South Carolina, Mississippi, Mi
   if (form && btn) {
     form.addEventListener('submit', () => {
       ensureTrackingId();
+      applyQuoteAttributionToForm(form);
 
       if (emailInput) {
         emailInput.value = normalizeEmailAddress(emailInput.value);

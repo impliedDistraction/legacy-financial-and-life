@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { Resend } from 'resend';
 import { site } from '../../content/site';
+import { buildCampaignKey, flattenLeadAttribution, readLeadAttribution } from '../../lib/lead-attribution';
 import { getLeadTrackingId, trackLeadEvent } from '../../lib/lead-analytics';
 import { checkLeadDedup, isHoneypotTriggered, isRateLimited, isSubmissionTooFast, normalizePhone } from '../../lib/lead-dedup';
 import { buildEmailMetadata, buildTrackedUrl, getMonitoredReplyTo, syncResendContact } from '../../lib/resend-monitoring';
@@ -109,6 +110,9 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   const firstName = escapeHtml(rawFirstName);
   const trackingId = getLeadTrackingId(data.get('trackingId'));
   const routePath = '/free-quote';
+  const leadAttribution = readLeadAttribution(data, request.headers.get('referer'));
+  const attributionProps = flattenLeadAttribution(leadAttribution);
+  const campaignKey = buildCampaignKey(leadAttribution);
 
   const trackQuoteEvent = (
     eventName: string,
@@ -150,6 +154,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     || 'unknown';
 
   await trackQuoteEvent('quote_request_received', 'submission', 'info', 'legacy', {
+    ...attributionProps,
     emailDomain: getEmailDomain(email),
     client_ip: clientIp,
     hasReplyMonitorAddress: Boolean(import.meta.env.RESEND_REPLY_MONITOR_ADDRESS?.trim()),
@@ -161,11 +166,16 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   // Fire Vercel custom event (non‑blocking, flag‑annotated)
   const flagKeys = quoteFlowFlagKeys();
   void trackVercelEvent('Quote Received', {
+    ...toVercelAttributionProps(leadAttribution),
+    campaign_key: campaignKey,
     interest,
     state,
     source: 'fb-lead',
     route: routePath,
-  }, flagKeys);
+  }, {
+    flags: flagKeys,
+    request,
+  });
 
   // Basic server-side validation — all fields required
   if (!name || !email || !phone || !dob || !height || !weight || !beneficiary || !state || !interest || !tobaccoUse) {
@@ -248,8 +258,10 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   });
 
   await trackQuoteEvent('quote_lead_scored', 'submission', 'info', 'legacy', {
+    ...attributionProps,
     score: leadScore.score,
     tier: leadScore.tier,
+    ...flattenLeadScore(resultToFlatSignals(leadScore)),
     signals: Object.fromEntries(leadScore.signals.map(s => [s.signal, { points: s.points, max: s.maxPoints, detail: s.detail }])),
     ipGeo: leadScore.ipGeo ?? null,
   });
@@ -555,6 +567,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     }
 
     await trackQuoteEvent('quote_lead_handoff_ready', 'handoff', 'success', 'handoff', {
+      ...attributionProps,
       internalEmailId: internalResult.data?.id ?? null,
       confirmationEmailId: confirmationResult.data?.id ?? null,
       confirmationEmailStatus: confirmationResult.error ? 'warning' : 'success',
@@ -563,6 +576,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
     });
 
     await trackQuoteEvent('quote_pipeline_completed', 'handoff', confirmationResult.error ? 'warning' : 'success', 'handoff', {
+      ...attributionProps,
       internalEmailId: internalResult.data?.id ?? null,
       confirmationEmailId: confirmationResult.data?.id ?? null,
       resendContactStatus,
@@ -571,12 +585,19 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 
     // Vercel custom event: pipeline completed (flag‑annotated)
     void trackVercelEvent('Quote Pipeline Completed', {
+      ...toVercelAttributionProps(leadAttribution),
+      campaign_key: campaignKey,
       interest,
       state,
       confirmationOk: String(!confirmationResult.error),
       ringyStatus,
       resendContactStatus,
-    }, flagKeys);
+      leadScore: leadScore.score,
+      leadTier: leadScore.tier,
+    }, {
+      flags: flagKeys,
+      request,
+    });
   } catch (err) {
     console.error('Email send failed:', err);
     await trackQuoteEvent('quote_pipeline_failed', 'error', 'error', 'legacy', {
@@ -722,4 +743,42 @@ function buildLeadScoreBadge(result: LeadScoreResult): string {
       ${result.ipGeo ? `<p style="margin:8px 0 0;font-size:11px;color:#64748b;">IP: ${escapeHtml(result.ipGeo.city)}, ${escapeHtml(result.ipGeo.region)}, ${escapeHtml(result.ipGeo.country)} · ${escapeHtml(result.ipGeo.org)}</p>` : ''}
     </div>
   `;
+}
+
+function resultToFlatSignals(result: LeadScoreResult): LeadScoreResult['signals'] {
+  return result.signals;
+}
+
+function flattenLeadScore(signals: LeadScoreResult['signals']): Record<string, string | number> {
+  const flattened: Record<string, string | number> = {};
+
+  for (const signal of signals) {
+    const keyBase = `score_signal_${signal.signal}`;
+    flattened[`${keyBase}_points`] = signal.points;
+    flattened[`${keyBase}_max`] = signal.maxPoints;
+    flattened[`${keyBase}_detail`] = signal.detail;
+  }
+
+  return flattened;
+}
+
+function toVercelAttributionProps(attribution: Record<string, string | undefined>): Record<string, string> {
+  const allowedKeys = [
+    'utm_source',
+    'utm_medium',
+    'utm_campaign',
+    'utm_term',
+    'utm_content',
+    'fbclid',
+    'gclid',
+    'msclkid',
+    'ttclid',
+    'attribution_source',
+  ] as const;
+
+  return Object.fromEntries(
+    allowedKeys
+      .map((key) => [key, attribution[key]])
+      .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0),
+  );
 }

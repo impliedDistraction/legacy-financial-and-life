@@ -10,6 +10,11 @@
 import { track } from '@vercel/analytics/server';
 
 type VercelEventProperties = Record<string, string | number | boolean | null>;
+type VercelEventOptions = {
+  flags?: string[];
+  headers?: Headers | Record<string, string | string[] | undefined>;
+  request?: Request | { headers: Headers | Record<string, string | string[] | undefined> };
+};
 
 /**
  * Fire a Vercel Web Analytics custom event from a server‑side context.
@@ -22,13 +27,17 @@ type VercelEventProperties = Record<string, string | number | boolean | null>;
 export async function trackVercelEvent(
   eventName: string,
   properties: VercelEventProperties = {},
-  flags?: string[],
+  options: VercelEventOptions = {},
 ): Promise<void> {
   try {
     const safeProps = flattenProperties(properties);
-    const options = flags?.length ? { flags } : undefined;
+    const trackOptions = {
+      ...(options.flags?.length ? { flags: options.flags } : {}),
+      ...(options.request ? { request: options.request } : {}),
+      ...(!options.request && options.headers ? { headers: options.headers } : {}),
+    };
 
-    await track(eventName, safeProps, options);
+    await track(eventName, safeProps, trackOptions);
   } catch (err) {
     // Vercel track() can fail outside of Vercel's runtime or for network
     // reasons.  Never let it break the lead pipeline.

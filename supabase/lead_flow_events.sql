@@ -59,3 +59,15 @@ create index if not exists lead_flow_events_lead_phone_idx
 create index if not exists lead_flow_events_client_ip_idx
   on public.lead_flow_events ((properties->>'client_ip'), occurred_at desc)
   where event_name = 'quote_request_received';
+
+create index if not exists lead_flow_events_campaign_key_idx
+  on public.lead_flow_events ((properties->>'campaign_key'), occurred_at desc)
+  where properties ? 'campaign_key';
+
+create index if not exists lead_flow_events_utm_campaign_idx
+  on public.lead_flow_events ((properties->>'utm_campaign'), occurred_at desc)
+  where properties ? 'utm_campaign';
+
+create index if not exists lead_flow_events_score_idx
+  on public.lead_flow_events (((properties->>'score')::int), occurred_at desc)
+  where event_name = 'quote_lead_scored' and jsonb_typeof(properties->'score') = 'number';
