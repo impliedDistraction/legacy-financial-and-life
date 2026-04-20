@@ -1,3 +1,5 @@
+import { track } from '@vercel/analytics';
+
 type QuoteAnalyticsOptions = {
   eventName: string;
   route: string;
@@ -6,12 +8,6 @@ type QuoteAnalyticsOptions = {
   ownerScope: 'legacy' | 'handoff' | 'client' | 'external';
   interest?: string;
   properties?: Record<string, string>;
-};
-
-type VercelAnalyticsWindow = Window & {
-  va?: {
-    track: (eventName: string, properties?: Record<string, string>) => void;
-  };
 };
 
 const TRACKING_ID_KEY = 'quote_tracking_id';
@@ -121,8 +117,7 @@ export function trackQuoteAnalyticsEvent(options: QuoteAnalyticsOptions): void {
     ...(options.properties ?? {}),
   };
 
-  const analyticsWindow = window as VercelAnalyticsWindow;
-  analyticsWindow.va?.track(options.eventName, properties);
+  track(options.eventName, properties);
 
   const payload = JSON.stringify({
     trackingId,

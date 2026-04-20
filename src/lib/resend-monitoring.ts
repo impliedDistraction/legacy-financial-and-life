@@ -679,16 +679,19 @@ function buildMonitoringAlert(event: ResendWebhookEvent): MonitoringAlert | null
 
 async function dispatchMonitoringAlert(alert: MonitoringAlert, event: ResendWebhookEvent): Promise<void> {
   const tasks: Array<Promise<void>> = [];
+  const destinations: string[] = [];
   const webhookUrl = import.meta.env.RESEND_ALERT_WEBHOOK_URL?.trim();
   const alertRecipients = parseCsv(import.meta.env.RESEND_ALERT_RECIPIENTS);
   const resendKey = import.meta.env.RESEND_API_KEY;
 
   if (webhookUrl) {
     tasks.push(sendAlertWebhook(webhookUrl, alert, event));
+    destinations.push('webhook');
   }
 
   if (alertRecipients.length > 0 && resendKey) {
     tasks.push(sendAlertEmail(resendKey, alertRecipients, alert));
+    destinations.push('email');
   }
 
   if (tasks.length === 0) {
@@ -699,12 +702,28 @@ async function dispatchMonitoringAlert(alert: MonitoringAlert, event: ResendWebh
   }
 
   const results = await Promise.allSettled(tasks);
-  const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+  const failures = results
+    .map((result, index) => ({ result, destination: destinations[index] ?? `destination_${index}` }))
+    .filter((entry): entry is { result: PromiseRejectedResult; destination: string } => entry.result.status === 'rejected');
 
-  if (failures.length > 0) {
+  if (failures.length === 0) {
+    return;
+  }
+
+  const successCount = results.length - failures.length;
+
+  failures.forEach((failure) => {
+    console.error('Resend monitoring alert destination failed', {
+      eventType: alert.eventType,
+      destination: failure.destination,
+      reason: failure.result.reason instanceof Error ? failure.result.reason.message : String(failure.result.reason),
+    });
+  });
+
+  if (successCount === 0) {
     throw new Error(
       failures
-        .map((failure) => (failure.reason instanceof Error ? failure.reason.message : String(failure.reason)))
+        .map((failure) => (failure.result.reason instanceof Error ? failure.result.reason.message : String(failure.result.reason)))
         .join('; '),
     );
   }
