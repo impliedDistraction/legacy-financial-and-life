@@ -524,12 +524,13 @@ if (!session) {
     wrapper.className = 'flex gap-2' + (role === 'user' ? ' justify-end' : '');
 
     if (role === 'assistant') {
+      const { cleanText, actionHtml } = processActionBlocks(content);
       wrapper.innerHTML = `
         <div class="w-7 h-7 bg-brand-600 rounded-full flex-shrink-0 flex items-center justify-center mt-1">
           <span class="text-white text-xs font-bold">LF</span>
         </div>
-        <div class="bg-gray-100 rounded-2xl rounded-tl-md px-4 py-2.5 max-w-[80%]">
-          <p class="text-sm text-gray-800 whitespace-pre-wrap">${escapeHtml(content)}</p>
+        <div class="bg-gray-100 rounded-2xl rounded-tl-md px-4 py-2.5 max-w-[80%] msg-bubble">
+          <p class="text-sm text-gray-800 whitespace-pre-wrap">${escapeHtml(cleanText)}</p>${actionHtml}
         </div>`;
     } else {
       wrapper.innerHTML = `
@@ -567,6 +568,103 @@ if (!session) {
     return el.innerHTML;
   }
 
+  // ── Action-block renderer ───────────────────────────────────────
+  // Detects {{action_type}} markers in AI text and replaces them with
+  // interactive UI widgets. Returns the cleaned text + rendered HTML.
+  const ACTION_REGEX = /\{\{(book_consultation|call_now|transfer_agent|collect_info)\}\}/g;
+
+  function renderActionBlock(action: string): string {
+    switch (action) {
+      case 'book_consultation':
+        return `<div class="mt-3 bg-brand-50 border border-brand-200 rounded-xl p-3">
+          <p class="text-xs text-brand-700 font-semibold mb-2">📅 Ready to take the next step?</p>
+          <a href="https://app.ringy.com/book/legacy" target="_blank" rel="noopener"
+             class="inline-block px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors">
+            Book Free Consultation
+          </a>
+        </div>`;
+      case 'call_now':
+        return `<div class="mt-3 bg-green-50 border border-green-200 rounded-xl p-3">
+          <p class="text-xs text-green-700 font-semibold mb-2">📞 Speak with us directly</p>
+          <a href="tel:+17063335641"
+             class="inline-block px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
+            Call (706) 333-5641
+          </a>
+        </div>`;
+      case 'transfer_agent':
+        return `<div class="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <p class="text-xs text-amber-800 font-semibold mb-1">🤝 Talk to a Real Person</p>
+          <p class="text-xs text-amber-700 mb-2">Tim or Beth can help with your specific situation.</p>
+          <div class="flex gap-2">
+            <a href="tel:+17063335641"
+               class="inline-block px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-700 transition-colors">
+              Call Now
+            </a>
+            <a href="https://app.ringy.com/book/legacy" target="_blank" rel="noopener"
+               class="inline-block px-3 py-1.5 bg-white text-amber-700 border border-amber-300 text-xs font-medium rounded-lg hover:bg-amber-50 transition-colors">
+              Schedule a Call
+            </a>
+          </div>
+        </div>`;
+      case 'collect_info':
+        return `<div class="mt-3 bg-gray-50 border border-gray-200 rounded-xl p-3" id="inline-collect-form">
+          <p class="text-xs text-gray-700 font-semibold mb-2">📋 Share your details so Tim & Beth can reach you</p>
+          <div class="space-y-2">
+            <input type="text" placeholder="Your name" class="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" data-collect="name" />
+            <input type="tel" placeholder="Phone number" class="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" data-collect="phone" />
+            <select class="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-gray-600" data-collect="state">
+              <option value="">Select your state</option>
+              <option value="GA">Georgia</option><option value="OH">Ohio</option>
+              <option value="OK">Oklahoma</option><option value="SC">South Carolina</option>
+              <option value="MS">Mississippi</option><option value="MI">Michigan</option>
+              <option value="TX">Texas</option><option value="UT">Utah</option>
+              <option value="AL">Alabama</option><option value="LA">Louisiana</option>
+            </select>
+            <button class="w-full py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors collect-submit-btn">
+              Send My Info
+            </button>
+          </div>
+        </div>`;
+      default:
+        return '';
+    }
+  }
+
+  /** Parse text for action blocks, return clean text + action HTML. */
+  function processActionBlocks(text: string): { cleanText: string; actionHtml: string } {
+    let actionHtml = '';
+    const cleanText = text.replace(ACTION_REGEX, (_match, action) => {
+      actionHtml += renderActionBlock(action);
+      return '';
+    }).trimEnd();
+    return { cleanText, actionHtml };
+  }
+
+  /** Render final message content with action blocks into the bubble. */
+  function renderMessageContent(el: HTMLElement, text: string) {
+    const bubble = el.querySelector('.msg-bubble');
+    if (!bubble) return;
+    const { cleanText, actionHtml } = processActionBlocks(text);
+    bubble.innerHTML = `<p class="text-sm text-gray-800 whitespace-pre-wrap">${escapeHtml(cleanText)}</p>${actionHtml}`;
+
+    // Wire up collect_info form if present
+    const collectForm = bubble.querySelector('#inline-collect-form');
+    if (collectForm) {
+      const submitBtn = collectForm.querySelector('.collect-submit-btn');
+      submitBtn?.addEventListener('click', () => {
+        const name = (collectForm.querySelector('[data-collect="name"]') as HTMLInputElement)?.value.trim();
+        const phone = (collectForm.querySelector('[data-collect="phone"]') as HTMLInputElement)?.value.trim();
+        const state = (collectForm.querySelector('[data-collect="state"]') as HTMLSelectElement)?.value;
+        if (name && phone) {
+          // Inject as a user message so the AI sees the info
+          const infoMsg = `My name is ${name}, phone: ${phone}${state ? `, state: ${state}` : ''}`;
+          collectForm.innerHTML = `<p class="text-xs text-green-600 font-medium">✓ Info sent — Tim & Beth will be in touch!</p>`;
+          sendMessage(infoMsg);
+        }
+      });
+    }
+  }
+
   async function sendMessage(userMessage: string) {
     // Remove suggestion chips
     document.getElementById('suggestion-chips')?.remove();
@@ -597,14 +695,15 @@ if (!session) {
       }
 
       // Stream response — client-side thinking filter.
-      // Qwen3 emits chain-of-thought that may be wrapped in <think>...</think>
-      // or untagged (starts with "Okay, the user..." etc). We buffer the raw
-      // stream, detect where thinking ends, and only render the real response.
+      // With /no_think in the system prompt, the model should respond directly.
+      // Fallback: if <think>...</think> tags appear, strip them and show
+      // only the content that follows.
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let rawAccum = '';        // full raw text from model
       let displayText = '';     // what we actually show the user
-      let thinkResolved = false; // true once we know thinking is done
+      let insideThink = false;  // currently inside <think> block
+      let thinkDone = false;    // </think> seen — everything after is real
       let responseEl: HTMLElement | null = null;
       let buffer = '';
 
@@ -627,90 +726,76 @@ if (!session) {
 
             rawAccum += parsed.content;
 
-            // --- Thinking detection ---
-            if (!thinkResolved) {
-              // Case 1: Tagged thinking — <think>...</think>
+            // ── Think-tag stripping ──
+            // If model emits <think>...</think> despite /no_think,
+            // skip everything inside the tags.
+            if (!thinkDone) {
+              if (rawAccum.includes('<think>') && !rawAccum.includes('</think>')) {
+                insideThink = true;
+                continue; // still buffering thinking tokens
+              }
               if (rawAccum.includes('</think>')) {
-                const afterThink = rawAccum.split('</think>').pop()?.trimStart() || '';
-                displayText = afterThink;
-                thinkResolved = true;
-                typingEl.remove();
+                insideThink = false;
+                thinkDone = true;
+                displayText = rawAccum.split('</think>').pop()?.trimStart() || '';
                 if (displayText) {
-                  responseEl = addMessage('assistant', displayText);
-                }
-                continue;
-              }
-
-              // Case 2: Starts with <think> but hasn't closed yet — keep buffering
-              if (rawAccum.includes('<think>') || rawAccum.trimStart().startsWith('<think')) {
-                continue;
-              }
-
-              // Case 3: Untagged thinking — heuristic detection.
-              // If the first non-empty content looks like internal reasoning,
-              // buffer until we see a customer-facing response pattern.
-              const trimmedRaw = rawAccum.trimStart();
-              const thinkingStart = /^(okay|hmm|so,?\s|well|let me|the user|i need|i should|i think|first|now,?\s|alright|right|this is|we are|checking|double|i'll|note)/i;
-              const responsePattern = /^(hi|hey|hello|welcome|great|thank|glad|absolutely|sure|of course|we'd|we |at legacy|legacy financial|tim|beth|I'm Legacy|👋|🌟|💙|i'd be)/im;
-
-              if (thinkingStart.test(trimmedRaw)) {
-                // Looks like thinking — check if a response has started
-                // Split on double newline or the response pattern in later lines
-                const responseMatch = trimmedRaw.match(responsePattern);
-                if (responseMatch && responseMatch.index && responseMatch.index > 20) {
-                  // Found the real response after some thinking
-                  displayText = trimmedRaw.substring(responseMatch.index);
-                  thinkResolved = true;
                   typingEl.remove();
                   responseEl = addMessage('assistant', displayText);
-                  continue;
                 }
-                // Still accumulating thinking — keep the typing indicator
                 continue;
               }
-
-              // Doesn't look like thinking — stream normally
-              thinkResolved = true;
-              displayText = rawAccum;
-              typingEl.remove();
-              responseEl = addMessage('assistant', displayText);
-              continue;
+              if (insideThink) continue;
             }
 
-            // --- Already past thinking: append to display ---
-            displayText += parsed.content;
+            // ── Normal streaming (no think tags) ──
+            displayText = thinkDone
+              ? (rawAccum.split('</think>').pop()?.trimStart() || '')
+              : rawAccum;
+
             if (!responseEl) {
               typingEl.remove();
               responseEl = addMessage('assistant', displayText);
             } else {
+              // Live-update the bubble text (action blocks rendered on finalize)
               const p = responseEl.querySelector('p');
-              if (p) p.innerHTML = escapeHtml(displayText);
+              if (p) p.textContent = displayText;
             }
             chatMessages.scrollTop = chatMessages.scrollHeight;
-          } catch { /* skip */ }
+          } catch { /* skip malformed lines */ }
         }
       }
 
-      // Stream ended — handle case where thinking never resolved
-      if (!thinkResolved && rawAccum) {
-        typingEl.remove();
-        // Try to extract response after </think> if present
-        if (rawAccum.includes('</think>')) {
-          displayText = rawAccum.split('</think>').pop()?.trimStart() || rawAccum;
-        } else {
-          // Last resort: show whatever we got
-          displayText = rawAccum;
-        }
-        addMessage('assistant', displayText);
+      // ── Finalize: guaranteed cleanup ──
+      typingEl.remove();
+      document.getElementById('typing-indicator')?.remove();
+
+      if (!displayText && rawAccum) {
+        // Edge case: entire response was inside <think> that never closed
+        displayText = rawAccum.includes('</think>')
+          ? (rawAccum.split('</think>').pop()?.trimStart() || rawAccum)
+          : rawAccum;
+      }
+
+      // Render final content with action blocks
+      if (responseEl && displayText) {
+        renderMessageContent(responseEl, displayText);
+      } else if (displayText && !responseEl) {
+        responseEl = addMessage('assistant', displayText);
       }
 
       if (displayText) {
-        conversationHistory.push({ role: 'assistant', content: displayText });
+        // Store clean text (without action markers) in conversation history
+        const { cleanText } = processActionBlocks(displayText);
+        conversationHistory.push({ role: 'assistant', content: cleanText });
       }
     } catch {
       typingEl.remove();
+      document.getElementById('typing-indicator')?.remove();
       addMessage('assistant', 'Connection error. The AI model may not be running. Please try again later.');
     } finally {
+      // Guaranteed cleanup — remove any stale typing indicators
+      typingEl.remove();
+      document.getElementById('typing-indicator')?.remove();
       sendBtn.disabled = false;
       chatInput.disabled = false;
       chatInput.focus();
