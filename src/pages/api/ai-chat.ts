@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { trackLeadEvent } from '../../lib/lead-analytics';
+import { verifySessionCookie } from '../../lib/ai-demo-auth';
 
 export const prerender = false;
 
@@ -32,6 +33,19 @@ Carriers: Mutual of Omaha, Transamerica, Aflac, and other trusted carriers
 Booking Link: https://app.ringy.com/book/legacy
 Phone: (706) 333-5641 | Email: Beth@legacyf-l.com
 
+CONVERSATION GOAL:
+Every message should move the prospect one step closer to booking a free consultation. You are not a knowledge base — you are a warm, persuasive guide. After answering a question, ALWAYS include a clear next step or call-to-action. Examples:
+- "Would you like to book a quick, no-obligation call with Tim & Beth to explore your options? Here's the link: https://app.ringy.com/book/legacy"
+- "I'd love to have Tim or Beth walk you through the details — can I get your name and phone number so they can reach out?"
+- "Want me to set up a free consultation for you? It only takes a couple minutes: https://app.ringy.com/book/legacy"
+
+If the prospect has already been given the booking link, vary your CTA — try asking for their phone number or email instead, or ask a qualifying question (age, state, family situation) to demonstrate personal attention.
+
+RESPONSE FORMAT:
+- Keep it to 2-4 short paragraphs max. This is Messenger, not an essay.
+- Lead with empathy or a direct answer, then pivot to a CTA.
+- Use the prospect's name if they've shared it.
+
 STRICT RULES:
 1. NEVER quote specific premiums, rates, or dollar amounts
 2. NEVER provide specific financial, tax, or legal advice
@@ -42,16 +56,69 @@ STRICT RULES:
 7. Be warm, professional, concise
 8. Sign messages as "Tim & Beth" or "The Legacy Financial Team"
 9. Comply with insurance advertising regulations — no guaranteed returns or misleading claims
-10. NEVER output internal reasoning, chain-of-thought, or meta-commentary. Never say "Okay, the user is asking..." or "Let me think about this". Respond DIRECTLY to the customer.`;
+10. NEVER output internal reasoning, chain-of-thought, or meta-commentary. Never say "Okay, the user is asking..." or "Let me think about this". Respond DIRECTLY to the customer.
+11. EVERY substantive response MUST contain a specific call-to-action (booking link, ask for contact info, or qualifying question). Do not end a message with only information — always guide the user toward the next step.`;
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
 }
 
-// Think-stripping is handled client-side. The server streams raw tokens.
+// ── Think-stripping state machine ─────────────────────────────────
+// Primary defense: strip <think>…</think> blocks server-side so they
+// never reach the client. The client retains its heuristic filter as
+// a secondary safety net for any untagged thinking that slips through.
+const enum ThinkState { OUTSIDE, INSIDE }
+
+function createThinkStripper() {
+  let state: ThinkState = ThinkState.OUTSIDE;
+  let buffer = '';
+
+  return function strip(chunk: string): string {
+    let output = '';
+    buffer += chunk;
+
+    while (buffer.length > 0) {
+      if (state === ThinkState.OUTSIDE) {
+        const openIdx = buffer.indexOf('<think>');
+        if (openIdx === -1) {
+          // No opening tag — check if buffer ends with a partial '<think'
+          // Keep last 6 chars in case of partial tag
+          const safe = buffer.length > 6 ? buffer.slice(0, -6) : '';
+          output += safe;
+          buffer = buffer.slice(safe.length);
+          break;
+        } else {
+          output += buffer.slice(0, openIdx);
+          buffer = buffer.slice(openIdx + 7); // skip '<think>'
+          state = ThinkState.INSIDE;
+        }
+      } else {
+        const closeIdx = buffer.indexOf('</think>');
+        if (closeIdx === -1) {
+          // Still inside thinking — discard everything, keep partial tag
+          buffer = buffer.length > 8 ? buffer.slice(-8) : buffer;
+          break;
+        } else {
+          buffer = buffer.slice(closeIdx + 8); // skip '</think>'
+          state = ThinkState.OUTSIDE;
+        }
+      }
+    }
+
+    return output;
+  };
+}
 
 export const POST: APIRoute = async ({ request }) => {
+  const session = await verifySessionCookie(request.headers.get('cookie'));
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const requestStart = Date.now();
     const body = await request.json();
@@ -101,11 +168,11 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Simple pipe: Ollama NDJSON → SSE. No think-filtering server-side;
-    // the client handles stripping <think> blocks and untagged thinking.
+    // Pipe Ollama NDJSON → SSE with server-side <think> stripping.
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     const ollamaReader = ollamaRes.body.getReader();
+    const stripThinking = createThinkStripper();
     let promptTokens = 0;
     let completionTokens = 0;
 
@@ -149,10 +216,13 @@ export const POST: APIRoute = async ({ request }) => {
                 completionTokens = chunk.eval_count || 0;
               }
 
-              const content: string = chunk.message?.content || '';
-              if (content) {
-                const sseData = JSON.stringify({ content, done: false });
-                controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+              const raw: string = chunk.message?.content || '';
+              if (raw) {
+                const content = stripThinking(raw);
+                if (content) {
+                  const sseData = JSON.stringify({ content, done: false });
+                  controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                }
               }
             } catch { /* skip malformed lines */ }
           }

@@ -1,11 +1,20 @@
 import type { APIRoute } from 'astro';
+import { verifySessionCookie } from '../../lib/ai-demo-auth';
 
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request }) => {
+  const session = await verifySessionCookie(request.headers.get('cookie'));
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const body = await request.json();
-    const { rating, comment, section, page } = body;
+    const { rating, comment, section, page, conversation } = body;
 
     if (!rating || typeof rating !== 'number' || rating < 1 || rating > 5) {
       return new Response(JSON.stringify({ error: 'Rating 1-5 required' }), {
@@ -14,11 +23,20 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    // Sanitise and truncate conversation history if provided
+    const sanitisedConversation = Array.isArray(conversation)
+      ? conversation.slice(0, 50).map((m: { role?: string; content?: string }) => ({
+          role: String(m.role || '').slice(0, 10),
+          content: String(m.content || '').slice(0, 2000),
+        }))
+      : null;
+
     const feedback = {
       rating,
       comment: String(comment || '').slice(0, 1000),
       section: String(section || 'general').slice(0, 100),
       page: String(page || '/ai-demo').slice(0, 100),
+      conversation: sanitisedConversation,
       timestamp: new Date().toISOString(),
     };
 

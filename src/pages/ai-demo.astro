@@ -12,8 +12,15 @@
  */
 import Base from '../layouts/Base.astro';
 import '../styles/tailwind.css';
+import { verifySessionCookie } from '../lib/ai-demo-auth';
 
 export const prerender = false;
+
+// ── auth gate ───────────────────────────────────────────────────────
+const session = await verifySessionCookie(Astro.request.headers.get('cookie'));
+if (!session) {
+  return Astro.redirect('/ai-demo-login', 302);
+}
 ---
 <Base title="AI Demo — Legacy Financial & Life" description="Preview of AI-powered engagement tools">
 
@@ -1280,15 +1287,21 @@ export const prerender = false;
       submitEl.textContent = 'Sending…';
 
       try {
+        // Include the conversation transcript when sending chat feedback
+        const payload: Record<string, unknown> = {
+          rating: selectedRating,
+          comment: textEl.value,
+          section,
+          page: '/ai-demo',
+        };
+        if (section === 'messenger-chat' && conversationHistory.length > 0) {
+          payload.conversation = conversationHistory;
+        }
+
         await fetch('/api/ai-feedback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            rating: selectedRating,
-            comment: textEl.value,
-            section,
-            page: '/ai-demo',
-          }),
+          body: JSON.stringify(payload),
         });
         submitEl.textContent = '✓ Thank you!';
         submitEl.className = submitEl.className.replace('bg-gray-100 text-gray-600', 'bg-green-100 text-green-700');

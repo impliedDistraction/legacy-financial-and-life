@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { trackLeadEvent } from '../../lib/lead-analytics';
+import { verifySessionCookie } from '../../lib/ai-demo-auth';
 
 export const prerender = false;
 
@@ -87,6 +88,14 @@ function extractJson(text: string): string {
 }
 
 export const POST: APIRoute = async ({ request }) => {
+  const session = await verifySessionCookie(request.headers.get('cookie'));
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   try {
     const requestStart = Date.now();
     const body = await request.json();
