@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { trackLeadEvent } from '../../lib/lead-analytics';
 
 export const prerender = false;
 
@@ -70,6 +71,9 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const results = [];
+    let totalPromptTokens = 0;
+    let totalCompletionTokens = 0;
+    const batchStart = Date.now();
 
     for (const comment of comments) {
       const sanitized = String(comment).slice(0, 500);
@@ -107,8 +111,30 @@ export const POST: APIRoute = async ({ request }) => {
       const raw = data.message?.content || '';
       const cleaned = stripUntaggedThinking(stripThinking(raw));
 
+      totalPromptTokens += data.prompt_eval_count || 0;
+      totalCompletionTokens += data.eval_count || 0;
+
       results.push({ comment: sanitized, draft: cleaned });
     }
+
+    // Track batch usage
+    trackLeadEvent({
+      route: '/api/ai-comments',
+      eventName: 'ai_comment_drafts',
+      source: 'server',
+      stage: 'submission',
+      status: 'success',
+      ownerScope: 'legacy',
+      provider: MODEL,
+      properties: {
+        model: MODEL,
+        comment_count: comments.length,
+        prompt_tokens: totalPromptTokens,
+        completion_tokens: totalCompletionTokens,
+        total_tokens: totalPromptTokens + totalCompletionTokens,
+        latency_ms: Date.now() - batchStart,
+      },
+    }).catch(() => {});
 
     return new Response(JSON.stringify({ results }), {
       headers: { 'Content-Type': 'application/json' },

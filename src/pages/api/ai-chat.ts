@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { trackLeadEvent } from '../../lib/lead-analytics';
 
 export const prerender = false;
 
@@ -92,6 +93,7 @@ function stripUntaggedThinking(text: string): string {
 
 export const POST: APIRoute = async ({ request }) => {
   try {
+    const requestStart = Date.now();
     const body = await request.json();
     const messages: ChatMessage[] = body.messages;
 
@@ -144,6 +146,28 @@ export const POST: APIRoute = async ({ request }) => {
 
     const ollamaData = await ollamaRes.json();
     let fullText: string = ollamaData.message?.content || '';
+
+    // Track usage metrics
+    const latencyMs = Date.now() - requestStart;
+    const promptTokens = ollamaData.prompt_eval_count || 0;
+    const completionTokens = ollamaData.eval_count || 0;
+    trackLeadEvent({
+      route: '/api/ai-chat',
+      eventName: 'ai_chat_completion',
+      source: 'server',
+      stage: 'submission',
+      status: 'success',
+      ownerScope: 'legacy',
+      provider: MODEL,
+      properties: {
+        model: MODEL,
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+        total_tokens: promptTokens + completionTokens,
+        latency_ms: latencyMs,
+        message_count: messages.length,
+      },
+    }).catch(() => {});
 
     // Strip <think>...</think> blocks if present
     fullText = stripThinking(fullText);
