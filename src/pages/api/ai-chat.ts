@@ -49,45 +49,17 @@ interface ChatMessage {
   content: string;
 }
 
+// Strip <think>...</think> blocks as a safety net — thinking should be disabled
+// via /no_think but models occasionally ignore the hint.
 function stripThinking(text: string): string {
-  // Qwen3 models emit thinking in <think>...</think> tags
   const thinkEnd = text.indexOf('</think>');
-  if (thinkEnd !== -1) {
-    return text.substring(thinkEnd + 8).trimStart();
+  if (thinkEnd !== -1) return text.substring(thinkEnd + 8).trimStart();
+  // Also strip an opening <think> tag with no matching close (partial thinking)
+  const thinkStart = text.indexOf('<think>');
+  if (thinkStart === 0) {
+    // Everything is inside a think block with no close — wait or return empty
+    return '';
   }
-  return text;
-}
-
-function stripUntaggedThinking(text: string): string {
-  // Qwen3 MoE sometimes outputs untagged chain-of-thought before the actual
-  // response. Detect and strip it by looking for the transition point.
-  // Thinking lines typically start with "Okay," "Hmm," "The user," "I need to,"
-  // "Let me," "So," etc. and read as internal monologue.
-  const thinkingPrefixes = /^(okay|hmm|so|well|let me|the user|i need|i should|i think|first|now|alright|right)/i;
-  const lines = text.split('\n');
-
-  // If the first line doesn't look like thinking, return as-is
-  if (!thinkingPrefixes.test(lines[0].trim())) return text;
-
-  // Find where thinking ends and the actual customer-facing response starts.
-  // Look for a blank line gap followed by content that addresses the customer,
-  // or a greeting/response pattern.
-  const responseStart = /^(hi|hey|hello|welcome|great|thank|glad|absolutely|sure|of course|we |at legacy|legacy financial|tim|beth|👋|🌟|💙|i'd)/i;
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    // Check if this line starts the actual response
-    if (i > 0 && responseStart.test(trimmed)) {
-      return lines.slice(i).join('\n').trimStart();
-    }
-    // A double newline gap followed by non-thinking content
-    if (trimmed === '' && i + 1 < lines.length && responseStart.test(lines[i + 1].trim())) {
-      return lines.slice(i + 1).join('\n').trimStart();
-    }
-  }
-
-  // If we can't find a clear transition, return the full text 
-  // (better to show thinking than nothing)
   return text;
 }
 
@@ -104,7 +76,8 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Prepend system prompt
+    // Prepend system prompt. The /no_think directive disables Qwen3's
+    // chain-of-thought so we get faster, direct responses we can stream.
     const fullMessages: ChatMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT },
       ...messages.map(m => ({
@@ -113,88 +86,122 @@ export const POST: APIRoute = async ({ request }) => {
       })),
     ];
 
-    // Collect full response from Ollama first (non-streaming), then strip
-    // thinking content and re-stream to client. Qwen3 MoE models leak
-    // chain-of-thought without <think> tags, so we can't filter in-stream.
+    // Append /no_think to the last user message to disable chain-of-thought
+    const lastMsg = fullMessages[fullMessages.length - 1];
+    if (lastMsg.role === 'user') {
+      lastMsg.content += ' /no_think';
+    }
+
     const ollamaHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
       'ngrok-skip-browser-warning': '1',
     };
     if (OLLAMA_SECRET) ollamaHeaders['Authorization'] = `Bearer ${OLLAMA_SECRET}`;
 
+    // True streaming from Ollama → client. With thinking disabled we can
+    // pipe tokens directly instead of buffering the full response.
     const ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: 'POST',
       headers: ollamaHeaders,
       body: JSON.stringify({
         model: MODEL,
         messages: fullMessages,
-        stream: false,
+        stream: true,
+        keep_alive: '30m',
         options: {
           temperature: 0.7,
           top_p: 0.9,
-          num_predict: 2048,
+          num_predict: 512,
         },
       }),
     });
 
-    if (!ollamaRes.ok) {
+    if (!ollamaRes.ok || !ollamaRes.body) {
       return new Response(JSON.stringify({ error: 'AI model unavailable' }), {
         status: 502,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const ollamaData = await ollamaRes.json();
-    let fullText: string = ollamaData.message?.content || '';
-
-    // Track usage metrics
-    const latencyMs = Date.now() - requestStart;
-    const promptTokens = ollamaData.prompt_eval_count || 0;
-    const completionTokens = ollamaData.eval_count || 0;
-    trackLeadEvent({
-      route: '/api/ai-chat',
-      eventName: 'ai_chat_completion',
-      source: 'server',
-      stage: 'submission',
-      status: 'success',
-      ownerScope: 'legacy',
-      provider: MODEL,
-      properties: {
-        model: MODEL,
-        prompt_tokens: promptTokens,
-        completion_tokens: completionTokens,
-        total_tokens: promptTokens + completionTokens,
-        latency_ms: latencyMs,
-        message_count: messages.length,
-      },
-    }).catch(() => {});
-
-    // Strip <think>...</think> blocks if present
-    fullText = stripThinking(fullText);
-
-    // Strip untagged chain-of-thought that Qwen3 outputs before the actual
-    // response. Pattern: starts with meta-commentary like "Okay, the user..."
-    // and transitions to the actual customer-facing response after a double
-    // newline or when the tone shifts to addressing the customer directly.
-    fullText = stripUntaggedThinking(fullText);
-
-    // Re-stream the cleaned text as SSE word-chunks for a typing effect
+    // Stream Ollama's NDJSON → SSE for the client
     const encoder = new TextEncoder();
-    const CHUNK_SIZE = 4; // words per SSE chunk
-    const words = fullText.split(/(\s+)/); // preserve whitespace
+    const decoder = new TextDecoder();
+    const ollamaReader = ollamaRes.body.getReader();
+    let fullText = '';
+    let insideThink = false;
+    let promptTokens = 0;
+    let completionTokens = 0;
 
     const stream = new ReadableStream({
-      start(controller) {
-        // Write all chunks immediately — SSE transport handles the streaming
-        for (let i = 0; i < words.length; i += CHUNK_SIZE) {
-          const chunk = words.slice(i, i + CHUNK_SIZE).join('');
-          if (chunk) {
-            const sseData = JSON.stringify({ content: chunk, done: false });
-            controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+      async pull(controller) {
+        try {
+          const { done, value } = await ollamaReader.read();
+          if (done) {
+            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+            controller.close();
+
+            // Track usage after stream completes
+            trackLeadEvent({
+              route: '/api/ai-chat',
+              eventName: 'ai_chat_completion',
+              source: 'server',
+              stage: 'submission',
+              status: 'success',
+              ownerScope: 'legacy',
+              provider: MODEL,
+              properties: {
+                model: MODEL,
+                prompt_tokens: promptTokens,
+                completion_tokens: completionTokens,
+                total_tokens: promptTokens + completionTokens,
+                latency_ms: Date.now() - requestStart,
+                message_count: messages.length,
+                streaming: true,
+              },
+            }).catch(() => {});
+            return;
           }
+
+          const text = decoder.decode(value, { stream: true });
+          const lines = text.split('\n').filter(Boolean);
+
+          for (const line of lines) {
+            try {
+              const chunk = JSON.parse(line);
+              const content: string = chunk.message?.content || '';
+
+              // Capture token counts from the final chunk
+              if (chunk.done) {
+                promptTokens = chunk.prompt_eval_count || 0;
+                completionTokens = chunk.eval_count || 0;
+              }
+
+              if (!content) continue;
+
+              // Safety-net: skip <think>...</think> blocks if model ignores /no_think
+              if (content.includes('<think>')) { insideThink = true; continue; }
+              if (insideThink) {
+                if (content.includes('</think>')) {
+                  insideThink = false;
+                  const after = content.split('</think>').pop()?.trim();
+                  if (after) {
+                    fullText += after;
+                    const sseData = JSON.stringify({ content: after, done: false });
+                    controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                  }
+                }
+                continue;
+              }
+
+              fullText += content;
+              const sseData = JSON.stringify({ content, done: false });
+              controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+            } catch { /* skip malformed NDJSON lines */ }
+          }
+        } catch {
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+          controller.close();
         }
-        controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
-        controller.close();
       },
     });
 

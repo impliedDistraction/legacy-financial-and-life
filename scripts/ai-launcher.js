@@ -279,6 +279,30 @@ async function main() {
   log('Updating Vercel env...');
   updateVercelEnv(tunnelUrl);
 
+  // 6. Warm up the model — load it into VRAM so the first real request is fast
+  log('Warming up model...');
+  try {
+    const warmStart = Date.now();
+    const warmRes = await fetch(`http://127.0.0.1:${OLLAMA_PORT}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: process.env.AI_MODEL || 'qwen3:30b',
+        messages: [{ role: 'user', content: 'hi' }],
+        stream: false,
+        keep_alive: '30m',
+        options: { num_predict: 1 },
+      }),
+    });
+    if (warmRes.ok) {
+      log(`Model warm in ${((Date.now() - warmStart) / 1000).toFixed(1)}s`);
+    } else {
+      warn('Warm-up request failed — first user request will be slower');
+    }
+  } catch (e) {
+    warn(`Warm-up error: ${e.message}`);
+  }
+
   console.log('\n  ✓ All services running. Press Ctrl+C to stop.\n');
   console.log(`  Chat demo: https://legacyfinancial.app/ai-demo`);
   console.log(`  Tunnel:    ${tunnelUrl}`);
