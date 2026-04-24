@@ -73,8 +73,41 @@ Tim is exploring AI promotional services (currently being quoted high prices by 
 - Custom model `legacy-messenger` has system prompt baked in for quick access
 - Comment generator supports: batch JSON, stdin pipe, and interactive modes
 
-## Phase 2: Facebook Messenger Integration (OpenClaw)
-**Status: NOT STARTED**
+## Phase 2: Client Demo Page
+**Status: COMPLETE** ✅
+
+Built an internal demo page at `/ai-demo` so Tim can preview AI capabilities before we get Facebook credentials.
+
+### What Was Built
+- [x] `/api/ai-chat` — Streaming SSE chat endpoint (buffers Ollama response, strips thinking, re-streams)
+- [x] `/api/ai-comments` — Batch comment draft generation (1-10 comments per request)
+- [x] `/api/ai-feedback` — Feedback collection to Supabase (`lead_flow_events` table)
+- [x] `/ai-demo` — Full demo page with chat interface, comment draft tool, and feedback widgets
+- [x] Thinking content stripping (handles both `<think>` tags and untagged chain-of-thought)
+- [x] End-to-end testing against local Ollama
+
+### Files Created
+- `src/pages/ai-demo.astro` — Demo page with tabbed UI (Messenger Chat + Comment Drafts)
+- `src/pages/api/ai-chat.ts` — SSE streaming chat proxy to Ollama
+- `src/pages/api/ai-comments.ts` — Batch comment draft generation endpoint
+- `src/pages/api/ai-feedback.ts` — Feedback collection endpoint
+
+### Demo Features
+- **Messenger Chat Tab**: Real-time conversation with the insurance AI assistant, suggestion chips for starter questions, typing indicators
+- **Comment Drafts Tab**: Paste Facebook comments (1 per line), generates reply drafts with copy button
+- **Feedback Widgets**: Star rating + text feedback on both tabs, saves to Supabase
+- **Cost Comparison**: Bottom section showing vendor costs vs. our approach
+- **Branded**: Uses Legacy Financial brand colors and styling
+
+### Technical Notes
+- Qwen3 MoE outputs chain-of-thought without opening `<think>` tag but WITH closing `</think>` tag
+- Solution: `stripThinking()` finds `</think>` and takes everything after; `stripUntaggedThinking()` as fallback
+- Ollama response is collected non-streaming, cleaned, then re-streamed as SSE chunks for typing effect
+- Page is unlinked from site nav — only accessible via direct URL
+- Built with `export const prerender = false` for server-side rendering
+
+## Phase 3: Facebook Messenger Integration (OpenClaw)
+**Status: WAITING ON FACEBOOK CREDENTIALS**
 
 ### Requirements
 - [ ] Tim's Facebook Page admin access or Page Access Token
@@ -110,7 +143,7 @@ The AI must know:
 - Must not discuss competitors negatively
 - Must comply with insurance advertising regulations
 
-## Phase 3: Comment Response Drafts
+## Phase 4: Comment Response Drafts (Production)
 **Status: NOT STARTED**
 
 ### Approach Options
@@ -125,7 +158,7 @@ The AI must know:
 - [ ] Review/approval workflow (could be simple CLI, web UI, or email)
 - [ ] Draft queue for Tim/Beth to review
 
-## Phase 4: Ad Copy Generation (Demo)
+## Phase 5: Ad Copy Generation (Demo)
 **Status: NOT STARTED**
 
 ### Goal
@@ -140,6 +173,14 @@ Demonstrate Qwen3:30b capability to generate Facebook ad copy for Tim's review. 
 ---
 
 ## Decisions & Notes
+
+### 2026-04-23 (Session 3)
+- **Built:** Client demo page at `/ai-demo` with chat + comment drafts + feedback
+- **Discovery:** Qwen3:30b MoE emits `</think>` closing tag but no opening `<think>` tag via Ollama API
+- **Discovery:** `think: false` API parameter and `/nothink` prefix do NOT work through Ollama REST API
+- **Solution:** Buffer full response, strip with `</think>` detection, re-stream as SSE chunks
+- **Note:** Assistant prefill technique works for single exchanges but not multi-turn
+- **Waiting on:** Tim's Facebook credentials for Phase 3
 
 ### 2026-04-23
 - **Decision:** Start with Qwen3:30b as primary model — best local fit for 24GB VRAM

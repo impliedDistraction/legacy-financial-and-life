@@ -9,6 +9,7 @@ export default defineConfig({
     webAnalytics: {
       enabled: true,
     },
+    maxDuration: 60,
   }),
   integrations: [tailwind({ applyBaseStyles: false })],
   prefetch: true

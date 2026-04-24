@@ -1,0 +1,624 @@
+---
+/**
+ * /ai-demo — Internal demo page for AI capabilities.
+ * 
+ * Shows Tim what the local AI can do:
+ * 1. Live Messenger-style chat with the insurance AI assistant
+ * 2. Facebook comment draft generator
+ * 3. Inline feedback collection
+ *
+ * This page is intentionally unlinked from the main site nav.
+ * Remove this file when the demo period is over.
+ */
+import Base from '../layouts/Base.astro';
+
+export const prerender = false;
+---
+<Base title="AI Demo — Legacy Financial & Life" description="Preview of AI-powered engagement tools">
+
+<div class="bg-gray-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+          <span class="text-white font-bold text-sm">L</span>
+        </div>
+        <div>
+          <h1 class="text-lg font-semibold text-gray-900">AI Services Preview</h1>
+          <p class="text-xs text-gray-500">Legacy Financial & Life — Internal Demo</p>
+        </div>
+      </div>
+      <span class="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded-full font-medium">PREVIEW</span>
+    </div>
+  </header>
+
+  <!-- Intro -->
+  <section class="max-w-6xl mx-auto px-4 pt-8 pb-4">
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-2">What You're Looking At</h2>
+      <p class="text-gray-600 text-sm leading-relaxed mb-3">
+        This is a preview of AI tools we're building for Legacy Financial & Life.
+        Everything runs on a <strong>local AI model</strong> — no monthly subscriptions, no per-message fees.
+        The AI knows your products, your carriers, your licensed states, and your brand voice.
+      </p>
+      <div class="flex flex-wrap gap-3 text-xs">
+        <span class="bg-green-50 text-green-700 px-3 py-1 rounded-full">✓ Zero monthly AI fees</span>
+        <span class="bg-green-50 text-green-700 px-3 py-1 rounded-full">✓ Your data stays local</span>
+        <span class="bg-green-50 text-green-700 px-3 py-1 rounded-full">✓ Insurance compliance guardrails</span>
+        <span class="bg-green-50 text-green-700 px-3 py-1 rounded-full">✓ Knows your products & carriers</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tab Navigation -->
+  <div class="max-w-6xl mx-auto px-4 pt-2">
+    <div class="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit" id="tab-nav">
+      <button class="tab-btn active px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="chat">
+        💬 Messenger Chat
+      </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="comments">
+        📝 Comment Drafts
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="max-w-6xl mx-auto px-4 py-4">
+
+    <!-- ═══════════════ CHAT TAB ═══════════════ -->
+    <div id="tab-chat" class="tab-panel">
+      <div class="grid lg:grid-cols-3 gap-4">
+        <!-- Chat Window -->
+        <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 flex flex-col" style="height: 600px;">
+          <!-- Chat Header -->
+          <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
+            <div class="w-10 h-10 bg-brand-600 rounded-full flex items-center justify-center">
+              <span class="text-white font-bold">LF</span>
+            </div>
+            <div>
+              <p class="font-medium text-gray-900 text-sm">Legacy Financial Assistant</p>
+              <p class="text-xs text-green-600 flex items-center gap-1">
+                <span class="w-2 h-2 bg-green-500 rounded-full inline-block" id="status-dot"></span>
+                <span id="status-text">Online</span>
+              </p>
+            </div>
+          </div>
+
+          <!-- Messages Area -->
+          <div class="flex-1 overflow-y-auto p-4 space-y-3" id="chat-messages">
+            <!-- Welcome message -->
+            <div class="flex gap-2">
+              <div class="w-7 h-7 bg-brand-600 rounded-full flex-shrink-0 flex items-center justify-center mt-1">
+                <span class="text-white text-xs font-bold">LF</span>
+              </div>
+              <div class="bg-gray-100 rounded-2xl rounded-tl-md px-4 py-2.5 max-w-[80%]">
+                <p class="text-sm text-gray-800">Hi there! 👋 Welcome to Legacy Financial & Life. I'm here to help with any questions about life insurance, retirement planning, or financial protection. What can I help you with today?</p>
+              </div>
+            </div>
+
+            <!-- Suggestion chips -->
+            <div class="flex flex-wrap gap-2 pl-9" id="suggestion-chips">
+              <button class="chip-btn text-xs bg-brand-50 text-brand-700 border border-brand-200 px-3 py-1.5 rounded-full hover:bg-brand-100 transition-colors">
+                I need life insurance for my family
+              </button>
+              <button class="chip-btn text-xs bg-brand-50 text-brand-700 border border-brand-200 px-3 py-1.5 rounded-full hover:bg-brand-100 transition-colors">
+                What's final expense insurance?
+              </button>
+              <button class="chip-btn text-xs bg-brand-50 text-brand-700 border border-brand-200 px-3 py-1.5 rounded-full hover:bg-brand-100 transition-colors">
+                I'm 55 and planning for retirement
+              </button>
+              <button class="chip-btn text-xs bg-brand-50 text-brand-700 border border-brand-200 px-3 py-1.5 rounded-full hover:bg-brand-100 transition-colors">
+                Are you a real person or AI?
+              </button>
+            </div>
+          </div>
+
+          <!-- Input Area -->
+          <div class="p-3 border-t border-gray-100">
+            <form id="chat-form" class="flex gap-2">
+              <input
+                type="text"
+                id="chat-input"
+                placeholder="Type a message…"
+                autocomplete="off"
+                class="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              />
+              <button
+                type="submit"
+                id="send-btn"
+                class="px-4 py-2.5 bg-brand-600 text-white rounded-full text-sm font-medium hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Send
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Sidebar Info -->
+        <div class="space-y-4">
+          <div class="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 class="font-semibold text-gray-900 text-sm mb-2">💡 Try asking about...</h3>
+            <ul class="text-xs text-gray-600 space-y-1.5">
+              <li>• Term vs. whole life insurance</li>
+              <li>• Coverage for seniors / final expense</li>
+              <li>• IUL wealth building strategies</li>
+              <li>• What states you're licensed in</li>
+              <li>• Retirement income planning</li>
+              <li>• Booking a consultation</li>
+            </ul>
+          </div>
+
+          <div class="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 class="font-semibold text-gray-900 text-sm mb-2">🛡️ Built-in Guardrails</h3>
+            <ul class="text-xs text-gray-600 space-y-1.5">
+              <li>• Never quotes specific premiums</li>
+              <li>• Never gives financial/legal advice</li>
+              <li>• Discloses it's AI when asked</li>
+              <li>• Escalates complex questions</li>
+              <li>• Stays on-topic</li>
+              <li>• Insurance regulation compliant</li>
+            </ul>
+          </div>
+
+          <!-- Chat Feedback -->
+          <div class="bg-white rounded-xl border border-gray-200 p-4" id="chat-feedback-panel">
+            <h3 class="font-semibold text-gray-900 text-sm mb-2">Rate This Chat</h3>
+            <p class="text-xs text-gray-500 mb-3">How well did the AI handle the conversation?</p>
+            <div class="flex gap-1 mb-3" id="chat-stars">
+              <button class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="1">★</button>
+              <button class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="2">★</button>
+              <button class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="3">★</button>
+              <button class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="4">★</button>
+              <button class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="5">★</button>
+            </div>
+            <textarea 
+              id="chat-feedback-text"
+              placeholder="Any thoughts on the responses? What would you change?"
+              class="w-full text-xs p-2 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-brand-500"
+              rows="3"
+            ></textarea>
+            <button 
+              id="chat-feedback-submit"
+              class="mt-2 w-full py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+              disabled
+            >
+              Submit Feedback
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ COMMENTS TAB ═══════════════ -->
+    <div id="tab-comments" class="tab-panel hidden">
+      <div class="grid lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 space-y-4">
+          <!-- Comment Input -->
+          <div class="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 class="font-semibold text-gray-900 text-sm mb-2">Paste Facebook Comments</h3>
+            <p class="text-xs text-gray-500 mb-3">Enter one or more comments (one per line) and the AI will draft replies in Tim & Beth's voice.</p>
+            <textarea 
+              id="comments-input"
+              placeholder="My dad passed without any life insurance and it was devastating financially.&#10;Is Legacy Financial legit? Never heard of them.&#10;How much does a basic policy cost? We live in Texas."
+              class="w-full p-3 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-brand-500"
+              rows="5"
+            ></textarea>
+            <div class="flex justify-between items-center mt-3">
+              <span class="text-xs text-gray-400" id="comments-count">0 comments</span>
+              <button 
+                id="generate-drafts-btn"
+                class="px-4 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Generate Drafts
+              </button>
+            </div>
+          </div>
+
+          <!-- Results -->
+          <div id="draft-results" class="space-y-3"></div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-4">
+          <div class="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 class="font-semibold text-gray-900 text-sm mb-2">How It Works</h3>
+            <ol class="text-xs text-gray-600 space-y-1.5 list-decimal list-inside">
+              <li>Paste real Facebook comments</li>
+              <li>AI generates reply drafts</li>
+              <li>Tim/Beth review & edit before posting</li>
+              <li>You keep full control</li>
+            </ol>
+          </div>
+
+          <div class="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 class="font-semibold text-gray-900 text-sm mb-2">Reply Tone Examples</h3>
+            <ul class="text-xs text-gray-600 space-y-1.5">
+              <li><strong>Empathetic:</strong> For loss/grief comments</li>
+              <li><strong>Encouraging:</strong> For hesitant prospects</li>
+              <li><strong>Informative:</strong> For product questions</li>
+              <li><strong>Redirect:</strong> For pricing questions</li>
+            </ul>
+          </div>
+
+          <!-- Comment Feedback -->
+          <div class="bg-white rounded-xl border border-gray-200 p-4" id="comment-feedback-panel">
+            <h3 class="font-semibold text-gray-900 text-sm mb-2">Rate the Drafts</h3>
+            <p class="text-xs text-gray-500 mb-3">How close are these to what you'd actually post?</p>
+            <div class="flex gap-1 mb-3" id="comment-stars">
+              <button class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="1">★</button>
+              <button class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="2">★</button>
+              <button class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="3">★</button>
+              <button class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="4">★</button>
+              <button class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="5">★</button>
+            </div>
+            <textarea 
+              id="comment-feedback-text"
+              placeholder="Would you post these as-is? What tone adjustments would help?"
+              class="w-full text-xs p-2 border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-brand-500"
+              rows="3"
+            ></textarea>
+            <button 
+              id="comment-feedback-submit"
+              class="mt-2 w-full py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors disabled:opacity-50"
+              disabled
+            >
+              Submit Feedback
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Cost Comparison -->
+  <section class="max-w-6xl mx-auto px-4 pb-12">
+    <div class="bg-gradient-to-r from-brand-600 to-brand-800 rounded-xl p-6 text-white">
+      <h3 class="text-lg font-semibold mb-2">What This Replaces</h3>
+      <div class="grid sm:grid-cols-2 gap-4 text-sm">
+        <div>
+          <p class="text-brand-200 text-xs uppercase tracking-wide mb-1">Typical AI Service Vendors</p>
+          <p class="text-2xl font-bold">$2,000 – $10,000<span class="text-base font-normal">/mo</span></p>
+          <p class="text-brand-200 text-xs mt-1">Chatbot + content generation + social management</p>
+        </div>
+        <div>
+          <p class="text-brand-200 text-xs uppercase tracking-wide mb-1">Our Approach</p>
+          <p class="text-2xl font-bold">$0 – $55<span class="text-base font-normal">/mo</span></p>
+          <p class="text-brand-200 text-xs mt-1">Local AI models on existing hardware + optional cloud fallback</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<style>
+  .tab-btn { color: #6b7280; }
+  .tab-btn.active { background: white; color: #1a62db; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .star-btn.selected { color: #facc15; }
+
+  /* Typing indicator */
+  @keyframes blink {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+  .typing-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: #9ca3af; display: inline-block;
+    animation: blink 1.2s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+</style>
+
+<script>
+  // ═══════════════════════════════════════════
+  // TAB SWITCHING
+  // ═══════════════════════════════════════════
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = (btn as HTMLElement).dataset.tab;
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`tab-${tab}`)?.classList.remove('hidden');
+    });
+  });
+
+  // ═══════════════════════════════════════════
+  // CHAT
+  // ═══════════════════════════════════════════
+  const chatMessages = document.getElementById('chat-messages')!;
+  const chatForm = document.getElementById('chat-form') as HTMLFormElement;
+  const chatInput = document.getElementById('chat-input') as HTMLInputElement;
+  const sendBtn = document.getElementById('send-btn') as HTMLButtonElement;
+  const statusDot = document.getElementById('status-dot')!;
+  const statusText = document.getElementById('status-text')!;
+
+  interface Message { role: 'user' | 'assistant'; content: string; }
+  const conversationHistory: Message[] = [];
+
+  function addMessage(role: 'user' | 'assistant', content: string) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex gap-2' + (role === 'user' ? ' justify-end' : '');
+
+    if (role === 'assistant') {
+      wrapper.innerHTML = `
+        <div class="w-7 h-7 bg-brand-600 rounded-full flex-shrink-0 flex items-center justify-center mt-1">
+          <span class="text-white text-xs font-bold">LF</span>
+        </div>
+        <div class="bg-gray-100 rounded-2xl rounded-tl-md px-4 py-2.5 max-w-[80%]">
+          <p class="text-sm text-gray-800 whitespace-pre-wrap">${escapeHtml(content)}</p>
+        </div>`;
+    } else {
+      wrapper.innerHTML = `
+        <div class="bg-brand-600 text-white rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
+          <p class="text-sm whitespace-pre-wrap">${escapeHtml(content)}</p>
+        </div>`;
+    }
+
+    chatMessages.appendChild(wrapper);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return wrapper;
+  }
+
+  function addTypingIndicator(): HTMLElement {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex gap-2';
+    wrapper.id = 'typing-indicator';
+    wrapper.innerHTML = `
+      <div class="w-7 h-7 bg-brand-600 rounded-full flex-shrink-0 flex items-center justify-center mt-1">
+        <span class="text-white text-xs font-bold">LF</span>
+      </div>
+      <div class="bg-gray-100 rounded-2xl rounded-tl-md px-4 py-3">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>`;
+    chatMessages.appendChild(wrapper);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    return wrapper;
+  }
+
+  function escapeHtml(text: string): string {
+    const el = document.createElement('span');
+    el.textContent = text;
+    return el.innerHTML;
+  }
+
+  async function sendMessage(userMessage: string) {
+    // Remove suggestion chips
+    document.getElementById('suggestion-chips')?.remove();
+
+    // Add user message
+    addMessage('user', userMessage);
+    conversationHistory.push({ role: 'user', content: userMessage });
+
+    // Show typing
+    sendBtn.disabled = true;
+    chatInput.disabled = true;
+    statusDot.className = 'w-2 h-2 bg-yellow-500 rounded-full inline-block animate-pulse';
+    statusText.textContent = 'Thinking…';
+
+    const typingEl = addTypingIndicator();
+
+    try {
+      const res = await fetch('/api/ai-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: conversationHistory }),
+      });
+
+      typingEl.remove();
+
+      if (!res.ok || !res.body) {
+        addMessage('assistant', 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.');
+        return;
+      }
+
+      // Stream response
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = '';
+      let responseEl: HTMLElement | null = null;
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6);
+          if (data === '[DONE]') break;
+
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.content) {
+              fullResponse += parsed.content;
+
+              if (!responseEl) {
+                responseEl = addMessage('assistant', fullResponse);
+              } else {
+                const p = responseEl.querySelector('p');
+                if (p) p.innerHTML = escapeHtml(fullResponse);
+              }
+              chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+          } catch { /* skip */ }
+        }
+      }
+
+      if (fullResponse) {
+        conversationHistory.push({ role: 'assistant', content: fullResponse });
+      }
+    } catch {
+      typingEl.remove();
+      addMessage('assistant', 'Connection error. The AI model may not be running. Please try again later.');
+    } finally {
+      sendBtn.disabled = false;
+      chatInput.disabled = false;
+      chatInput.focus();
+      statusDot.className = 'w-2 h-2 bg-green-500 rounded-full inline-block';
+      statusText.textContent = 'Online';
+    }
+  }
+
+  chatForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const message = chatInput.value.trim();
+    if (!message) return;
+    chatInput.value = '';
+    sendMessage(message);
+  });
+
+  // Suggestion chips
+  document.querySelectorAll('.chip-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.textContent?.trim();
+      if (text) sendMessage(text);
+    });
+  });
+
+  // ═══════════════════════════════════════════
+  // COMMENT DRAFTS
+  // ═══════════════════════════════════════════
+  const commentsInput = document.getElementById('comments-input') as HTMLTextAreaElement;
+  const commentsCount = document.getElementById('comments-count')!;
+  const generateBtn = document.getElementById('generate-drafts-btn') as HTMLButtonElement;
+  const draftResults = document.getElementById('draft-results')!;
+
+  commentsInput.addEventListener('input', () => {
+    const lines = commentsInput.value.split('\n').filter(l => l.trim());
+    commentsCount.textContent = `${lines.length} comment${lines.length !== 1 ? 's' : ''}`;
+  });
+
+  generateBtn.addEventListener('click', async () => {
+    const lines = commentsInput.value.split('\n').filter(l => l.trim());
+    if (lines.length === 0) return;
+
+    generateBtn.disabled = true;
+    generateBtn.textContent = 'Generating…';
+    draftResults.innerHTML = `
+      <div class="bg-white rounded-xl border border-gray-200 p-6 text-center">
+        <div class="inline-flex gap-1 mb-2">
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
+        </div>
+        <p class="text-sm text-gray-500">Generating ${lines.length} draft${lines.length !== 1 ? 's' : ''}… This may take a moment.</p>
+      </div>`;
+
+    try {
+      const res = await fetch('/api/ai-comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comments: lines.slice(0, 10) }),
+      });
+
+      const data = await res.json();
+      draftResults.innerHTML = '';
+
+      if (data.results) {
+        data.results.forEach((r: { comment: string; draft: string; error?: boolean }, i: number) => {
+          const card = document.createElement('div');
+          card.className = 'bg-white rounded-xl border border-gray-200 p-4';
+          card.innerHTML = `
+            <div class="flex items-start gap-3 mb-3">
+              <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium mt-0.5">${i + 1}</span>
+              <div>
+                <p class="text-xs text-gray-500 mb-1">Original Comment:</p>
+                <p class="text-sm text-gray-800 italic">"${escapeHtml(r.comment)}"</p>
+              </div>
+            </div>
+            <div class="ml-7 pl-3 border-l-2 ${r.error ? 'border-red-200' : 'border-brand-200'}">
+              <p class="text-xs ${r.error ? 'text-red-500' : 'text-brand-600'} mb-1 font-medium">Draft Reply:</p>
+              <p class="text-sm text-gray-800 whitespace-pre-wrap">${escapeHtml(r.draft)}</p>
+            </div>
+            <div class="flex justify-end mt-3 gap-2">
+              <button class="copy-draft text-xs text-gray-500 hover:text-gray-700 px-2 py-1" data-draft="${encodeURIComponent(r.draft)}">
+                📋 Copy
+              </button>
+            </div>`;
+          draftResults.appendChild(card);
+        });
+
+        // Copy functionality
+        draftResults.querySelectorAll('.copy-draft').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const draft = decodeURIComponent((btn as HTMLElement).dataset.draft || '');
+            navigator.clipboard.writeText(draft);
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => { btn.textContent = '📋 Copy'; }, 2000);
+          });
+        });
+      }
+    } catch {
+      draftResults.innerHTML = `
+        <div class="bg-white rounded-xl border border-red-200 p-6 text-center">
+          <p class="text-sm text-red-600">Failed to generate drafts. The AI model may not be running.</p>
+        </div>`;
+    } finally {
+      generateBtn.disabled = false;
+      generateBtn.textContent = 'Generate Drafts';
+    }
+  });
+
+  // ═══════════════════════════════════════════
+  // FEEDBACK (shared logic for both panels)
+  // ═══════════════════════════════════════════
+  function setupFeedback(
+    containerId: string,
+    starsId: string,
+    textId: string,
+    submitId: string,
+    section: string
+  ) {
+    const container = document.getElementById(containerId)!;
+    const starsEl = document.getElementById(starsId)!;
+    const textEl = document.getElementById(textId) as HTMLTextAreaElement;
+    const submitEl = document.getElementById(submitId) as HTMLButtonElement;
+    let selectedRating = 0;
+
+    starsEl.querySelectorAll('.star-btn').forEach(star => {
+      star.addEventListener('click', () => {
+        selectedRating = parseInt((star as HTMLElement).dataset.rating || '0');
+        starsEl.querySelectorAll('.star-btn').forEach((s, i) => {
+          s.classList.toggle('selected', i < selectedRating);
+        });
+        submitEl.disabled = false;
+      });
+    });
+
+    submitEl.addEventListener('click', async () => {
+      if (!selectedRating) return;
+      submitEl.disabled = true;
+      submitEl.textContent = 'Sending…';
+
+      try {
+        await fetch('/api/ai-feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            rating: selectedRating,
+            comment: textEl.value,
+            section,
+            page: '/ai-demo',
+          }),
+        });
+        submitEl.textContent = '✓ Thank you!';
+        submitEl.className = submitEl.className.replace('bg-gray-100 text-gray-600', 'bg-green-100 text-green-700');
+      } catch {
+        submitEl.textContent = 'Error — try again';
+        submitEl.disabled = false;
+      }
+    });
+  }
+
+  setupFeedback('chat-feedback-panel', 'chat-stars', 'chat-feedback-text', 'chat-feedback-submit', 'messenger-chat');
+  setupFeedback('comment-feedback-panel', 'comment-stars', 'comment-feedback-text', 'comment-feedback-submit', 'comment-drafts');
+</script>
+
+</Base>
