@@ -718,6 +718,7 @@ if (!session) {
       let thinkDone = false;    // </think> seen — everything after is real
       let responseEl: HTMLElement | null = null;
       let buffer = '';
+      let streamDone = false;   // true once [DONE] or reader finishes
 
       // Minimum visible characters before we replace the typing indicator
       // with a message bubble. Prevents empty/flash bubbles.
@@ -728,7 +729,7 @@ if (!session) {
       const stripActionMarkers = (t: string) =>
         t.replace(/\{\{(book_consultation|call_now|transfer_agent|collect_info)\}\}/g, '').trimEnd();
 
-      while (true) {
+      while (!streamDone) {
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -739,7 +740,10 @@ if (!session) {
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           const data = line.slice(6);
-          if (data === '[DONE]') break;
+          if (data === '[DONE]') {
+            streamDone = true;
+            break; // exit for loop; streamDone exits while loop
+          }
 
           try {
             const parsed = JSON.parse(data);
@@ -759,8 +763,6 @@ if (!session) {
                 insideThink = false;
                 thinkDone = true;
                 displayText = rawAccum.split('</think>').pop()?.trimStart() || '';
-                // Don't create bubble yet — let the normal path handle it
-                // once we have enough visible characters
                 continue;
               }
               if (insideThink) continue;
@@ -792,19 +794,25 @@ if (!session) {
         }
       }
 
-      // ── Finalize: guaranteed cleanup ──
+      // Cancel the reader immediately so we don't block on stream drain
+      reader.cancel().catch(() => {});
+
+      // ── Finalize: immediately unblock the UI ──
       typingEl.remove();
       document.getElementById('typing-indicator')?.remove();
+      sendBtn.disabled = false;
+      chatInput.disabled = false;
+      chatInput.focus();
+      statusDot.className = 'w-2 h-2 bg-green-500 rounded-full inline-block';
+      statusText.textContent = 'Online';
 
       if (!displayText && rawAccum) {
-        // Edge case: entire response was inside <think> that never closed
         displayText = rawAccum.includes('</think>')
           ? (rawAccum.split('</think>').pop()?.trimStart() || rawAccum)
           : rawAccum;
       }
 
-      // Final render — action blocks are appended seamlessly below
-      // the already-visible text (no content replacement jump).
+      // Append action block widget below the already-visible text
       if (responseEl && displayText) {
         renderMessageContent(responseEl, displayText);
       } else if (displayText && !responseEl) {
@@ -812,21 +820,20 @@ if (!session) {
       }
 
       if (displayText) {
-        // Store clean text (without action markers) in conversation history
         const { cleanText } = processActionBlocks(displayText);
         conversationHistory.push({ role: 'assistant', content: cleanText });
       }
+      chatMessages.scrollTop = chatMessages.scrollHeight;
     } catch {
-      typingEl.remove();
-      document.getElementById('typing-indicator')?.remove();
-      addMessage('assistant', 'Connection error. The AI model may not be running. Please try again later.');
-    } finally {
-      // Guaranteed cleanup — remove any stale typing indicators
       typingEl.remove();
       document.getElementById('typing-indicator')?.remove();
       sendBtn.disabled = false;
       chatInput.disabled = false;
-      chatInput.focus();
+      addMessage('assistant', 'Connection error. The AI model may not be running. Please try again later.');
+    } finally {
+      // Safety net — ensure UI is always unlocked
+      sendBtn.disabled = false;
+      chatInput.disabled = false;
       statusDot.className = 'w-2 h-2 bg-green-500 rounded-full inline-block';
       statusText.textContent = 'Online';
     }
