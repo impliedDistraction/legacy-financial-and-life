@@ -49,17 +49,10 @@ interface ChatMessage {
   content: string;
 }
 
-// Strip <think>...</think> blocks as a safety net — thinking should be disabled
-// via /no_think but models occasionally ignore the hint.
+// Strip <think>...</think> blocks from a completed string (used as fallback).
 function stripThinking(text: string): string {
   const thinkEnd = text.indexOf('</think>');
   if (thinkEnd !== -1) return text.substring(thinkEnd + 8).trimStart();
-  // Also strip an opening <think> tag with no matching close (partial thinking)
-  const thinkStart = text.indexOf('<think>');
-  if (thinkStart === 0) {
-    // Everything is inside a think block with no close — wait or return empty
-    return '';
-  }
   return text;
 }
 
@@ -76,8 +69,6 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Prepend system prompt. The /no_think directive disables Qwen3's
-    // chain-of-thought so we get faster, direct responses we can stream.
     const fullMessages: ChatMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT },
       ...messages.map(m => ({
@@ -86,20 +77,12 @@ export const POST: APIRoute = async ({ request }) => {
       })),
     ];
 
-    // Append /no_think to the last user message to disable chain-of-thought
-    const lastMsg = fullMessages[fullMessages.length - 1];
-    if (lastMsg.role === 'user') {
-      lastMsg.content += ' /no_think';
-    }
-
     const ollamaHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
       'ngrok-skip-browser-warning': '1',
     };
     if (OLLAMA_SECRET) ollamaHeaders['Authorization'] = `Bearer ${OLLAMA_SECRET}`;
 
-    // True streaming from Ollama → client. With thinking disabled we can
-    // pipe tokens directly instead of buffering the full response.
     const ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: 'POST',
       headers: ollamaHeaders,
@@ -123,12 +106,17 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Stream Ollama's NDJSON → SSE for the client
+    // Stream Ollama → SSE, buffering and hiding <think>...</think> blocks.
+    // Qwen3 often emits a <think> block at the start. We accumulate all
+    // content while inside a think block and only start sending SSE events
+    // once we're past it. This gives us true streaming for the real response
+    // while hiding internal reasoning.
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     const ollamaReader = ollamaRes.body.getReader();
-    let fullText = '';
+    let rawBuffer = '';         // accumulates raw text to detect think boundaries
     let insideThink = false;
+    let thinkingDone = false;   // once true, stream everything directly
     let promptTokens = 0;
     let completionTokens = 0;
 
@@ -137,10 +125,18 @@ export const POST: APIRoute = async ({ request }) => {
         try {
           const { done, value } = await ollamaReader.read();
           if (done) {
+            // If we never exited thinking, try to salvage a response
+            if (insideThink && rawBuffer.includes('</think>')) {
+              const cleaned = stripThinking(rawBuffer);
+              if (cleaned) {
+                const sseData = JSON.stringify({ content: cleaned, done: false });
+                controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+              }
+            }
+
             controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
             controller.close();
 
-            // Track usage after stream completes
             trackLeadEvent({
               route: '/api/ai-chat',
               eventName: 'ai_chat_completion',
@@ -170,7 +166,6 @@ export const POST: APIRoute = async ({ request }) => {
               const chunk = JSON.parse(line);
               const content: string = chunk.message?.content || '';
 
-              // Capture token counts from the final chunk
               if (chunk.done) {
                 promptTokens = chunk.prompt_eval_count || 0;
                 completionTokens = chunk.eval_count || 0;
@@ -178,24 +173,60 @@ export const POST: APIRoute = async ({ request }) => {
 
               if (!content) continue;
 
-              // Safety-net: skip <think>...</think> blocks if model ignores /no_think
-              if (content.includes('<think>')) { insideThink = true; continue; }
-              if (insideThink) {
-                if (content.includes('</think>')) {
-                  insideThink = false;
-                  const after = content.split('</think>').pop()?.trim();
-                  if (after) {
-                    fullText += after;
-                    const sseData = JSON.stringify({ content: after, done: false });
-                    controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
-                  }
+              // If we already finished thinking, stream directly
+              if (thinkingDone) {
+                const sseData = JSON.stringify({ content, done: false });
+                controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                continue;
+              }
+
+              // Accumulate into buffer to detect think block boundaries
+              rawBuffer += content;
+
+              // Detect opening <think> tag
+              if (!insideThink && rawBuffer.includes('<think>')) {
+                // Send a status event so client knows model is thinking
+                const beforeThink = rawBuffer.split('<think>')[0];
+                if (beforeThink.trim()) {
+                  const sseData = JSON.stringify({ content: beforeThink, done: false });
+                  controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                }
+                insideThink = true;
+              }
+
+              // Detect closing </think> tag
+              if (insideThink && rawBuffer.includes('</think>')) {
+                const afterThink = rawBuffer.split('</think>').pop()?.trimStart() || '';
+                insideThink = false;
+                thinkingDone = true;
+                rawBuffer = ''; // free memory
+
+                if (afterThink) {
+                  const sseData = JSON.stringify({ content: afterThink, done: false });
+                  controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
                 }
                 continue;
               }
 
-              fullText += content;
-              const sseData = JSON.stringify({ content, done: false });
-              controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+              // Not inside thinking and no think tag seen — stream directly
+              if (!insideThink && !rawBuffer.includes('<think')) {
+                // Check if buffer might contain a partial "<think" tag
+                // If the buffer ends with "<" or "<t" etc, hold it
+                const partialTag = rawBuffer.match(/<t?h?i?n?k?>?$/);
+                if (partialTag) {
+                  // Hold the partial tag, send everything before it
+                  const safe = rawBuffer.slice(0, rawBuffer.length - partialTag[0].length);
+                  if (safe) {
+                    const sseData = JSON.stringify({ content: safe, done: false });
+                    controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                    rawBuffer = partialTag[0];
+                  }
+                } else {
+                  const sseData = JSON.stringify({ content: rawBuffer, done: false });
+                  controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                  rawBuffer = '';
+                }
+              }
             } catch { /* skip malformed NDJSON lines */ }
           }
         } catch {

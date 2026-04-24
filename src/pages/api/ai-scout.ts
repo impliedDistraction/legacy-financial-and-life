@@ -120,7 +120,7 @@ export const POST: APIRoute = async ({ request }) => {
         model: MODEL,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt + ' /no_think' },
+          { role: 'user', content: userPrompt },
         ],
         stream: false,
         keep_alive: '30m',

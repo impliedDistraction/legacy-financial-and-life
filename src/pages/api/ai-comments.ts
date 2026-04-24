@@ -91,7 +91,7 @@ export const POST: APIRoute = async ({ request }) => {
           model: MODEL,
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: `Draft a reply to this Facebook comment:\n\n"${sanitized}" /no_think` },
+            { role: 'user', content: `Draft a reply to this Facebook comment:\n\n"${sanitized}"` },
           ],
           stream: false,
           keep_alive: '30m',
