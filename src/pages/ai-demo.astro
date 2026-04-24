@@ -421,23 +421,23 @@ export const prerender = false;
 
   <!-- Built-in Analytics -->
   <section class="max-w-6xl mx-auto px-4 pb-12">
-    <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 text-white">
+    <div class="bg-gradient-to-br from-brand-600 to-brand-800 rounded-xl p-6 text-white">
       <h3 class="text-lg font-semibold mb-2">Built-in Usage Tracking</h3>
-      <p class="text-gray-300 text-sm mb-4">
+      <p class="text-brand-100 text-sm mb-4">
         Every interaction on this page is tracked so we can measure real impact — not just activity, but results.
       </p>
       <div class="grid sm:grid-cols-3 gap-4 text-sm">
-        <div class="bg-white/10 rounded-lg p-3">
+        <div class="bg-gray-900/40 rounded-lg p-3">
           <p class="font-semibold mb-1">📊 Per-Request Metrics</p>
-          <p class="text-gray-400 text-xs">Token usage, response times, and model performance logged for every AI call — chat, drafts, and scout analysis.</p>
+          <p class="text-brand-100 text-xs">Token usage, response times, and model performance logged for every AI call — chat, drafts, and scout analysis.</p>
         </div>
-        <div class="bg-white/10 rounded-lg p-3">
+        <div class="bg-gray-900/40 rounded-lg p-3">
           <p class="font-semibold mb-1">📋 Engagement Tracking</p>
-          <p class="text-gray-400 text-xs">Every scouted post, approved draft, and posted reply is tracked end-to-end so we can tie AI usage to real engagement outcomes.</p>
+          <p class="text-brand-100 text-xs">Every scouted post, approved draft, and posted reply is tracked end-to-end so we can tie AI usage to real engagement outcomes.</p>
         </div>
-        <div class="bg-white/10 rounded-lg p-3">
+        <div class="bg-gray-900/40 rounded-lg p-3">
           <p class="font-semibold mb-1">💡 No Subscription Fees</p>
-          <p class="text-gray-400 text-xs">The AI runs on local hardware instead of pay-per-message cloud services. We track actual operating costs to keep them as low as possible.</p>
+          <p class="text-brand-100 text-xs">The AI runs on local hardware instead of pay-per-message cloud services. We track actual operating costs to keep them as low as possible.</p>
         </div>
       </div>
     </div>
@@ -583,17 +583,21 @@ export const prerender = false;
         body: JSON.stringify({ messages: conversationHistory }),
       });
 
-      typingEl.remove();
-
       if (!res.ok || !res.body) {
+        typingEl.remove();
         addMessage('assistant', 'Sorry, I\'m having trouble connecting right now. Please try again in a moment.');
         return;
       }
 
-      // Stream response
+      // Stream response — client-side thinking filter.
+      // Qwen3 emits chain-of-thought that may be wrapped in <think>...</think>
+      // or untagged (starts with "Okay, the user..." etc). We buffer the raw
+      // stream, detect where thinking ends, and only render the real response.
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let fullResponse = '';
+      let rawAccum = '';        // full raw text from model
+      let displayText = '';     // what we actually show the user
+      let thinkResolved = false; // true once we know thinking is done
       let responseEl: HTMLElement | null = null;
       let buffer = '';
 
@@ -612,23 +616,89 @@ export const prerender = false;
 
           try {
             const parsed = JSON.parse(data);
-            if (parsed.content) {
-              fullResponse += parsed.content;
+            if (!parsed.content) continue;
 
-              if (!responseEl) {
-                responseEl = addMessage('assistant', fullResponse);
-              } else {
-                const p = responseEl.querySelector('p');
-                if (p) p.innerHTML = escapeHtml(fullResponse);
+            rawAccum += parsed.content;
+
+            // --- Thinking detection ---
+            if (!thinkResolved) {
+              // Case 1: Tagged thinking — <think>...</think>
+              if (rawAccum.includes('</think>')) {
+                const afterThink = rawAccum.split('</think>').pop()?.trimStart() || '';
+                displayText = afterThink;
+                thinkResolved = true;
+                typingEl.remove();
+                if (displayText) {
+                  responseEl = addMessage('assistant', displayText);
+                }
+                continue;
               }
-              chatMessages.scrollTop = chatMessages.scrollHeight;
+
+              // Case 2: Starts with <think> but hasn't closed yet — keep buffering
+              if (rawAccum.includes('<think>') || rawAccum.trimStart().startsWith('<think')) {
+                continue;
+              }
+
+              // Case 3: Untagged thinking — heuristic detection.
+              // If the first non-empty content looks like internal reasoning,
+              // buffer until we see a customer-facing response pattern.
+              const trimmedRaw = rawAccum.trimStart();
+              const thinkingStart = /^(okay|hmm|so,?\s|well|let me|the user|i need|i should|i think|first|now,?\s|alright|right|this is|we are|checking|double|i'll|note)/i;
+              const responsePattern = /^(hi|hey|hello|welcome|great|thank|glad|absolutely|sure|of course|we'd|we |at legacy|legacy financial|tim|beth|I'm Legacy|👋|🌟|💙|i'd be)/im;
+
+              if (thinkingStart.test(trimmedRaw)) {
+                // Looks like thinking — check if a response has started
+                // Split on double newline or the response pattern in later lines
+                const responseMatch = trimmedRaw.match(responsePattern);
+                if (responseMatch && responseMatch.index && responseMatch.index > 20) {
+                  // Found the real response after some thinking
+                  displayText = trimmedRaw.substring(responseMatch.index);
+                  thinkResolved = true;
+                  typingEl.remove();
+                  responseEl = addMessage('assistant', displayText);
+                  continue;
+                }
+                // Still accumulating thinking — keep the typing indicator
+                continue;
+              }
+
+              // Doesn't look like thinking — stream normally
+              thinkResolved = true;
+              displayText = rawAccum;
+              typingEl.remove();
+              responseEl = addMessage('assistant', displayText);
+              continue;
             }
+
+            // --- Already past thinking: append to display ---
+            displayText += parsed.content;
+            if (!responseEl) {
+              typingEl.remove();
+              responseEl = addMessage('assistant', displayText);
+            } else {
+              const p = responseEl.querySelector('p');
+              if (p) p.innerHTML = escapeHtml(displayText);
+            }
+            chatMessages.scrollTop = chatMessages.scrollHeight;
           } catch { /* skip */ }
         }
       }
 
-      if (fullResponse) {
-        conversationHistory.push({ role: 'assistant', content: fullResponse });
+      // Stream ended — handle case where thinking never resolved
+      if (!thinkResolved && rawAccum) {
+        typingEl.remove();
+        // Try to extract response after </think> if present
+        if (rawAccum.includes('</think>')) {
+          displayText = rawAccum.split('</think>').pop()?.trimStart() || rawAccum;
+        } else {
+          // Last resort: show whatever we got
+          displayText = rawAccum;
+        }
+        addMessage('assistant', displayText);
+      }
+
+      if (displayText) {
+        conversationHistory.push({ role: 'assistant', content: displayText });
       }
     } catch {
       typingEl.remove();
