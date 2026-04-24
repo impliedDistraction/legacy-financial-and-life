@@ -57,57 +57,13 @@ STRICT RULES:
 8. Sign messages as "Tim & Beth" or "The Legacy Financial Team"
 9. Comply with insurance advertising regulations — no guaranteed returns or misleading claims
 10. NEVER output internal reasoning, chain-of-thought, or meta-commentary. Never say "Okay, the user is asking..." or "Let me think about this". Respond DIRECTLY to the customer.
-11. EVERY substantive response MUST contain a specific call-to-action (booking link, ask for contact info, or qualifying question). Do not end a message with only information — always guide the user toward the next step.`;
+11. EVERY substantive response MUST contain a specific call-to-action (booking link, ask for contact info, or qualifying question). Do not end a message with only information — always guide the user toward the next step.
+
+/no_think`;
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
-}
-
-// ── Think-stripping state machine ─────────────────────────────────
-// Primary defense: strip <think>…</think> blocks server-side so they
-// never reach the client. The client retains its heuristic filter as
-// a secondary safety net for any untagged thinking that slips through.
-const enum ThinkState { OUTSIDE, INSIDE }
-
-function createThinkStripper() {
-  let state: ThinkState = ThinkState.OUTSIDE;
-  let buffer = '';
-
-  return function strip(chunk: string): string {
-    let output = '';
-    buffer += chunk;
-
-    while (buffer.length > 0) {
-      if (state === ThinkState.OUTSIDE) {
-        const openIdx = buffer.indexOf('<think>');
-        if (openIdx === -1) {
-          // No opening tag — check if buffer ends with a partial '<think'
-          // Keep last 6 chars in case of partial tag
-          const safe = buffer.length > 6 ? buffer.slice(0, -6) : '';
-          output += safe;
-          buffer = buffer.slice(safe.length);
-          break;
-        } else {
-          output += buffer.slice(0, openIdx);
-          buffer = buffer.slice(openIdx + 7); // skip '<think>'
-          state = ThinkState.INSIDE;
-        }
-      } else {
-        const closeIdx = buffer.indexOf('</think>');
-        if (closeIdx === -1) {
-          // Still inside thinking — discard everything, keep partial tag
-          buffer = buffer.length > 8 ? buffer.slice(-8) : buffer;
-          break;
-        } else {
-          buffer = buffer.slice(closeIdx + 8); // skip '</think>'
-          state = ThinkState.OUTSIDE;
-        }
-      }
-    }
-
-    return output;
-  };
 }
 
 export const POST: APIRoute = async ({ request }) => {
@@ -168,11 +124,12 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Pipe Ollama NDJSON → SSE with server-side <think> stripping.
+    // Pipe Ollama NDJSON → SSE. Thinking detection is handled client-side;
+    // the server passes through all content to keep the SSE stream active
+    // and avoid Vercel function timeouts during long thinking phases.
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     const ollamaReader = ollamaRes.body.getReader();
-    const stripThinking = createThinkStripper();
     let promptTokens = 0;
     let completionTokens = 0;
 
@@ -218,11 +175,8 @@ export const POST: APIRoute = async ({ request }) => {
 
               const raw: string = chunk.message?.content || '';
               if (raw) {
-                const content = stripThinking(raw);
-                if (content) {
-                  const sseData = JSON.stringify({ content, done: false });
-                  controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
-                }
+                const sseData = JSON.stringify({ content: raw, done: false });
+                controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
               }
             } catch { /* skip malformed lines */ }
           }
