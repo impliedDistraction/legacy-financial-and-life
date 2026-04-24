@@ -640,12 +640,24 @@ if (!session) {
     return { cleanText, actionHtml };
   }
 
-  /** Render final message content with action blocks into the bubble. */
+  /** Render final message content with action blocks into the bubble.
+   *  Updates the text to the clean version and appends action widgets
+   *  below — no jarring full-content replacement. */
   function renderMessageContent(el: HTMLElement, text: string) {
     const bubble = el.querySelector('.msg-bubble');
     if (!bubble) return;
     const { cleanText, actionHtml } = processActionBlocks(text);
-    bubble.innerHTML = `<p class="text-sm text-gray-800 whitespace-pre-wrap">${escapeHtml(cleanText)}</p>${actionHtml}`;
+    // Update text in-place (strips action markers from displayed text)
+    const p = bubble.querySelector('p');
+    if (p) p.textContent = cleanText;
+    // Append action widget below the text (no re-render of the text itself)
+    if (actionHtml) {
+      const actionContainer = document.createElement('div');
+      actionContainer.innerHTML = actionHtml;
+      while (actionContainer.firstChild) {
+        bubble.appendChild(actionContainer.firstChild);
+      }
+    }
 
     // Wire up collect_info form if present
     const collectForm = bubble.querySelector('#inline-collect-form');
@@ -707,6 +719,15 @@ if (!session) {
       let responseEl: HTMLElement | null = null;
       let buffer = '';
 
+      // Minimum visible characters before we replace the typing indicator
+      // with a message bubble. Prevents empty/flash bubbles.
+      const MIN_DISPLAY_CHARS = 3;
+
+      // Strip action markers from live-streamed text so the user never
+      // sees raw {{book_consultation}} etc. Actions render on finalization.
+      const stripActionMarkers = (t: string) =>
+        t.replace(/\{\{(book_consultation|call_now|transfer_agent|collect_info)\}\}/g, '').trimEnd();
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -738,10 +759,8 @@ if (!session) {
                 insideThink = false;
                 thinkDone = true;
                 displayText = rawAccum.split('</think>').pop()?.trimStart() || '';
-                if (displayText) {
-                  typingEl.remove();
-                  responseEl = addMessage('assistant', displayText);
-                }
+                // Don't create bubble yet — let the normal path handle it
+                // once we have enough visible characters
                 continue;
               }
               if (insideThink) continue;
@@ -752,13 +771,21 @@ if (!session) {
               ? (rawAccum.split('</think>').pop()?.trimStart() || '')
               : rawAccum;
 
+            const visibleText = stripActionMarkers(displayText);
+
+            // Wait until we have enough real characters before creating the
+            // message bubble. This prevents the empty/flash white bubble.
             if (!responseEl) {
-              typingEl.remove();
-              responseEl = addMessage('assistant', displayText);
+              if (visibleText.trim().length >= MIN_DISPLAY_CHARS) {
+                statusDot.className = 'w-2 h-2 bg-green-500 rounded-full inline-block';
+                statusText.textContent = 'Responding…';
+                typingEl.remove();
+                responseEl = addMessage('assistant', visibleText);
+              }
             } else {
-              // Live-update the bubble text (action blocks rendered on finalize)
+              // Live-update — show clean text without action markers
               const p = responseEl.querySelector('p');
-              if (p) p.textContent = displayText;
+              if (p) p.textContent = visibleText;
             }
             chatMessages.scrollTop = chatMessages.scrollHeight;
           } catch { /* skip malformed lines */ }
@@ -776,7 +803,8 @@ if (!session) {
           : rawAccum;
       }
 
-      // Render final content with action blocks
+      // Final render — action blocks are appended seamlessly below
+      // the already-visible text (no content replacement jump).
       if (responseEl && displayText) {
         renderMessageContent(responseEl, displayText);
       } else if (displayText && !responseEl) {
