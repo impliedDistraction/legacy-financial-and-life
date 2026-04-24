@@ -187,23 +187,12 @@ export const POST: APIRoute = async ({ request }) => {
     // Triggers on: action block markers, or common sign-off patterns
     // followed by enough trailing newlines to indicate a paragraph break.
     const ACTION_BLOCK_RE = /\{\{(book_consultation|call_now|transfer_agent|collect_info)\}\}/;
-    const SIGNOFF_RE = /(?:Tim\s*&\s*Beth|The Legacy Financial Team|Legacy Financial\s*&\s*Life)\s*$/m;
     function isResponseComplete(text: string): boolean {
-      // If an action block appeared, the message is definitively complete
-      if (ACTION_BLOCK_RE.test(text)) return true;
-      // Sign-off followed by end of text (with optional trailing whitespace)
-      if (SIGNOFF_RE.test(text.trimEnd())) {
-        // Wait for a bit more text to confirm no continuation.
-        // If the last 50 chars haven't changed, it's done.
-        // We check length: sign-off should be at/near the end.
-        const trimmed = text.trimEnd();
-        const signoffMatch = trimmed.match(SIGNOFF_RE);
-        if (signoffMatch && signoffMatch.index !== undefined) {
-          // Sign-off is within last 60 chars of trimmed text — likely final
-          return (trimmed.length - signoffMatch.index) < 60;
-        }
-      }
-      return false;
+      // Action blocks are the only reliable completion signal.
+      // Sign-off patterns ("Tim & Beth") appear mid-sentence too often
+      // to be safe triggers. The client-side 2s idle timeout handles
+      // responses that end without an action block.
+      return ACTION_BLOCK_RE.test(text);
     }
 
     function detectResponseStart(): void {
