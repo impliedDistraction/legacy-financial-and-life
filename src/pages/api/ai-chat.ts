@@ -6,7 +6,7 @@ export const prerender = false;
 
 const OLLAMA_URL = import.meta.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_SECRET = import.meta.env.OLLAMA_SECRET || '';
-const MODEL = import.meta.env.AI_MODEL || 'qwen3:30b';
+const MODEL = import.meta.env.AI_MODEL || 'legacy-messenger';
 
 const SYSTEM_PROMPT = `You are a helpful assistant for Legacy Financial & Life, an insurance agency founded by Tim and Beth Byrd in Luthersville, Georgia.
 
@@ -128,7 +128,7 @@ export const POST: APIRoute = async ({ request }) => {
         model: MODEL,
         messages: fullMessages,
         stream: true,
-        keep_alive: '30m',
+        keep_alive: '2h',
         options: {
           temperature: 0.7,
           top_p: 0.9,
@@ -144,20 +144,92 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Pipe Ollama NDJSON → SSE. Thinking detection is handled client-side;
-    // the server passes through all content to keep the SSE stream active
-    // and avoid Vercel function timeouts during long thinking phases.
+    // ── Server-side thinking filter ──────────────────────────────────
+    // Qwen3 MoE often emits untagged chain-of-thought reasoning as its
+    // initial output ("Okay, the user is asking...", "We need to...",
+    // etc.) before producing the customer-facing response.
+    //
+    // Strategy:
+    // 1. Buffer all tokens, accumulating the full output
+    // 2. Send heartbeat SSE events during thinking to keep the stream
+    //    (and the Vercel function) alive
+    // 3. Detect when customer-facing response starts
+    // 4. Emit only the clean response tokens to the client
+    //
+    // The customer-facing response is detected by patterns that match
+    // how the model addresses prospects (greetings, warm language, etc.)
+    // vs. internal reasoning (meta-commentary about the user/rules).
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     const ollamaReader = ollamaRes.body.getReader();
     let promptTokens = 0;
     let completionTokens = 0;
 
+    // Accumulator for the full raw output
+    let fullRaw = '';
+    // Index into fullRaw where the real response starts (-1 = not found yet)
+    let responseStartIdx = -1;
+    // How much of the response we've already sent to the client
+    let sentUpTo = 0;
+
+    // Patterns that indicate start of customer-facing content.
+    // Tested against the accumulated text; the real response often starts
+    // after a double newline or at a paragraph beginning.
+    const RESPONSE_STARTERS = /(?:^|\n\n)((?:Hi|Hey|Hello|Welcome|Great|Thank|Glad|Absolutely|Sure|Of course|We'd|We would|At Legacy|Legacy Financial|Tim|Beth|I'm Legacy|That's a|I understand|I appreciate|What a|No worries|Good|You're|It sounds|Life insurance|Final expense|Term life|Whole life|Universal|Indexed|Retirement|Estate|An IUL|An annuity|👋|🌟|💙|❤️|🙏|I'd be|I'd love|I'm glad|I'm here|I'm sorry|I completely|That's completely))/im;
+
+    // Pattern that identifies internal reasoning / meta-commentary
+    const THINKING_PATTERNS = /^(okay|hmm|so,?\s|well,?\s|let me|the user|i need to|i should|i think|first,?\s|now,?\s|Wait,?\s|alright|this is|we are|checking|I'll |note|According to|We must|We are given|The prospect|Looking at|since |but |However)/i;
+
+    function detectResponseStart(): void {
+      if (responseStartIdx >= 0) return;
+      const trimmed = fullRaw.trimStart();
+
+      // If the output starts with <think>, wait for </think>
+      if (trimmed.startsWith('<think>') || trimmed.startsWith('<think')) {
+        const closeIdx = fullRaw.indexOf('</think>');
+        if (closeIdx >= 0) {
+          responseStartIdx = closeIdx + 8; // skip '</think>'
+          // Trim leading whitespace from the response
+          while (responseStartIdx < fullRaw.length && fullRaw[responseStartIdx] === '\n') {
+            responseStartIdx++;
+          }
+        }
+        return;
+      }
+
+      // If it starts with a thinking pattern, search for the response boundary
+      if (THINKING_PATTERNS.test(trimmed)) {
+        const match = fullRaw.match(RESPONSE_STARTERS);
+        if (match && match.index !== undefined) {
+          // The response starts at the match (after \n\n if present)
+          responseStartIdx = match.index;
+          if (fullRaw[responseStartIdx] === '\n') {
+            // Skip the \n\n separator
+            while (responseStartIdx < fullRaw.length && fullRaw[responseStartIdx] === '\n') {
+              responseStartIdx++;
+            }
+          }
+        }
+        return;
+      }
+
+      // Doesn't look like thinking — response starts from the beginning
+      responseStartIdx = 0;
+    }
+
     const stream = new ReadableStream({
       async pull(controller) {
         try {
           const { done, value } = await ollamaReader.read();
           if (done) {
+            // If we never found a response boundary, send everything
+            // (better to show thinking than nothing)
+            if (responseStartIdx < 0) responseStartIdx = 0;
+            const remaining = fullRaw.slice(Math.max(responseStartIdx, sentUpTo));
+            if (remaining) {
+              const sseData = JSON.stringify({ content: remaining, done: false });
+              controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+            }
             controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
             controller.close();
 
@@ -195,8 +267,21 @@ export const POST: APIRoute = async ({ request }) => {
 
               const raw: string = chunk.message?.content || '';
               if (raw) {
-                const sseData = JSON.stringify({ content: raw, done: false });
-                controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                fullRaw += raw;
+                detectResponseStart();
+
+                if (responseStartIdx >= 0 && responseStartIdx < fullRaw.length) {
+                  // We have response content to send
+                  const newContent = fullRaw.slice(Math.max(responseStartIdx, sentUpTo));
+                  sentUpTo = fullRaw.length;
+                  if (newContent) {
+                    const sseData = JSON.stringify({ content: newContent, done: false });
+                    controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                  }
+                } else {
+                  // Still in thinking — send a heartbeat to keep stream alive
+                  controller.enqueue(encoder.encode(`data: {"heartbeat":true}\n\n`));
+                }
               }
             } catch { /* skip malformed lines */ }
           }

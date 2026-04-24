@@ -476,21 +476,40 @@ if (!session) {
   const statusDot = document.getElementById('status-dot')!;
   const statusText = document.getElementById('status-text')!;
 
+  let modelReady = false; // true once warmup succeeds
+
   statusDot.className = 'w-2 h-2 bg-yellow-500 rounded-full inline-block animate-pulse';
   statusText.textContent = 'Loading model…';
+
+  // Show elapsed time during warmup so the user knows it's working
+  const warmupStart = Date.now();
+  const warmupTimer = setInterval(() => {
+    const elapsed = Math.round((Date.now() - warmupStart) / 1000);
+    if (elapsed >= 5) {
+      statusText.textContent = `Loading model… ${elapsed}s`;
+    }
+  }, 1000);
 
   fetch('/api/ai-warmup', { method: 'POST' })
     .then(r => r.json())
     .then(data => {
+      clearInterval(warmupTimer);
       if (data.warm) {
+        modelReady = true;
+        const loadSec = (data.loadMs / 1000).toFixed(1);
         statusDot.className = 'w-2 h-2 bg-green-500 rounded-full inline-block';
-        statusText.textContent = 'Online';
+        statusText.textContent = data.cold ? `Online (loaded in ${loadSec}s)` : 'Online';
+        // If it was a cold start, clear the extra status after a few seconds
+        if (data.cold) {
+          setTimeout(() => { statusText.textContent = 'Online'; }, 5000);
+        }
       } else {
         statusDot.className = 'w-2 h-2 bg-red-500 rounded-full inline-block';
         statusText.textContent = 'Offline';
       }
     })
     .catch(() => {
+      clearInterval(warmupTimer);
       statusDot.className = 'w-2 h-2 bg-red-500 rounded-full inline-block';
       statusText.textContent = 'Offline';
     });
@@ -553,9 +572,13 @@ if (!session) {
         <span class="text-white text-xs font-bold">LF</span>
       </div>
       <div class="bg-gray-100 rounded-2xl rounded-tl-md px-4 py-3">
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>
-        <span class="typing-dot"></span>
+        <div class="flex items-center gap-2">
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
+          <span class="typing-dot"></span>
+          <span class="text-xs text-gray-400 ml-1 hidden" id="typing-elapsed"></span>
+        </div>
+        <p class="text-xs text-gray-400 mt-1 hidden" id="typing-cold-notice"></p>
       </div>`;
     chatMessages.appendChild(wrapper);
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -693,6 +716,28 @@ if (!session) {
 
     const typingEl = addTypingIndicator();
 
+    // Track time waiting for first token — show progressive notices
+    const waitStart = Date.now();
+    let firstTokenReceived = false;
+    const waitTimer = setInterval(() => {
+      if (firstTokenReceived) { clearInterval(waitTimer); return; }
+      const elapsed = Math.round((Date.now() - waitStart) / 1000);
+      const elapsedEl = document.getElementById('typing-elapsed');
+      const noticeEl = document.getElementById('typing-cold-notice');
+      if (elapsedEl && elapsed >= 5) {
+        elapsedEl.textContent = `${elapsed}s`;
+        elapsedEl.classList.remove('hidden');
+      }
+      if (noticeEl && elapsed >= 10 && !noticeEl.textContent) {
+        noticeEl.textContent = 'Model is warming up — this can take up to a minute on first use.';
+        noticeEl.classList.remove('hidden');
+        statusText.textContent = 'Warming up…';
+      }
+      if (elapsedEl && elapsed >= 30) {
+        statusText.textContent = `Warming up… ${elapsed}s`;
+      }
+    }, 1000);
+
     try {
       const res = await fetch('/api/ai-chat', {
         method: 'POST',
@@ -706,19 +751,13 @@ if (!session) {
         return;
       }
 
-      // Stream response — client-side thinking filter.
-      // With /no_think in the system prompt, the model should respond directly.
-      // Fallback: if <think>...</think> tags appear, strip them and show
-      // only the content that follows.
+      // Stream response — server strips thinking, client just renders.
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let rawAccum = '';        // full raw text from model
-      let displayText = '';     // what we actually show the user
-      let insideThink = false;  // currently inside <think> block
-      let thinkDone = false;    // </think> seen — everything after is real
+      let displayText = '';
       let responseEl: HTMLElement | null = null;
       let buffer = '';
-      let streamDone = false;   // true once [DONE] or reader finishes
+      let streamDone = false;
 
       // Minimum visible characters before we replace the typing indicator
       // with a message bubble. Prevents empty/flash bubbles.
@@ -742,50 +781,29 @@ if (!session) {
           const data = line.slice(6);
           if (data === '[DONE]') {
             streamDone = true;
-            break; // exit for loop; streamDone exits while loop
+            break;
           }
 
           try {
             const parsed = JSON.parse(data);
+            // Skip heartbeat events (server sends these during thinking)
+            if (parsed.heartbeat) continue;
             if (!parsed.content) continue;
 
-            rawAccum += parsed.content;
-
-            // ── Think-tag stripping ──
-            // If model emits <think>...</think> despite /no_think,
-            // skip everything inside the tags.
-            if (!thinkDone) {
-              if (rawAccum.includes('<think>') && !rawAccum.includes('</think>')) {
-                insideThink = true;
-                continue; // still buffering thinking tokens
-              }
-              if (rawAccum.includes('</think>')) {
-                insideThink = false;
-                thinkDone = true;
-                displayText = rawAccum.split('</think>').pop()?.trimStart() || '';
-                continue;
-              }
-              if (insideThink) continue;
-            }
-
-            // ── Normal streaming (no think tags) ──
-            displayText = thinkDone
-              ? (rawAccum.split('</think>').pop()?.trimStart() || '')
-              : rawAccum;
+            displayText += parsed.content;
 
             const visibleText = stripActionMarkers(displayText);
 
-            // Wait until we have enough real characters before creating the
-            // message bubble. This prevents the empty/flash white bubble.
             if (!responseEl) {
               if (visibleText.trim().length >= MIN_DISPLAY_CHARS) {
+                firstTokenReceived = true;
+                clearInterval(waitTimer);
                 statusDot.className = 'w-2 h-2 bg-green-500 rounded-full inline-block';
                 statusText.textContent = 'Responding…';
                 typingEl.remove();
                 responseEl = addMessage('assistant', visibleText);
               }
             } else {
-              // Live-update — show clean text without action markers
               const p = responseEl.querySelector('p');
               if (p) p.textContent = visibleText;
             }
@@ -798,6 +816,8 @@ if (!session) {
       reader.cancel().catch(() => {});
 
       // ── Finalize: immediately unblock the UI ──
+      clearInterval(waitTimer);
+      firstTokenReceived = true;
       typingEl.remove();
       document.getElementById('typing-indicator')?.remove();
       sendBtn.disabled = false;
@@ -805,12 +825,6 @@ if (!session) {
       chatInput.focus();
       statusDot.className = 'w-2 h-2 bg-green-500 rounded-full inline-block';
       statusText.textContent = 'Online';
-
-      if (!displayText && rawAccum) {
-        displayText = rawAccum.includes('</think>')
-          ? (rawAccum.split('</think>').pop()?.trimStart() || rawAccum)
-          : rawAccum;
-      }
 
       // Append action block widget below the already-visible text
       if (responseEl && displayText) {
@@ -825,6 +839,8 @@ if (!session) {
       }
       chatMessages.scrollTop = chatMessages.scrollHeight;
     } catch {
+      clearInterval(waitTimer);
+      firstTokenReceived = true;
       typingEl.remove();
       document.getElementById('typing-indicator')?.remove();
       sendBtn.disabled = false;

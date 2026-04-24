@@ -6,7 +6,7 @@ export const prerender = false;
 
 const OLLAMA_URL = import.meta.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_SECRET = import.meta.env.OLLAMA_SECRET || '';
-const MODEL = import.meta.env.AI_MODEL || 'qwen3:30b';
+const MODEL = import.meta.env.AI_MODEL || 'legacy-messenger';
 
 const SYSTEM_PROMPT = `You are a social media assistant for Legacy Financial & Life, an insurance agency run by Tim and Beth Byrd in Luthersville, Georgia.
 
