@@ -27,9 +27,13 @@ if (!TOKEN) {
 }
 
 const server = http.createServer((req, res) => {
+  const start = Date.now();
+  console.log(`→ ${req.method} ${req.url}`);
+
   // Validate bearer token
   const auth = req.headers.authorization;
   if (!auth || auth !== `Bearer ${TOKEN}`) {
+    console.log(`✗ 401 Unauthorized (${Date.now() - start}ms)`);
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
     return;
@@ -54,6 +58,7 @@ const server = http.createServer((req, res) => {
         },
       },
       (proxyRes) => {
+        console.log(`✓ ${proxyRes.statusCode} ${req.url} (${Date.now() - start}ms)`);
         res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
         proxyRes.pipe(res, { end: true });
       }
