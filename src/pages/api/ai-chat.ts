@@ -171,6 +171,8 @@ export const POST: APIRoute = async ({ request }) => {
     let responseStartIdx = -1;
     // How much of the response we've already sent to the client
     let sentUpTo = 0;
+    // True once we've detected the response is complete and sent [DONE]
+    let responseClosed = false;
 
     // Patterns that indicate start of customer-facing content.
     // Tested against the accumulated text; the real response often starts
@@ -179,6 +181,30 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Pattern that identifies internal reasoning / meta-commentary
     const THINKING_PATTERNS = /^(okay|hmm|so,?\s|well,?\s|let me|the user|i need to|i should|i think|first,?\s|now,?\s|Wait,?\s|alright|this is|we are|checking|I'll |note|According to|We must|We are given|The prospect|Looking at|since |but |However)/i;
+
+    // Detect when the customer-facing response is complete so we can
+    // send [DONE] early without waiting for the model to stop generating.
+    // Triggers on: action block markers, or common sign-off patterns
+    // followed by enough trailing newlines to indicate a paragraph break.
+    const ACTION_BLOCK_RE = /\{\{(book_consultation|call_now|transfer_agent|collect_info)\}\}/;
+    const SIGNOFF_RE = /(?:Tim\s*&\s*Beth|The Legacy Financial Team|Legacy Financial\s*&\s*Life)\s*$/m;
+    function isResponseComplete(text: string): boolean {
+      // If an action block appeared, the message is definitively complete
+      if (ACTION_BLOCK_RE.test(text)) return true;
+      // Sign-off followed by end of text (with optional trailing whitespace)
+      if (SIGNOFF_RE.test(text.trimEnd())) {
+        // Wait for a bit more text to confirm no continuation.
+        // If the last 50 chars haven't changed, it's done.
+        // We check length: sign-off should be at/near the end.
+        const trimmed = text.trimEnd();
+        const signoffMatch = trimmed.match(SIGNOFF_RE);
+        if (signoffMatch && signoffMatch.index !== undefined) {
+          // Sign-off is within last 60 chars of trimmed text — likely final
+          return (trimmed.length - signoffMatch.index) < 60;
+        }
+      }
+      return false;
+    }
 
     function detectResponseStart(): void {
       if (responseStartIdx >= 0) return;
@@ -222,6 +248,7 @@ export const POST: APIRoute = async ({ request }) => {
         try {
           const { done, value } = await ollamaReader.read();
           if (done) {
+            if (responseClosed) return; // already closed early
             // If we never found a response boundary, send everything
             // (better to show thinking than nothing)
             if (responseStartIdx < 0) responseStartIdx = 0;
@@ -270,6 +297,8 @@ export const POST: APIRoute = async ({ request }) => {
                 fullRaw += raw;
                 detectResponseStart();
 
+                if (responseClosed) continue; // already sent [DONE]
+
                 if (responseStartIdx >= 0 && responseStartIdx < fullRaw.length) {
                   // We have response content to send
                   const newContent = fullRaw.slice(Math.max(responseStartIdx, sentUpTo));
@@ -277,6 +306,35 @@ export const POST: APIRoute = async ({ request }) => {
                   if (newContent) {
                     const sseData = JSON.stringify({ content: newContent, done: false });
                     controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                  }
+
+                  // Check if the response looks complete — action block or
+                  // sign-off detected. If so, send [DONE] immediately and
+                  // let the Ollama stream drain silently.
+                  const sentSoFar = fullRaw.slice(responseStartIdx, sentUpTo);
+                  if (isResponseComplete(sentSoFar)) {
+                    responseClosed = true;
+                    controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+                    controller.close();
+                    // Fire-and-forget analytics with current counts
+                    trackLeadEvent({
+                      route: '/api/ai-chat',
+                      eventName: 'ai_chat_completion',
+                      source: 'server',
+                      stage: 'submission',
+                      status: 'success',
+                      ownerScope: 'legacy',
+                      provider: MODEL,
+                      properties: {
+                        model: MODEL,
+                        prompt_tokens: promptTokens,
+                        completion_tokens: completionTokens,
+                        total_tokens: promptTokens + completionTokens,
+                        latency_ms: Date.now() - requestStart,
+                        message_count: messages.length,
+                      },
+                    }).catch(() => {});
+                    return;
                   }
                 } else {
                   // Still in thinking — send a heartbeat to keep stream alive

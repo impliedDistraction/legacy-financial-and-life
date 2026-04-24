@@ -768,6 +768,23 @@ if (!session) {
       const stripActionMarkers = (t: string) =>
         t.replace(/\{\{(book_consultation|call_now|transfer_agent|collect_info)\}\}/g, '').trimEnd();
 
+      // Idle timeout: if content has been received but nothing new arrives
+      // for 2s, treat the response as complete and unlock the UI.
+      let lastContentTime = 0;
+      let idleTimer: ReturnType<typeof setTimeout> | null = null;
+      const IDLE_MS = 2000;
+
+      function resetIdleTimer() {
+        lastContentTime = Date.now();
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          if (!streamDone && displayText.length > 0) {
+            streamDone = true;
+            reader.cancel().catch(() => {});
+          }
+        }, IDLE_MS);
+      }
+
       while (!streamDone) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -791,6 +808,7 @@ if (!session) {
             if (!parsed.content) continue;
 
             displayText += parsed.content;
+            resetIdleTimer();
 
             const visibleText = stripActionMarkers(displayText);
 
@@ -814,6 +832,7 @@ if (!session) {
 
       // Cancel the reader immediately so we don't block on stream drain
       reader.cancel().catch(() => {});
+      if (idleTimer) clearTimeout(idleTimer);
 
       // ── Finalize: immediately unblock the UI ──
       clearInterval(waitTimer);
