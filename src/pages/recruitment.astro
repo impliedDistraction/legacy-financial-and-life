@@ -1,0 +1,1063 @@
+---
+/**
+ * /recruitment — Agent recruitment campaign dashboard.
+ *
+ * Allows Tim to:
+ * 1. Upload a CSV of potential recruits
+ * 2. Run AI processing to generate personalized outreach
+ * 3. Review/edit/approve generated emails & call scripts
+ * 4. Send emails and track outcomes
+ *
+ * Protected by the same magic-link auth as /ai-demo.
+ */
+import Base from '../layouts/Base.astro';
+import '../styles/tailwind.css';
+import { verifySessionCookie } from '../lib/ai-demo-auth';
+
+export const prerender = false;
+
+const session = await verifySessionCookie(Astro.request.headers.get('cookie'));
+if (!session) {
+  return Astro.redirect('/ai-demo-login', 302);
+}
+---
+<Base title="Recruitment — Legacy Financial & Life" description="AI-powered agent recruitment campaigns">
+
+<div class="bg-gray-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-sm font-bold text-gray-900">Agent Recruitment</h1>
+          <p class="text-xs text-gray-500">Legacy Financial & Life</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="status-indicator" class="flex items-center gap-1.5 text-xs text-gray-500">
+          <span id="status-dot" class="w-2 h-2 bg-gray-300 rounded-full inline-block"></span>
+          <span id="status-text">Ready</span>
+        </span>
+        <a href="/ai-demo" class="text-xs text-brand-600 hover:text-brand-700 font-medium">← AI Demo</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats Bar -->
+  <section class="max-w-7xl mx-auto px-4 pt-6 pb-2">
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+        <div class="text-2xl font-bold text-gray-900" id="stat-total">0</div>
+        <div class="text-xs text-gray-500">Total</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+        <div class="text-2xl font-bold text-amber-600" id="stat-pending">0</div>
+        <div class="text-xs text-gray-500">Pending</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+        <div class="text-2xl font-bold text-blue-600" id="stat-processed">0</div>
+        <div class="text-xs text-gray-500">Ready</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+        <div class="text-2xl font-bold text-green-600" id="stat-sent">0</div>
+        <div class="text-xs text-gray-500">Sent</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+        <div class="text-2xl font-bold text-purple-600" id="stat-converted">0</div>
+        <div class="text-xs text-gray-500">Converted</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tab Navigation -->
+  <div class="max-w-7xl mx-auto px-4 pt-4">
+    <div class="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit" id="tab-nav">
+      <button class="tab-btn active px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="upload">
+        📤 Upload
+      </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="review">
+        ✅ Review & Approve
+      </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="sent">
+        📧 Sent & Tracking
+      </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="preview">
+        🧪 Preview & Test
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="max-w-7xl mx-auto px-4 py-4">
+
+    <!-- ═══════════════ UPLOAD TAB ═══════════════ -->
+    <div id="tab-upload" class="tab-panel">
+      <div class="grid lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 space-y-4">
+          <!-- CSV Upload -->
+          <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-1">Upload Recruit List</h2>
+            <p class="text-sm text-gray-500 mb-4">Upload a CSV file with your prospect list. We'll process each one with AI-generated personalized outreach.</p>
+
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-brand-400 transition-colors" id="drop-zone">
+              <input type="file" accept=".csv,.txt" id="csv-input" class="hidden" />
+              <svg class="w-10 h-10 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+              </svg>
+              <p class="text-sm text-gray-600 mb-1">Drop CSV here or <button class="text-brand-600 font-medium hover:underline" id="browse-btn">browse</button></p>
+              <p class="text-xs text-gray-400">Supports: .csv files up to 500 rows</p>
+            </div>
+
+            <!-- Preview -->
+            <div id="csv-preview" class="hidden mt-4">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-medium text-gray-700">Preview (<span id="preview-count">0</span> prospects)</h3>
+                <button class="text-xs text-red-500 hover:text-red-700" id="clear-csv-btn">Clear</button>
+              </div>
+              <div class="overflow-x-auto max-h-60 border border-gray-200 rounded-lg">
+                <table class="w-full text-xs" id="preview-table">
+                  <thead class="bg-gray-50 sticky top-0"><tr id="preview-header"></tr></thead>
+                  <tbody id="preview-body"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Campaign Name + Column Mapping -->
+            <div id="upload-controls" class="hidden mt-4 space-y-3">
+              <div>
+                <label class="text-sm font-medium text-gray-700">Campaign Name</label>
+                <input type="text" id="campaign-name" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500" placeholder="e.g., May 2026 Georgia Agents" />
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="column-mapping">
+                <!-- Populated dynamically -->
+              </div>
+              <button id="upload-btn" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg transition-colors">
+                Upload & Start Processing
+              </button>
+            </div>
+          </div>
+
+          <!-- Processing Status -->
+          <div id="processing-status" class="hidden bg-white rounded-xl border border-gray-200 p-6">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-gray-900">Processing</h3>
+              <span class="text-xs text-gray-500" id="process-progress">0/0</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+              <div class="bg-brand-600 h-2 rounded-full transition-all duration-300" id="process-bar" style="width: 0%"></div>
+            </div>
+            <p class="text-xs text-gray-500" id="process-status-text">Waiting...</p>
+          </div>
+        </div>
+
+        <!-- Sidebar Instructions -->
+        <div class="space-y-4">
+          <div class="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 class="text-sm font-semibold text-gray-900 mb-3">CSV Format</h3>
+            <p class="text-xs text-gray-600 mb-3">Your CSV should include some or all of these columns:</p>
+            <ul class="text-xs text-gray-600 space-y-1.5">
+              <li class="flex gap-2"><span class="text-brand-600 font-mono">name</span> <span class="text-gray-400">— Full name (required)</span></li>
+              <li class="flex gap-2"><span class="text-brand-600 font-mono">email</span> <span class="text-gray-400">— Email address</span></li>
+              <li class="flex gap-2"><span class="text-brand-600 font-mono">phone</span> <span class="text-gray-400">— Phone number</span></li>
+              <li class="flex gap-2"><span class="text-brand-600 font-mono">state</span> <span class="text-gray-400">— State abbreviation</span></li>
+              <li class="flex gap-2"><span class="text-brand-600 font-mono">city</span> <span class="text-gray-400">— City</span></li>
+              <li class="flex gap-2"><span class="text-brand-600 font-mono">experience</span> <span class="text-gray-400">— Experience level</span></li>
+              <li class="flex gap-2"><span class="text-brand-600 font-mono">agency</span> <span class="text-gray-400">— Current agency</span></li>
+              <li class="flex gap-2"><span class="text-brand-600 font-mono">notes</span> <span class="text-gray-400">— Any notes</span></li>
+            </ul>
+          </div>
+          <div class="bg-blue-50 rounded-xl border border-blue-200 p-5">
+            <h3 class="text-sm font-semibold text-blue-900 mb-2">How It Works</h3>
+            <ol class="text-xs text-blue-800 space-y-2 list-decimal list-inside">
+              <li>Upload your CSV list of potential agents</li>
+              <li>AI generates personalized emails & call scripts for each</li>
+              <li>Review, edit, and approve each outreach</li>
+              <li>Send emails with one click (from tim@legacyf-l.com)</li>
+              <li>Track opens, replies, and conversions</li>
+            </ol>
+          </div>
+          <div class="bg-green-50 rounded-xl border border-green-200 p-5">
+            <h3 class="text-sm font-semibold text-green-900 mb-2">Cost: $0 per message</h3>
+            <p class="text-xs text-green-800">All AI processing runs locally — no per-message fees. Email sending included in your plan.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ REVIEW TAB ═══════════════ -->
+    <div id="tab-review" class="tab-panel hidden">
+      <div class="space-y-4">
+        <!-- Filters -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <select id="review-filter" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+            <option value="processed">Ready for Review</option>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending (unprocessed)</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button id="process-batch-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors">
+            ⚡ Process Next 5
+          </button>
+          <button id="approve-all-btn" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors">
+            ✓ Approve All Visible
+          </button>
+        </div>
+
+        <!-- Prospect Cards -->
+        <div id="review-list" class="space-y-3">
+          <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+            <p class="text-sm">No prospects to review. Upload a CSV to get started.</p>
+          </div>
+        </div>
+
+        <!-- Load More -->
+        <div class="text-center">
+          <button id="load-more-btn" class="hidden text-sm text-brand-600 hover:text-brand-700 font-medium py-2">
+            Load more...
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ SENT TAB ═══════════════ -->
+    <div id="tab-sent" class="tab-panel hidden">
+      <div class="space-y-4">
+        <div class="flex items-center gap-3">
+          <select id="sent-filter" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+            <option value="sent">Sent</option>
+            <option value="converted">Converted</option>
+          </select>
+        </div>
+        <div id="sent-list" class="space-y-3">
+          <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+            <p class="text-sm">No outreach sent yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ PREVIEW & TEST TAB ═══════════════ -->
+    <div id="tab-preview" class="tab-panel hidden">
+      <div class="grid lg:grid-cols-2 gap-4">
+        <!-- Left: Input Form -->
+        <div class="space-y-4">
+          <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-1">Test Prospect</h2>
+            <p class="text-sm text-gray-500 mb-4">Enter a synthetic prospect to preview exactly what the AI would generate. Nothing is sent — this is a dry run.</p>
+
+            <div class="space-y-3">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="text-xs font-medium text-gray-600">Name *</label>
+                  <input type="text" id="test-name" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="Marcus Johnson" />
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-600">State</label>
+                  <input type="text" id="test-state" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="GA" />
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="text-xs font-medium text-gray-600">City</label>
+                  <input type="text" id="test-city" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="Atlanta" />
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-600">Experience</label>
+                  <select id="test-experience" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <option value="new">New (0-1 yr)</option>
+                    <option value="1-3yr" selected>1-3 years</option>
+                    <option value="3-5yr">3-5 years</option>
+                    <option value="5+yr">5+ years</option>
+                    <option value="unknown">Unknown</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="text-xs font-medium text-gray-600">Email</label>
+                  <input type="email" id="test-email" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="marcus.johnson@test.legacy" />
+                </div>
+                <div>
+                  <label class="text-xs font-medium text-gray-600">Phone</label>
+                  <input type="tel" id="test-phone" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="(404) 555-0199" />
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-600">Current Agency</label>
+                <input type="text" id="test-agency" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="Family First Insurance Group" />
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-600">Notes (anything you know about them)</label>
+                <textarea id="test-notes" rows="2" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Met at a conference, focused on final expense">Recently got licensed, looking for better training support. Met at an industry mixer.</textarea>
+              </div>
+            </div>
+
+            <div class="flex gap-2 mt-4">
+              <button id="test-generate-btn" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg transition-colors">
+                🧪 Generate Preview
+              </button>
+              <button id="test-random-btn" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2.5 rounded-lg transition-colors text-sm">
+                🎲 Random
+              </button>
+            </div>
+          </div>
+
+          <!-- Feedback Section -->
+          <div id="test-feedback-section" class="hidden bg-white rounded-xl border border-amber-200 p-6">
+            <h3 class="text-sm font-semibold text-gray-900 mb-2">📝 Prompt Feedback</h3>
+            <p class="text-xs text-gray-500 mb-3">How should the AI adjust? Your feedback will refine future outreach for all prospects.</p>
+            <div class="space-y-2">
+              <div class="flex gap-2 flex-wrap">
+                <button class="feedback-chip text-xs border border-gray-300 rounded-full px-3 py-1 hover:bg-brand-50 hover:border-brand-300 transition-colors" data-feedback="more-personal">More personal</button>
+                <button class="feedback-chip text-xs border border-gray-300 rounded-full px-3 py-1 hover:bg-brand-50 hover:border-brand-300 transition-colors" data-feedback="shorter">Shorter</button>
+                <button class="feedback-chip text-xs border border-gray-300 rounded-full px-3 py-1 hover:bg-brand-50 hover:border-brand-300 transition-colors" data-feedback="more-direct">More direct CTA</button>
+                <button class="feedback-chip text-xs border border-gray-300 rounded-full px-3 py-1 hover:bg-brand-50 hover:border-brand-300 transition-colors" data-feedback="less-formal">Less formal</button>
+                <button class="feedback-chip text-xs border border-gray-300 rounded-full px-3 py-1 hover:bg-brand-50 hover:border-brand-300 transition-colors" data-feedback="mention-ai">Mention AI tools</button>
+                <button class="feedback-chip text-xs border border-gray-300 rounded-full px-3 py-1 hover:bg-brand-50 hover:border-brand-300 transition-colors" data-feedback="mention-training">Emphasize training</button>
+              </div>
+              <textarea id="test-feedback-text" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="Or type specific feedback: 'Always mention the weekly Zoom calls' or 'Reference our commission structure'"></textarea>
+              <button id="test-feedback-submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium py-2 rounded-lg transition-colors">
+                Save Feedback & Regenerate
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Preview Output -->
+        <div class="space-y-4">
+          <div id="test-output" class="bg-white rounded-xl border border-gray-200 p-6">
+            <div class="text-center text-gray-400 py-8">
+              <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+              </svg>
+              <p class="text-sm">Click "Generate Preview" to see what the recruit would receive</p>
+              <p class="text-xs text-gray-300 mt-1">The AI will generate a personalized email and call script</p>
+            </div>
+          </div>
+
+          <!-- How the system sees it -->
+          <div id="test-meta" class="hidden bg-gray-50 rounded-xl border border-gray-200 p-5">
+            <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">System View</h3>
+            <div id="test-meta-content" class="text-xs text-gray-600 space-y-1"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+  .tab-btn { color: #6b7280; }
+  .tab-btn.active { background: white; color: #1a62db; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+</style>
+
+<script>
+  // ═══════════════════════════════════════════
+  // STATE
+  // ═══════════════════════════════════════════
+  let csvData: Record<string, string>[] = [];
+  let csvHeaders: string[] = [];
+  let columnMap: Record<string, string> = {};
+  let currentOffset = 0;
+  const PAGE_SIZE = 20;
+
+  // ═══════════════════════════════════════════
+  // TAB SWITCHING
+  // ═══════════════════════════════════════════
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = (btn as HTMLElement).dataset.tab;
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`tab-${tab}`)?.classList.remove('hidden');
+      if (tab === 'review') loadReviewList();
+      if (tab === 'sent') loadSentList();
+    });
+  });
+
+  // ═══════════════════════════════════════════
+  // CSV PARSING
+  // ═══════════════════════════════════════════
+  const dropZone = document.getElementById('drop-zone')!;
+  const csvInput = document.getElementById('csv-input') as HTMLInputElement;
+  const browseBtn = document.getElementById('browse-btn')!;
+  const csvPreview = document.getElementById('csv-preview')!;
+  const previewCount = document.getElementById('preview-count')!;
+  const previewHeader = document.getElementById('preview-header')!;
+  const previewBody = document.getElementById('preview-body')!;
+  const uploadControls = document.getElementById('upload-controls')!;
+  const clearCsvBtn = document.getElementById('clear-csv-btn')!;
+
+  browseBtn.addEventListener('click', () => csvInput.click());
+  dropZone.addEventListener('click', () => csvInput.click());
+
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('border-brand-400', 'bg-brand-50');
+  });
+  dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('border-brand-400', 'bg-brand-50');
+  });
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('border-brand-400', 'bg-brand-50');
+    const file = e.dataTransfer?.files[0];
+    if (file) handleFile(file);
+  });
+
+  csvInput.addEventListener('change', () => {
+    if (csvInput.files?.[0]) handleFile(csvInput.files[0]);
+  });
+
+  clearCsvBtn.addEventListener('click', () => {
+    csvData = [];
+    csvHeaders = [];
+    csvPreview.classList.add('hidden');
+    uploadControls.classList.add('hidden');
+    dropZone.classList.remove('hidden');
+  });
+
+  function handleFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      parseCSV(text);
+    };
+    reader.readAsText(file);
+  }
+
+  function parseCSV(text: string) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return;
+
+    // Detect delimiter
+    const firstLine = lines[0];
+    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+
+    csvHeaders = parseLine(firstLine, delimiter);
+    csvData = [];
+
+    for (let i = 1; i < lines.length && csvData.length < 500; i++) {
+      const values = parseLine(lines[i], delimiter);
+      const row: Record<string, string> = {};
+      csvHeaders.forEach((h, idx) => { row[h] = values[idx] || ''; });
+      if (Object.values(row).some(v => v.trim())) csvData.push(row);
+    }
+
+    renderPreview();
+  }
+
+  function parseLine(line: string, delimiter: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (const char of line) {
+      if (char === '"') { inQuotes = !inQuotes; continue; }
+      if (char === delimiter && !inQuotes) { result.push(current.trim()); current = ''; continue; }
+      current += char;
+    }
+    result.push(current.trim());
+    return result;
+  }
+
+  function renderPreview() {
+    previewCount.textContent = String(csvData.length);
+    previewHeader.innerHTML = csvHeaders.map(h => `<th class="px-2 py-1.5 text-left font-medium text-gray-600 border-b">${escapeHtml(h)}</th>`).join('');
+    previewBody.innerHTML = csvData.slice(0, 10).map(row =>
+      `<tr class="border-b border-gray-100">${csvHeaders.map(h => `<td class="px-2 py-1.5 text-gray-700 whitespace-nowrap max-w-[150px] truncate">${escapeHtml(row[h] || '')}</td>`).join('')}</tr>`
+    ).join('');
+    if (csvData.length > 10) {
+      previewBody.innerHTML += `<tr><td colspan="${csvHeaders.length}" class="px-2 py-2 text-gray-400 text-center">...and ${csvData.length - 10} more</td></tr>`;
+    }
+
+    dropZone.classList.add('hidden');
+    csvPreview.classList.remove('hidden');
+    uploadControls.classList.remove('hidden');
+    renderColumnMapping();
+  }
+
+  function renderColumnMapping() {
+    const mapEl = document.getElementById('column-mapping')!;
+    const knownFields = ['name', 'email', 'phone', 'state', 'city', 'experience', 'agency', 'notes'];
+    const normalizedHeaders = csvHeaders.map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+
+    // Auto-detect mapping
+    columnMap = {};
+    knownFields.forEach(field => {
+      const idx = normalizedHeaders.findIndex(h =>
+        h === field || h.includes(field) ||
+        (field === 'name' && (h.includes('first') || h.includes('full') || h === 'name')) ||
+        (field === 'phone' && (h.includes('phone') || h.includes('cell') || h.includes('mobile'))) ||
+        (field === 'agency' && (h.includes('agency') || h.includes('company') || h.includes('employer'))) ||
+        (field === 'experience' && (h.includes('exp') || h.includes('years') || h.includes('level')))
+      );
+      if (idx !== -1) columnMap[field] = csvHeaders[idx];
+    });
+
+    mapEl.innerHTML = knownFields.map(field => `
+      <div>
+        <label class="text-xs font-medium text-gray-600 capitalize">${field}</label>
+        <select class="field-map w-full mt-0.5 text-xs border border-gray-300 rounded px-2 py-1" data-field="${field}">
+          <option value="">— skip —</option>
+          ${csvHeaders.map(h => `<option value="${escapeHtml(h)}" ${columnMap[field] === h ? 'selected' : ''}>${escapeHtml(h)}</option>`).join('')}
+        </select>
+      </div>
+    `).join('');
+
+    mapEl.querySelectorAll('.field-map').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const field = (sel as HTMLSelectElement).dataset.field!;
+        const value = (sel as HTMLSelectElement).value;
+        if (value) columnMap[field] = value;
+        else delete columnMap[field];
+      });
+    });
+  }
+
+  // ═══════════════════════════════════════════
+  // UPLOAD
+  // ═══════════════════════════════════════════
+  const uploadBtn = document.getElementById('upload-btn') as HTMLButtonElement;
+  const campaignNameInput = document.getElementById('campaign-name') as HTMLInputElement;
+
+  uploadBtn.addEventListener('click', async () => {
+    if (csvData.length === 0) return;
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading...';
+
+    // Map CSV data to normalized prospect format
+    const prospects = csvData.map(row => ({
+      name: row[columnMap['name']] || Object.values(row)[0] || 'Unknown',
+      email: row[columnMap['email']] || null,
+      phone: row[columnMap['phone']] || null,
+      state: row[columnMap['state']] || null,
+      city: row[columnMap['city']] || null,
+      experience_level: row[columnMap['experience']] || null,
+      current_agency: row[columnMap['agency']] || null,
+      notes: row[columnMap['notes']] || null,
+    }));
+
+    try {
+      const res = await fetch('/api/recruitment-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prospects,
+          campaignName: campaignNameInput.value.trim() || `Upload ${new Date().toLocaleDateString()}`,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        showToast(`✓ Uploaded ${data.uploaded} prospects. Starting AI processing...`);
+        startProcessing(data.campaignId, data.uploaded);
+      } else {
+        showToast(`Error: ${data.error}`, 'error');
+      }
+    } catch {
+      showToast('Upload failed. Check connection.', 'error');
+    } finally {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = 'Upload & Start Processing';
+    }
+  });
+
+  // ═══════════════════════════════════════════
+  // PROCESSING (batch, sequential)
+  // ═══════════════════════════════════════════
+  const processingStatus = document.getElementById('processing-status')!;
+  const processBar = document.getElementById('process-bar')!;
+  const processProgress = document.getElementById('process-progress')!;
+  const processStatusText = document.getElementById('process-status-text')!;
+
+  async function startProcessing(_campaignId: string, total: number) {
+    processingStatus.classList.remove('hidden');
+    let processed = 0;
+
+    while (processed < total) {
+      processStatusText.textContent = `Processing batch ${Math.floor(processed / 5) + 1}...`;
+      processProgress.textContent = `${processed}/${total}`;
+      processBar.style.width = `${(processed / total) * 100}%`;
+
+      try {
+        const res = await fetch('/api/recruitment-process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: 5 }),
+        });
+        const data = await res.json();
+        processed += data.processed || 0;
+        if ((data.processed || 0) === 0) break; // No more pending
+      } catch {
+        processStatusText.textContent = 'Processing error — will retry...';
+        break;
+      }
+    }
+
+    processProgress.textContent = `${processed}/${total}`;
+    processBar.style.width = '100%';
+    processStatusText.textContent = `Done! ${processed} prospects processed.`;
+    refreshStats();
+  }
+
+  // ═══════════════════════════════════════════
+  // REVIEW LIST
+  // ═══════════════════════════════════════════
+  const reviewList = document.getElementById('review-list')!;
+  const reviewFilter = document.getElementById('review-filter') as HTMLSelectElement;
+  const processBatchBtn = document.getElementById('process-batch-btn') as HTMLButtonElement;
+  const approveAllBtn = document.getElementById('approve-all-btn') as HTMLButtonElement;
+  const loadMoreBtn = document.getElementById('load-more-btn') as HTMLButtonElement;
+
+  reviewFilter.addEventListener('change', () => { currentOffset = 0; loadReviewList(); });
+
+  processBatchBtn.addEventListener('click', async () => {
+    processBatchBtn.disabled = true;
+    processBatchBtn.textContent = '⚡ Processing...';
+    try {
+      const res = await fetch('/api/recruitment-process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 5 }),
+      });
+      const data = await res.json();
+      showToast(`Processed ${data.processed} prospects`);
+      loadReviewList();
+      refreshStats();
+    } catch {
+      showToast('Processing failed', 'error');
+    } finally {
+      processBatchBtn.disabled = false;
+      processBatchBtn.textContent = '⚡ Process Next 5';
+    }
+  });
+
+  async function loadReviewList() {
+    const status = reviewFilter.value;
+    try {
+      const res = await fetch(`/api/recruitment-upload?status=${status}&limit=${PAGE_SIZE}&offset=${currentOffset}`);
+      const data = await res.json();
+      renderReviewCards(data.prospects || [], status);
+      loadMoreBtn.classList.toggle('hidden', (data.prospects?.length || 0) < PAGE_SIZE);
+    } catch {
+      reviewList.innerHTML = '<div class="text-center text-red-500 text-sm py-4">Failed to load prospects</div>';
+    }
+  }
+
+  loadMoreBtn.addEventListener('click', () => { currentOffset += PAGE_SIZE; loadReviewList(); });
+
+  function renderReviewCards(prospects: any[], status: string) {
+    if (prospects.length === 0) {
+      reviewList.innerHTML = `<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><p class="text-sm">No prospects with status "${status}"</p></div>`;
+      return;
+    }
+
+    reviewList.innerHTML = prospects.map(p => {
+      const scoreColor = (p.fit_score || 0) >= 7 ? 'green' : (p.fit_score || 0) >= 4 ? 'amber' : 'red';
+      const stateMatch = ['GA','OH','OK','SC','MS','MI','TX','UT','AL','LA'].includes(p.state?.toUpperCase());
+
+      return `
+        <div class="bg-white rounded-xl border border-gray-200 p-4 prospect-card" data-id="${p.id}">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <h3 class="font-semibold text-gray-900 text-sm">${escapeHtml(p.name)}</h3>
+                ${p.fit_score ? `<span class="text-xs font-bold text-${scoreColor}-600">${p.fit_score}/10</span>` : ''}
+                ${stateMatch ? '<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Licensed State</span>' : ''}
+              </div>
+              <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
+                ${p.state ? `<span>📍 ${escapeHtml(p.state)}${p.city ? ', ' + escapeHtml(p.city) : ''}</span>` : ''}
+                ${p.email ? `<span>✉️ ${escapeHtml(p.email)}</span>` : ''}
+                ${p.phone ? `<span>📞 ${escapeHtml(p.phone)}</span>` : ''}
+                ${p.experience_level && p.experience_level !== 'unknown' ? `<span>⭐ ${escapeHtml(p.experience_level)}</span>` : ''}
+              </div>
+              ${p.fit_reason ? `<p class="text-xs text-gray-500 mt-1 italic">${escapeHtml(p.fit_reason)}</p>` : ''}
+              ${p.personal_notes ? `<p class="text-xs text-blue-600 mt-1">💡 ${escapeHtml(p.personal_notes)}</p>` : ''}
+            </div>
+          </div>
+
+          ${p.email_body ? `
+          <details class="mt-3">
+            <summary class="text-xs font-medium text-brand-600 cursor-pointer">View Email Draft</summary>
+            <div class="mt-2 bg-gray-50 rounded-lg p-3">
+              <div class="text-xs text-gray-500 mb-1">Subject: <span class="font-medium text-gray-700">${escapeHtml(p.email_subject || '')}</span></div>
+              <textarea class="w-full text-xs text-gray-700 bg-white border border-gray-200 rounded p-2 min-h-[80px] email-edit" data-id="${p.id}">${escapeHtml(p.edited_email_body || p.email_body)}</textarea>
+            </div>
+          </details>` : ''}
+
+          ${p.call_script ? `
+          <details class="mt-2">
+            <summary class="text-xs font-medium text-brand-600 cursor-pointer">View Call Script</summary>
+            <div class="mt-2 bg-gray-50 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap">${escapeHtml(p.call_script)}</div>
+            ${p.voicemail_script ? `<div class="mt-1 text-xs text-gray-500"><strong>Voicemail:</strong> ${escapeHtml(p.voicemail_script)}</div>` : ''}
+          </details>` : ''}
+
+          ${status === 'processed' ? `
+          <div class="flex gap-2 mt-3">
+            <button class="action-btn approve-btn bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✓ Approve</button>
+            <button class="action-btn reject-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
+            ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Approve & Send</button>` : ''}
+          </div>` : ''}
+
+          ${status === 'approved' ? `
+          <div class="flex gap-2 mt-3">
+            ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Send Email</button>` : ''}
+            <button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>
+          </div>` : ''}
+        </div>`;
+    }).join('');
+
+    // Wire action buttons
+    reviewList.querySelectorAll('.approve-btn').forEach(btn => {
+      btn.addEventListener('click', () => doAction(getAttr(btn, 'data-id'), 'approve'));
+    });
+    reviewList.querySelectorAll('.reject-btn').forEach(btn => {
+      btn.addEventListener('click', () => doAction(getAttr(btn, 'data-id'), 'reject'));
+    });
+    reviewList.querySelectorAll('.send-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = getAttr(btn, 'data-id');
+        const emailArea = document.querySelector(`.email-edit[data-id="${id}"]`) as HTMLTextAreaElement | null;
+        await doAction(id, 'approve', emailArea?.value);
+        await doAction(id, 'send_email', emailArea?.value);
+      });
+    });
+    reviewList.querySelectorAll('.call-btn').forEach(btn => {
+      btn.addEventListener('click', () => doAction(getAttr(btn, 'data-id'), 'mark_called'));
+    });
+  }
+
+  approveAllBtn.addEventListener('click', async () => {
+    const cards = reviewList.querySelectorAll('.prospect-card');
+    for (const card of cards) {
+      const id = (card as HTMLElement).dataset.id;
+      if (id) await doAction(id, 'approve');
+    }
+    loadReviewList();
+    refreshStats();
+  });
+
+  async function doAction(id: string, action: string, editedEmailBody?: string) {
+    try {
+      await fetch('/api/recruitment-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action, editedEmailBody }),
+      });
+      // Remove the card from view
+      const card = reviewList.querySelector(`[data-id="${id}"]`);
+      card?.remove();
+      refreshStats();
+    } catch {
+      showToast('Action failed', 'error');
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // SENT LIST
+  // ═══════════════════════════════════════════
+  const sentList = document.getElementById('sent-list')!;
+  const sentFilter = document.getElementById('sent-filter') as HTMLSelectElement;
+  sentFilter.addEventListener('change', loadSentList);
+
+  async function loadSentList() {
+    const status = sentFilter.value;
+    try {
+      const res = await fetch(`/api/recruitment-upload?status=${status}&limit=50`);
+      const data = await res.json();
+      if (!data.prospects?.length) {
+        sentList.innerHTML = '<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><p class="text-sm">No outreach in this category yet.</p></div>';
+        return;
+      }
+      sentList.innerHTML = data.prospects.map((p: any) => `
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="font-semibold text-gray-900 text-sm">${escapeHtml(p.name)}</h3>
+              <p class="text-xs text-gray-500">${escapeHtml(p.email || '')} • ${escapeHtml(p.state || '')}</p>
+            </div>
+            <div class="text-right">
+              <span class="text-xs ${p.status === 'converted' ? 'text-green-600 font-bold' : 'text-gray-500'}">${p.status}</span>
+              ${p.email_sent_at ? `<p class="text-xs text-gray-400">Sent ${new Date(p.email_sent_at).toLocaleDateString()}</p>` : ''}
+              ${p.call_outcome ? `<p class="text-xs text-amber-600">Call: ${p.call_outcome}</p>` : ''}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    } catch {
+      sentList.innerHTML = '<div class="text-center text-red-500 text-sm py-4">Failed to load</div>';
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // STATS
+  // ═══════════════════════════════════════════
+  async function refreshStats() {
+    try {
+      const statuses = ['pending', 'processed', 'sent', 'converted'];
+      const counts: Record<string, number> = {};
+      let total = 0;
+
+      for (const s of statuses) {
+        const res = await fetch(`/api/recruitment-upload?status=${s}&limit=1`);
+        const data = await res.json();
+        counts[s] = data.total || 0;
+        total += counts[s];
+      }
+      // Also count approved
+      const approvedRes = await fetch('/api/recruitment-upload?status=approved&limit=1');
+      const approvedData = await approvedRes.json();
+      total += approvedData.total || 0;
+      counts['processed'] += approvedData.total || 0; // show approved + processed as "Ready"
+
+      document.getElementById('stat-total')!.textContent = String(total);
+      document.getElementById('stat-pending')!.textContent = String(counts['pending'] || 0);
+      document.getElementById('stat-processed')!.textContent = String(counts['processed'] || 0);
+      document.getElementById('stat-sent')!.textContent = String(counts['sent'] || 0);
+      document.getElementById('stat-converted')!.textContent = String(counts['converted'] || 0);
+    } catch { /* silent */ }
+  }
+
+  // ═══════════════════════════════════════════
+  // UTILITIES
+  // ═══════════════════════════════════════════
+  function escapeHtml(text: string): string {
+    const el = document.createElement('span');
+    el.textContent = text;
+    return el.innerHTML;
+  }
+
+  function getAttr(el: Element, attr: string): string {
+    return el.getAttribute(attr) || '';
+  }
+
+  function showToast(message: string, type: 'success' | 'error' = 'success') {
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-4 right-4 px-4 py-2 rounded-lg text-sm font-medium z-50 shadow-lg transition-opacity ${
+      type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
+    }`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+  }
+
+  // ═══════════════════════════════════════════
+  // PREVIEW & TEST
+  // ═══════════════════════════════════════════
+  const testGenerateBtn = document.getElementById('test-generate-btn') as HTMLButtonElement;
+  const testRandomBtn = document.getElementById('test-random-btn') as HTMLButtonElement;
+  const testOutput = document.getElementById('test-output')!;
+  const testMeta = document.getElementById('test-meta')!;
+  const testMetaContent = document.getElementById('test-meta-content')!;
+  const testFeedbackSection = document.getElementById('test-feedback-section')!;
+  const testFeedbackText = document.getElementById('test-feedback-text') as HTMLTextAreaElement;
+  const testFeedbackSubmit = document.getElementById('test-feedback-submit') as HTMLButtonElement;
+
+  // Stored feedback adjustments
+  const FEEDBACK_KEY = 'legacy_recruitment_feedback';
+  function loadFeedback(): string[] {
+    try { return JSON.parse(localStorage.getItem(FEEDBACK_KEY) || '[]'); }
+    catch { return []; }
+  }
+  function saveFeedback(items: string[]) {
+    localStorage.setItem(FEEDBACK_KEY, JSON.stringify(items));
+  }
+
+  // Random test prospects
+  const TEST_PROSPECTS = [
+    { name: 'Marcus Johnson', state: 'GA', city: 'Atlanta', experience: '1-3yr', email: 'marcus.j@test.legacy', phone: '(404) 555-0199', agency: 'Family First Insurance Group', notes: 'Recently got licensed, looking for better training. Met at industry mixer.' },
+    { name: 'Sarah Mitchell', state: 'TX', city: 'Dallas', experience: '3-5yr', email: 'sarah.m@test.legacy', phone: '(214) 555-0342', agency: 'Shield Life Agency', notes: 'Experienced but unhappy with current upline support. Focus on final expense.' },
+    { name: 'David Chen', state: 'OH', city: 'Columbus', experience: 'new', email: 'david.c@test.legacy', phone: '(614) 555-0271', agency: '', notes: 'Career changer from finance. Has Series 6 & 63. Interested in IUL market.' },
+    { name: 'Lisa Rodriguez', state: 'AL', city: 'Birmingham', experience: '5+yr', email: 'lisa.r@test.legacy', phone: '(205) 555-0188', agency: 'Cornerstone Benefits', notes: 'Top producer but wants to build her own team. Already has 3 agents under her.' },
+    { name: 'James Walker', state: 'MS', city: 'Jackson', experience: '1-3yr', email: 'james.w@test.legacy', phone: '(601) 555-0415', agency: 'Primerica', notes: 'Looking for better products and carrier access. Tired of captive model.' },
+    { name: 'Tanisha Williams', state: 'SC', city: 'Charleston', experience: 'new', email: 'tanisha.w@test.legacy', phone: '(843) 555-0267', agency: '', notes: 'Just passed state exam. Background in nursing — strong empathy for final expense clients.' },
+    { name: 'Robert Kim', state: 'MI', city: 'Grand Rapids', experience: '3-5yr', email: 'robert.k@test.legacy', phone: '(616) 555-0394', agency: 'Globe Life', notes: 'Solid producer, wants mentorship on IUL and annuities to move upmarket.' },
+  ];
+
+  testRandomBtn.addEventListener('click', () => {
+    const p = TEST_PROSPECTS[Math.floor(Math.random() * TEST_PROSPECTS.length)];
+    (document.getElementById('test-name') as HTMLInputElement).value = p.name;
+    (document.getElementById('test-state') as HTMLInputElement).value = p.state;
+    (document.getElementById('test-city') as HTMLInputElement).value = p.city;
+    (document.getElementById('test-experience') as HTMLSelectElement).value = p.experience;
+    (document.getElementById('test-email') as HTMLInputElement).value = p.email;
+    (document.getElementById('test-phone') as HTMLInputElement).value = p.phone;
+    (document.getElementById('test-agency') as HTMLInputElement).value = p.agency;
+    (document.getElementById('test-notes') as HTMLTextAreaElement).value = p.notes;
+  });
+
+  testGenerateBtn.addEventListener('click', () => generatePreview());
+
+  async function generatePreview() {
+    const prospect = {
+      name: (document.getElementById('test-name') as HTMLInputElement).value.trim(),
+      state: (document.getElementById('test-state') as HTMLInputElement).value.trim(),
+      city: (document.getElementById('test-city') as HTMLInputElement).value.trim(),
+      experience_level: (document.getElementById('test-experience') as HTMLSelectElement).value,
+      email: (document.getElementById('test-email') as HTMLInputElement).value.trim(),
+      phone: (document.getElementById('test-phone') as HTMLInputElement).value.trim(),
+      current_agency: (document.getElementById('test-agency') as HTMLInputElement).value.trim(),
+      notes: (document.getElementById('test-notes') as HTMLTextAreaElement).value.trim(),
+    };
+
+    if (!prospect.name) { showToast('Name is required', 'error'); return; }
+
+    testGenerateBtn.disabled = true;
+    testGenerateBtn.textContent = '⚙️ Generating...';
+    testOutput.innerHTML = `
+      <div class="text-center py-8">
+        <div class="animate-pulse text-brand-600 mb-2">
+          <svg class="w-8 h-8 mx-auto animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </div>
+        <p class="text-sm text-gray-600">AI is generating personalized outreach...</p>
+        <p class="text-xs text-gray-400 mt-1">This takes 20-60 seconds (full inference)</p>
+      </div>`;
+
+    try {
+      const feedback = loadFeedback();
+      const res = await fetch('/api/recruitment-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospect, feedback }),
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        testOutput.innerHTML = `<div class="text-center py-8 text-red-500"><p class="text-sm">${escapeHtml(data.error)}</p></div>`;
+        return;
+      }
+
+      renderPreviewOutput(data, prospect);
+      testFeedbackSection.classList.remove('hidden');
+      testMeta.classList.remove('hidden');
+      renderMeta(data, prospect);
+    } catch {
+      testOutput.innerHTML = `<div class="text-center py-8 text-red-500"><p class="text-sm">Generation failed. Is the AI model running?</p></div>`;
+    } finally {
+      testGenerateBtn.disabled = false;
+      testGenerateBtn.textContent = '🧪 Generate Preview';
+    }
+  }
+
+  function renderPreviewOutput(data: any, prospect: any) {
+    const scoreColor = (data.fitScore || 0) >= 7 ? 'green' : (data.fitScore || 0) >= 4 ? 'amber' : 'red';
+    const isTestDomain = prospect.email?.endsWith('@test.legacy');
+
+    testOutput.innerHTML = `
+      <div class="space-y-4">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-lg font-bold text-${scoreColor}-600">${data.fitScore || '?'}/10</span>
+            <span class="text-xs text-gray-500">Fit Score</span>
+          </div>
+          ${isTestDomain ? '<span class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">🧪 TEST MODE</span>' : ''}
+        </div>
+        ${data.fitReason ? `<p class="text-xs text-gray-600 italic">${escapeHtml(data.fitReason)}</p>` : ''}
+        ${data.personalNotes ? `<p class="text-xs text-blue-600 bg-blue-50 p-2 rounded">💡 <strong>Note to Tim:</strong> ${escapeHtml(data.personalNotes)}</p>` : ''}
+
+        <!-- Email Preview -->
+        <div class="border border-gray-200 rounded-lg overflow-hidden">
+          <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center gap-2">
+            <span class="text-xs text-gray-400">From:</span>
+            <span class="text-xs font-medium">Tim Byrd &lt;tim@legacyf-l.com&gt;</span>
+          </div>
+          <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center gap-2">
+            <span class="text-xs text-gray-400">To:</span>
+            <span class="text-xs font-medium">${escapeHtml(prospect.name)} &lt;${escapeHtml(prospect.email || 'no email')}&gt;</span>
+          </div>
+          <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center gap-2">
+            <span class="text-xs text-gray-400">Subject:</span>
+            <span class="text-xs font-bold text-gray-800">${escapeHtml(data.email?.subject || '(no subject)')}</span>
+          </div>
+          <div class="px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">${escapeHtml(data.email?.body || '(no body)')}</div>
+        </div>
+
+        <!-- Call Script Preview -->
+        <div class="border border-gray-200 rounded-lg overflow-hidden">
+          <div class="bg-amber-50 px-4 py-2 border-b border-gray-200">
+            <span class="text-xs font-semibold text-amber-800">📞 Call Script (30-second opener)</span>
+          </div>
+          <div class="px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap">${escapeHtml(data.callScript?.opener || '(no script)')}</div>
+          ${data.callScript?.voicemail ? `
+          <div class="bg-gray-50 px-4 py-2 border-t border-gray-200">
+            <span class="text-xs font-semibold text-gray-500">📱 Voicemail</span>
+          </div>
+          <div class="px-4 py-3 text-xs text-gray-600 whitespace-pre-wrap">${escapeHtml(data.callScript.voicemail)}</div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function renderMeta(data: any, prospect: any) {
+    const isLicensedState = ['GA','OH','OK','SC','MS','MI','TX','UT','AL','LA'].includes(prospect.state?.toUpperCase());
+    testMetaContent.innerHTML = `
+      <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+        <span class="text-gray-500">Test domain:</span><span class="${prospect.email?.endsWith('@test.legacy') ? 'text-purple-600 font-medium' : 'text-gray-700'}">${prospect.email?.endsWith('@test.legacy') ? 'Yes (no send)' : 'Live email!'}</span>
+        <span class="text-gray-500">Licensed state:</span><span class="${isLicensedState ? 'text-green-600' : 'text-gray-700'}">${isLicensedState ? '✓ Yes' : '✗ No'}</span>
+        <span class="text-gray-500">Fit score:</span><span>${data.fitScore || '?'}/10</span>
+        <span class="text-gray-500">Active feedback:</span><span>${loadFeedback().length} adjustment${loadFeedback().length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="mt-2 pt-2 border-t border-gray-200">
+        <p class="text-gray-500 mb-1">Prompt adjustments active:</p>
+        ${loadFeedback().length > 0 ? `<ul class="list-disc list-inside text-gray-700">${loadFeedback().map(f => `<li>${escapeHtml(f)}</li>`).join('')}</ul>` : '<p class="text-gray-400 italic">None yet — use feedback below to adjust</p>'}
+      </div>`;
+  }
+
+  // Feedback chips
+  document.querySelectorAll('.feedback-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('bg-brand-100');
+      chip.classList.toggle('border-brand-400');
+      chip.classList.toggle('text-brand-700');
+    });
+  });
+
+  testFeedbackSubmit.addEventListener('click', async () => {
+    const chips = Array.from(document.querySelectorAll('.feedback-chip.bg-brand-100'))
+      .map(el => (el as HTMLElement).dataset.feedback!)
+      .filter(Boolean);
+    const freetext = testFeedbackText.value.trim();
+
+    const feedbackItems: string[] = [];
+    if (chips.includes('more-personal')) feedbackItems.push('Make emails more personal and specific to the prospect');
+    if (chips.includes('shorter')) feedbackItems.push('Keep emails under 150 words');
+    if (chips.includes('more-direct')) feedbackItems.push('Include a stronger, more direct call-to-action');
+    if (chips.includes('less-formal')) feedbackItems.push('Use a more casual, conversational tone');
+    if (chips.includes('mention-ai')) feedbackItems.push('Always mention the AI-powered tools and technology stack');
+    if (chips.includes('mention-training')) feedbackItems.push('Emphasize weekly training sessions and mentorship');
+    if (freetext) feedbackItems.push(freetext);
+
+    if (feedbackItems.length === 0) { showToast('Select or type feedback first', 'error'); return; }
+
+    // Merge with existing feedback (dedupe)
+    const existing = loadFeedback();
+    const merged = [...new Set([...existing, ...feedbackItems])];
+    saveFeedback(merged);
+
+    showToast(`Saved ${feedbackItems.length} feedback adjustment${feedbackItems.length > 1 ? 's' : ''}. Regenerating...`);
+
+    // Clear chip selections
+    document.querySelectorAll('.feedback-chip.bg-brand-100').forEach(el => {
+      el.classList.remove('bg-brand-100', 'border-brand-400', 'text-brand-700');
+    });
+    testFeedbackText.value = '';
+
+    // Regenerate with new feedback
+    await generatePreview();
+  });
+
+  // Initial load
+  refreshStats();
+</script>
+
+</Base>

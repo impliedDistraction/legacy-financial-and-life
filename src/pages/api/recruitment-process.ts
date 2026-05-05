@@ -1,0 +1,242 @@
+import type { APIRoute } from 'astro';
+import { verifySessionCookie } from '../../lib/ai-demo-auth';
+
+export const prerender = false;
+
+const SUPABASE_URL = import.meta.env.SUPABASE_URL?.trim();
+const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+const OLLAMA_URL = import.meta.env.OLLAMA_URL || 'http://localhost:11434';
+const OLLAMA_SECRET = import.meta.env.OLLAMA_SECRET || '';
+const MODEL = import.meta.env.AI_MODEL || 'legacy-messenger';
+const TABLE = 'recruitment_prospects';
+
+const SYSTEM_PROMPT = `You are a recruitment outreach specialist for Legacy Financial & Life, an insurance agency run by Tim & Beth Byrd.
+
+About Legacy Financial & Life:
+- Tim and Beth Byrd, 15+ years combined experience, 300+ policies sold
+- Licensed states: GA, OH, OK, SC, MS, MI, TX, UT, AL, LA
+- Carriers: Mutual of Omaha, Transamerica, Aflac, National Life Group, North American
+- Products: Term Life, Whole Life, Universal Life, Final Expense, IUL, Annuities
+- Offers: mentorship, AI-powered tools, proven systems, weekly training, lead sharing
+
+Given a recruit's profile, generate a personalized outreach email and call script.
+
+EMAIL RULES:
+- 150-250 words, warm, direct, peer-to-peer
+- Personal hook → value prop → soft CTA
+- Reference their state/experience if known
+- NEVER use MLM language, income claims, "unlimited earning potential", "be your own boss"
+- NEVER guarantee income or disparage their current agency
+- Sound like Tim talking to a fellow professional
+
+CALL SCRIPT RULES:
+- 30-second opener, friendly and unhurried
+- Include a voicemail version
+
+RESPOND IN THIS EXACT JSON FORMAT (no markdown fencing, no other text):
+{
+  "email": {
+    "subject": "Subject line",
+    "body": "Email body with \\n for line breaks"
+  },
+  "callScript": {
+    "opener": "Hi [Name], this is Tim Byrd from Legacy Financial...",
+    "voicemail": "Hey [Name], this is Tim Byrd..."
+  },
+  "personalNotes": "Brief note to Tim about this recruit",
+  "fitScore": 7,
+  "fitReason": "Brief explanation"
+}`;
+
+function stripThinking(text: string): string {
+  const thinkEnd = text.indexOf('</think>');
+  if (thinkEnd !== -1) return text.substring(thinkEnd + 8).trimStart();
+  return text;
+}
+
+function extractJson(text: string): string {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) return text.substring(start, end + 1);
+  return text;
+}
+
+/**
+ * POST /api/recruitment-process
+ * Process a batch of pending prospects through the AI.
+ * Body: { prospectIds?: string[], limit?: number }
+ * If prospectIds provided, processes those. Otherwise processes next N pending.
+ */
+export const POST: APIRoute = async ({ request }) => {
+  const session = await verifySessionCookie(request.headers.get('cookie'));
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(JSON.stringify({ error: 'Database not configured' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  try {
+    const body = await request.json();
+    const batchLimit = Math.min(parseInt(body.limit) || 5, 20);
+    const prospectIds: string[] | undefined = body.prospectIds;
+
+    // Fetch prospects to process
+    let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.pending&processed_at=is.null&order=created_at.asc&limit=${batchLimit}`;
+    if (prospectIds && Array.isArray(prospectIds) && prospectIds.length > 0) {
+      const ids = prospectIds.slice(0, 20).map(id => String(id));
+      queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?id=in.(${ids.join(',')})&status=eq.pending`;
+    }
+
+    const fetchRes = await fetch(queryUrl, {
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!fetchRes.ok) {
+      return new Response(JSON.stringify({ error: 'Failed to fetch prospects' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const prospects = await fetchRes.json();
+    if (prospects.length === 0) {
+      return new Response(JSON.stringify({ processed: 0, message: 'No pending prospects to process' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const results: { id: string; success: boolean; fitScore?: number }[] = [];
+
+    // Process each prospect sequentially (GPU constraint)
+    for (const prospect of prospects) {
+      try {
+        const result = await processProspect(prospect);
+        results.push({ id: prospect.id, success: true, fitScore: result.fitScore });
+      } catch (err) {
+        console.error(`Failed to process prospect ${prospect.id}:`, err);
+        results.push({ id: prospect.id, success: false });
+      }
+    }
+
+    return new Response(JSON.stringify({
+      processed: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results,
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (err) {
+    console.error('Recruitment process error:', err);
+    return new Response(JSON.stringify({ error: 'Invalid request' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+};
+
+async function processProspect(prospect: Record<string, unknown>): Promise<{ fitScore: number }> {
+  const profile = buildProfileDescription(prospect);
+
+  const ollamaHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': '1',
+  };
+  if (OLLAMA_SECRET) ollamaHeaders['Authorization'] = `Bearer ${OLLAMA_SECRET}`;
+  ollamaHeaders['X-OpenClaw-Client'] = 'legacy';
+
+  const ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
+    method: 'POST',
+    headers: ollamaHeaders,
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}` },
+      ],
+      stream: false,
+      options: { temperature: 0.7, top_p: 0.9, num_predict: 1024 },
+    }),
+  });
+
+  if (!ollamaRes.ok) {
+    throw new Error(`Ollama returned ${ollamaRes.status}`);
+  }
+
+  const ollamaData = await ollamaRes.json();
+  const rawContent = ollamaData?.message?.content || '';
+  const cleaned = stripThinking(rawContent);
+  const jsonStr = extractJson(cleaned);
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    throw new Error('Failed to parse AI response as JSON');
+  }
+
+  const email = parsed.email as Record<string, string> | undefined;
+  const callScript = parsed.callScript as Record<string, string> | undefined;
+  const fitScore = Math.min(10, Math.max(1, parseInt(String(parsed.fitScore)) || 5));
+
+  // Update the prospect in Supabase
+  const updateRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${prospect.id}`,
+    {
+      method: 'PATCH',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY!,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        fit_score: fitScore,
+        fit_reason: String(parsed.fitReason || '').slice(0, 500),
+        email_subject: String(email?.subject || '').slice(0, 200),
+        email_body: String(email?.body || '').slice(0, 5000),
+        call_script: String(callScript?.opener || '').slice(0, 2000),
+        voicemail_script: String(callScript?.voicemail || '').slice(0, 1000),
+        personal_notes: String(parsed.personalNotes || '').slice(0, 1000),
+        processed_at: new Date().toISOString(),
+        status: 'processed',
+        updated_at: new Date().toISOString(),
+      }),
+    }
+  );
+
+  if (!updateRes.ok) {
+    const err = await updateRes.text().catch(() => '');
+    throw new Error(`Failed to update prospect: ${updateRes.status} ${err}`);
+  }
+
+  return { fitScore };
+}
+
+function buildProfileDescription(prospect: Record<string, unknown>): string {
+  const parts: string[] = [];
+  if (prospect.name) parts.push(`Name: ${prospect.name}`);
+  if (prospect.state) parts.push(`State: ${prospect.state}`);
+  if (prospect.city) parts.push(`City: ${prospect.city}`);
+  if (prospect.experience_level && prospect.experience_level !== 'unknown') {
+    parts.push(`Experience: ${prospect.experience_level}`);
+  }
+  if (prospect.current_agency) parts.push(`Current Agency: ${prospect.current_agency}`);
+  if (prospect.email) parts.push(`Email: ${prospect.email}`);
+  if (prospect.phone) parts.push(`Phone: ${prospect.phone}`);
+  if (prospect.notes) parts.push(`Notes: ${prospect.notes}`);
+  return parts.join('\n') || 'Minimal profile information available.';
+}
