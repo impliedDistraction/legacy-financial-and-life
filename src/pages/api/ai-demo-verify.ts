@@ -16,6 +16,7 @@ export const prerender = false;
 export const GET: APIRoute = async ({ request }) => {
   const url = new URL(request.url);
   const token = url.searchParams.get('token') ?? '';
+  const redirect = sanitizeRedirect(url.searchParams.get('redirect'));
 
   const result = await verifyMagicToken(token);
 
@@ -31,8 +32,16 @@ export const GET: APIRoute = async ({ request }) => {
   return new Response(null, {
     status: 302,
     headers: {
-      Location: '/ai-demo',
+      Location: redirect || '/ai-demo',
       'Set-Cookie': cookie,
     },
   });
 };
+
+/** Only allow relative paths starting with / to prevent open redirect. */
+function sanitizeRedirect(value?: string | null): string | null {
+  if (!value || typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed.slice(0, 200);
+  return null;
+}

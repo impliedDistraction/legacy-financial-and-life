@@ -18,7 +18,7 @@ export const prerender = false;
 
 const session = await verifySessionCookie(Astro.request.headers.get('cookie'));
 if (!session) {
-  return Astro.redirect('/ai-demo-login', 302);
+  return Astro.redirect('/ai-demo-login?redirect=/recruitment', 302);
 }
 ---
 <Base title="Recruitment — Legacy Financial & Life" description="AI-powered agent recruitment campaigns">

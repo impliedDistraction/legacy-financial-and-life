@@ -59,11 +59,13 @@ export const prerender = false;
       msg.style.display = 'none';
 
       const email = form.email.value.trim();
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect') || null;
       try {
         const res = await fetch('/api/ai-demo-auth', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email, redirect }),
         });
         if (res.ok) {
           msg.className = 'msg msg-ok';

@@ -11,7 +11,7 @@ import { createMagicToken, isAllowedEmail } from '../../lib/ai-demo-auth';
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request }) => {
-  let body: { email?: string };
+  let body: { email?: string; redirect?: string };
   try {
     body = await request.json();
   } catch {
@@ -22,6 +22,7 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const email = (body.email ?? '').trim().toLowerCase();
+  const redirect = sanitizeRedirect(body.redirect);
 
   const okResponse = () =>
     new Response(JSON.stringify({ ok: true }), {
@@ -46,7 +47,8 @@ export const POST: APIRoute = async ({ request }) => {
 
   const token = await createMagicToken(email);
   const siteUrl = import.meta.env.SITE || 'https://legacyfinancial.app';
-  const verifyUrl = `${siteUrl}/api/ai-demo-verify?token=${encodeURIComponent(token)}`;
+  let verifyUrl = `${siteUrl}/api/ai-demo-verify?token=${encodeURIComponent(token)}`;
+  if (redirect) verifyUrl += `&redirect=${encodeURIComponent(redirect)}`;
 
   const resend = new Resend(resendKey);
 
@@ -82,4 +84,12 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+/** Only allow relative paths starting with / to prevent open redirect. */
+function sanitizeRedirect(value?: string): string | null {
+  if (!value || typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) return trimmed.slice(0, 200);
+  return null;
 }
