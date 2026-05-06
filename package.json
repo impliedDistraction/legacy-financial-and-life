@@ -15,9 +15,9 @@
     "ai": "node scripts/ai-launcher.js"
   },
   "dependencies": {
-    "@astrojs/vercel": "^7.8.0",
+    "@astrojs/vercel": "^10.0.6",
     "@vercel/analytics": "^2.0.1",
-    "astro": "^4.15.0",
+    "astro": "^6.2.2",
     "flags": "^4.0.6",
     "resend": "^4.0.0",
     "sharp": "^0.34.3",
@@ -25,7 +25,7 @@
     "vercel": "^51.4.0"
   },
   "devDependencies": {
-    "@astrojs/tailwind": "^5.1.0",
+    "@astrojs/tailwind": "^6.0.2",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.45",
     "puppeteer": "^22.15.0",

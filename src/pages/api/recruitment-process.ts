@@ -51,14 +51,20 @@ RESPOND IN THIS EXACT JSON FORMAT (no markdown fencing, no other text):
 function stripThinking(text: string): string {
   const thinkEnd = text.indexOf('</think>');
   if (thinkEnd !== -1) return text.substring(thinkEnd + 8).trimStart();
+  const thinkStart = text.indexOf('<think>');
+  if (thinkStart === 0) {
+    const jsonStart = text.indexOf('{');
+    if (jsonStart > 0) return text.substring(jsonStart);
+  }
   return text;
 }
 
 function extractJson(text: string): string {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start !== -1 && end !== -1 && end > start) return text.substring(start, end + 1);
-  return text;
+  let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) return cleaned.substring(start, end + 1);
+  return cleaned;
 }
 
 /**
@@ -168,7 +174,7 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
         { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}` },
       ],
       stream: false,
-      options: { temperature: 0.7, top_p: 0.9, num_predict: 1024 },
+      options: { temperature: 0.7, top_p: 0.9, num_predict: 2048 },
     }),
   });
 

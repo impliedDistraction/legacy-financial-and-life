@@ -46,16 +46,27 @@ RESPOND IN THIS EXACT JSON FORMAT (no markdown fencing, no other text):
 }`;
 
 function stripThinking(text: string): string {
+  // Qwen3 may output <think>...</think> or just </think> at the start
   const thinkEnd = text.indexOf('</think>');
   if (thinkEnd !== -1) return text.substring(thinkEnd + 8).trimStart();
+  // Also handle <think> without closing (model cut off mid-think)
+  const thinkStart = text.indexOf('<think>');
+  if (thinkStart === 0) {
+    // Everything before first { is thinking
+    const jsonStart = text.indexOf('{');
+    if (jsonStart > 0) return text.substring(jsonStart);
+  }
   return text;
 }
 
 function extractJson(text: string): string {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start !== -1 && end !== -1 && end > start) return text.substring(start, end + 1);
-  return text;
+  // Strip markdown code fences if present
+  let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+  // Find the outermost JSON object
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) return cleaned.substring(start, end + 1);
+  return cleaned;
 }
 
 /**
@@ -114,7 +125,7 @@ export const POST: APIRoute = async ({ request }) => {
           { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}` },
         ],
         stream: false,
-        options: { temperature: 0.7, top_p: 0.9, num_predict: 1024 },
+        options: { temperature: 0.7, top_p: 0.9, num_predict: 2048 },
       }),
     });
 
