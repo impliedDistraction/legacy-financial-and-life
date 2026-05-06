@@ -1,9 +1,11 @@
 -- Table: recruitment_prospects
 -- Used by the /recruitment dashboard for AI-powered agent outreach campaigns.
+-- NOTE: This table already exists in production (token-solutions Supabase).
 
 CREATE TABLE IF NOT EXISTS recruitment_prospects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ,
   
   -- Prospect info (from CSV upload)
   name TEXT NOT NULL,
@@ -23,8 +25,8 @@ CREATE TABLE IF NOT EXISTS recruitment_prospects (
   -- AI-generated content
   email_subject TEXT,
   email_body TEXT,
-  call_opener TEXT,
-  call_voicemail TEXT,
+  call_script TEXT,
+  voicemail_script TEXT,
   personal_notes TEXT,
   fit_score INTEGER,
   fit_reason TEXT,
@@ -33,9 +35,15 @@ CREATE TABLE IF NOT EXISTS recruitment_prospects (
   status TEXT NOT NULL DEFAULT 'pending',
   processed_at TIMESTAMPTZ,
   approved_at TIMESTAMPTZ,
-  sent_at TIMESTAMPTZ,
+  approved_by TEXT,
+  edited_email_body TEXT,
   
   -- Tracking
+  email_sent_at TIMESTAMPTZ,
+  email_opened_at TIMESTAMPTZ,
+  email_replied_at TIMESTAMPTZ,
+  call_made_at TIMESTAMPTZ,
+  call_outcome TEXT,
   properties JSONB DEFAULT '{}'::jsonb
 );
 

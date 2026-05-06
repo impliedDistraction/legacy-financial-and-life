@@ -137,12 +137,12 @@ if (!session) {
                 <!-- Populated dynamically -->
               </div>
               <button id="upload-btn" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg transition-colors">
-                Upload & Start Processing
+                Upload Campaign
               </button>
             </div>
           </div>
 
-          <!-- Processing Status -->
+          <!-- Processing Status (for batch operations) -->
           <div id="processing-status" class="hidden bg-white rounded-xl border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-3">
               <h3 class="text-sm font-semibold text-gray-900">Processing</h3>
@@ -192,20 +192,21 @@ if (!session) {
     <!-- ═══════════════ REVIEW TAB ═══════════════ -->
     <div id="tab-review" class="tab-panel hidden">
       <div class="space-y-4">
-        <!-- Filters -->
+        <!-- Filters & Controls -->
         <div class="flex items-center gap-3 flex-wrap">
           <select id="review-filter" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+            <option value="pending">Pending (needs AI)</option>
             <option value="processed">Ready for Review</option>
             <option value="approved">Approved</option>
-            <option value="pending">Pending (unprocessed)</option>
             <option value="rejected">Rejected</option>
           </select>
           <button id="process-batch-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors">
-            ⚡ Process Next 5
+            ⚡ Generate Next 5
           </button>
-          <button id="approve-all-btn" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors">
+          <button id="approve-all-btn" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors hidden">
             ✓ Approve All Visible
           </button>
+          <span id="review-count" class="text-xs text-gray-400 ml-auto"></span>
         </div>
 
         <!-- Prospect Cards -->
@@ -557,8 +558,17 @@ if (!session) {
 
       const data = await res.json();
       if (data.success) {
-        showToast(`✓ Uploaded ${data.uploaded} prospects. Starting AI processing...`);
-        startProcessing(data.campaignId, data.uploaded);
+        showToast(`✓ Uploaded ${data.uploaded} prospects to "${data.campaignName}"`);
+        // Switch to Review tab showing pending prospects
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        const reviewBtn = document.querySelector('[data-tab="review"]');
+        reviewBtn?.classList.add('active');
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById('tab-review')?.classList.remove('hidden');
+        reviewFilter.value = 'pending';
+        currentOffset = 0;
+        loadReviewList();
+        refreshStats();
       } else {
         showToast(`Error: ${data.error}`, 'error');
       }
@@ -566,7 +576,7 @@ if (!session) {
       showToast('Upload failed. Check connection.', 'error');
     } finally {
       uploadBtn.disabled = false;
-      uploadBtn.textContent = 'Upload & Start Processing';
+      uploadBtn.textContent = 'Upload Campaign';
     }
   });
 
@@ -621,7 +631,7 @@ if (!session) {
 
   processBatchBtn.addEventListener('click', async () => {
     processBatchBtn.disabled = true;
-    processBatchBtn.textContent = '⚡ Processing...';
+    processBatchBtn.textContent = '⚡ Generating...';
     try {
       const res = await fetch('/api/recruitment-process', {
         method: 'POST',
@@ -629,22 +639,31 @@ if (!session) {
         body: JSON.stringify({ limit: 5 }),
       });
       const data = await res.json();
-      showToast(`Processed ${data.processed} prospects`);
+      if (data.processed > 0) {
+        showToast(`Generated outreach for ${data.processed} prospects`);
+      } else {
+        showToast('No pending prospects to process');
+      }
       loadReviewList();
       refreshStats();
     } catch {
       showToast('Processing failed', 'error');
     } finally {
       processBatchBtn.disabled = false;
-      processBatchBtn.textContent = '⚡ Process Next 5';
+      processBatchBtn.textContent = '⚡ Generate Next 5';
     }
   });
 
   async function loadReviewList() {
     const status = reviewFilter.value;
+    // Show/hide contextual buttons
+    approveAllBtn.classList.toggle('hidden', status !== 'processed');
+    processBatchBtn.classList.toggle('hidden', status !== 'pending');
     try {
       const res = await fetch(`/api/recruitment-upload?status=${status}&limit=${PAGE_SIZE}&offset=${currentOffset}`);
       const data = await res.json();
+      const count = data.total || data.prospects?.length || 0;
+      document.getElementById('review-count')!.textContent = count > 0 ? `${count} total` : '';
       renderReviewCards(data.prospects || [], status);
       loadMoreBtn.classList.toggle('hidden', (data.prospects?.length || 0) < PAGE_SIZE);
     } catch {
@@ -656,7 +675,8 @@ if (!session) {
 
   function renderReviewCards(prospects: any[], status: string) {
     if (prospects.length === 0) {
-      reviewList.innerHTML = `<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><p class="text-sm">No prospects with status "${status}"</p></div>`;
+      const msg = status === 'pending' ? 'No pending prospects. Upload a CSV to add agents.' : `No prospects with status "${status}"`;
+      reviewList.innerHTML = `<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><p class="text-sm">${msg}</p></div>`;
       return;
     }
 
@@ -672,13 +692,16 @@ if (!session) {
                 <h3 class="font-semibold text-gray-900 text-sm">${escapeHtml(p.name)}</h3>
                 ${p.fit_score ? `<span class="text-xs font-bold text-${scoreColor}-600">${p.fit_score}/10</span>` : ''}
                 ${stateMatch ? '<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Licensed State</span>' : ''}
+                <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">${escapeHtml(p.status)}</span>
               </div>
               <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
                 ${p.state ? `<span>📍 ${escapeHtml(p.state)}${p.city ? ', ' + escapeHtml(p.city) : ''}</span>` : ''}
                 ${p.email ? `<span>✉️ ${escapeHtml(p.email)}</span>` : ''}
                 ${p.phone ? `<span>📞 ${escapeHtml(p.phone)}</span>` : ''}
                 ${p.experience_level && p.experience_level !== 'unknown' ? `<span>⭐ ${escapeHtml(p.experience_level)}</span>` : ''}
+                ${p.current_agency ? `<span>🏢 ${escapeHtml(p.current_agency)}</span>` : ''}
               </div>
+              ${p.notes ? `<p class="text-xs text-gray-400 mt-1">${escapeHtml(p.notes)}</p>` : ''}
               ${p.fit_reason ? `<p class="text-xs text-gray-500 mt-1 italic">${escapeHtml(p.fit_reason)}</p>` : ''}
               ${p.personal_notes ? `<p class="text-xs text-blue-600 mt-1">💡 ${escapeHtml(p.personal_notes)}</p>` : ''}
             </div>
@@ -689,7 +712,7 @@ if (!session) {
             <summary class="text-xs font-medium text-brand-600 cursor-pointer">View Email Draft</summary>
             <div class="mt-2 bg-gray-50 rounded-lg p-3">
               <div class="text-xs text-gray-500 mb-1">Subject: <span class="font-medium text-gray-700">${escapeHtml(p.email_subject || '')}</span></div>
-              <textarea class="w-full text-xs text-gray-700 bg-white border border-gray-200 rounded p-2 min-h-[80px] email-edit" data-id="${p.id}">${escapeHtml(p.edited_email_body || p.email_body)}</textarea>
+              <textarea class="w-full text-xs text-gray-700 bg-white border border-gray-200 rounded p-2 min-h-[80px] email-edit" data-id="${p.id}">${escapeHtml(p.email_body || '')}</textarea>
             </div>
           </details>` : ''}
 
@@ -700,22 +723,54 @@ if (!session) {
             ${p.voicemail_script ? `<div class="mt-1 text-xs text-gray-500"><strong>Voicemail:</strong> ${escapeHtml(p.voicemail_script)}</div>` : ''}
           </details>` : ''}
 
-          ${status === 'processed' ? `
-          <div class="flex gap-2 mt-3">
-            <button class="action-btn approve-btn bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✓ Approve</button>
-            <button class="action-btn reject-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
-            ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Approve & Send</button>` : ''}
-          </div>` : ''}
-
-          ${status === 'approved' ? `
-          <div class="flex gap-2 mt-3">
-            ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Send Email</button>` : ''}
-            <button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>
-          </div>` : ''}
+          <!-- Actions per status -->
+          <div class="flex gap-2 mt-3 flex-wrap">
+            ${status === 'pending' ? `
+              <button class="action-btn generate-btn bg-brand-600 hover:bg-brand-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">⚡ Generate Outreach</button>
+              <button class="action-btn reject-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Skip</button>
+            ` : ''}
+            ${status === 'processed' ? `
+              <button class="action-btn approve-btn bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✓ Approve</button>
+              <button class="action-btn reject-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
+              ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Approve & Send</button>` : ''}
+            ` : ''}
+            ${status === 'approved' ? `
+              ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Send Email</button>` : ''}
+              <button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>
+            ` : ''}
+          </div>
         </div>`;
     }).join('');
 
     // Wire action buttons
+    reviewList.querySelectorAll('.generate-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = getAttr(btn, 'data-id');
+        (btn as HTMLButtonElement).disabled = true;
+        (btn as HTMLButtonElement).textContent = '⏳ Generating...';
+        try {
+          const res = await fetch('/api/recruitment-process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prospectIds: [id] }),
+          });
+          const data = await res.json();
+          if (data.processed > 0) {
+            showToast('Outreach generated');
+            loadReviewList();
+          } else {
+            showToast('Generation failed — try again', 'error');
+            (btn as HTMLButtonElement).disabled = false;
+            (btn as HTMLButtonElement).textContent = '⚡ Generate Outreach';
+          }
+          refreshStats();
+        } catch {
+          showToast('Generation failed', 'error');
+          (btn as HTMLButtonElement).disabled = false;
+          (btn as HTMLButtonElement).textContent = '⚡ Generate Outreach';
+        }
+      });
+    });
     reviewList.querySelectorAll('.approve-btn').forEach(btn => {
       btn.addEventListener('click', () => doAction(getAttr(btn, 'data-id'), 'approve'));
     });

@@ -210,7 +210,7 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
       stream: false,
       think: false,
       format: 'json',
-      options: { temperature: 0.7, top_p: 0.9, num_predict: 4096 },
+      options: { temperature: 0.7, top_p: 0.9, num_predict: 8192 },
     }),
   });
 
