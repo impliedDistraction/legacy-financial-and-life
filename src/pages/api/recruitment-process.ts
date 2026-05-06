@@ -237,7 +237,7 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
     'ngrok-skip-browser-warning': '1',
   };
   if (OLLAMA_SECRET) ollamaHeaders['Authorization'] = `Bearer ${OLLAMA_SECRET}`;
-  ollamaHeaders['X-OpenClaw-Client'] = 'legacy';
+  ollamaHeaders['X-OpenClaw-Client'] = 'recruitment';
 
   const ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: 'POST',
@@ -256,11 +256,18 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
   });
 
   if (!ollamaRes.ok) {
-    throw new Error(`Ollama returned ${ollamaRes.status}`);
+    const errText = await ollamaRes.text().catch(() => '');
+    throw new Error(`Ollama returned ${ollamaRes.status}: ${errText.slice(0, 200)}`);
   }
 
   const ollamaData = await ollamaRes.json();
   const rawContent = ollamaData?.message?.content || ollamaData?.response || '';
+
+  if (!rawContent || rawContent.trim().length < 10) {
+    console.error('AI returned empty/minimal response:', JSON.stringify(ollamaData).slice(0, 500));
+    throw new Error('AI returned empty response — model may need reload');
+  }
+
   const cleaned = stripThinking(rawContent);
   const jsonStr = extractJson(cleaned);
 
@@ -292,6 +299,8 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
       try {
         parsed = JSON.parse(repairTruncatedJson(jsonStr));
       } catch {
+        console.error('AI parse failure — raw content (first 500 chars):', rawContent.slice(0, 500));
+        console.error('AI parse failure — extracted json (first 500 chars):', jsonStr.slice(0, 500));
         throw new Error('Failed to parse AI response as JSON');
       }
     }
