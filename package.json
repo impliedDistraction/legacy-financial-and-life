@@ -25,7 +25,6 @@
     "vercel": "^51.4.0"
   },
   "devDependencies": {
-    "@astrojs/tailwind": "^6.0.2",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.45",
     "puppeteer": "^22.15.0",

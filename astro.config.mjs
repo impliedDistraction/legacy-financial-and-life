@@ -1,16 +1,14 @@
 import { defineConfig } from 'astro/config';
-import tailwind from '@astrojs/tailwind';
-import vercel from '@astrojs/vercel/serverless';
+import vercel from '@astrojs/vercel';
 
 export default defineConfig({
   site: 'https://legacyfinancial.app',
-  output: 'hybrid',
+  output: 'static',
   adapter: vercel({
     webAnalytics: {
       enabled: true,
     },
     maxDuration: 60,
   }),
-  integrations: [tailwind({ applyBaseStyles: false })],
   prefetch: true
 });
