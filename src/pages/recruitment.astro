@@ -74,6 +74,13 @@ if (!session) {
     </div>
   </section>
 
+  <!-- AI Status Badge -->
+  <div class="max-w-7xl mx-auto px-4">
+    <div id="ai-busy-badge" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-full text-xs font-medium text-amber-700 animate-pulse">
+      🤖 AI working...
+    </div>
+  </div>
+
   <!-- Tab Navigation -->
   <div class="max-w-7xl mx-auto px-4 pt-4">
     <div class="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit" id="tab-nav">
@@ -368,6 +375,18 @@ if (!session) {
   let columnMap: Record<string, string> = {};
   let currentOffset = 0;
   const PAGE_SIZE = 20;
+  let activeGenerations = 0;
+
+  function updateGenerationStatus() {
+    const badge = document.getElementById('ai-busy-badge');
+    if (!badge) return;
+    if (activeGenerations > 0) {
+      badge.textContent = `🤖 AI working (${activeGenerations} in queue)`;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
 
   // ═══════════════════════════════════════════
   // TAB SWITCHING
@@ -632,6 +651,8 @@ if (!session) {
   processBatchBtn.addEventListener('click', async () => {
     processBatchBtn.disabled = true;
     processBatchBtn.textContent = '⚡ Generating...';
+    activeGenerations++;
+    updateGenerationStatus();
     try {
       const res = await fetch('/api/recruitment-process', {
         method: 'POST',
@@ -653,6 +674,8 @@ if (!session) {
     } catch {
       showToast('Processing failed — check connection', 'error');
     } finally {
+      activeGenerations--;
+      updateGenerationStatus();
       processBatchBtn.disabled = false;
       processBatchBtn.textContent = '⚡ Generate Next';
     }
@@ -720,11 +743,11 @@ if (!session) {
             </div>
           </details>` : ''}
 
-          ${p.call_script ? `
+          ${p.call_opener ? `
           <details class="mt-2">
             <summary class="text-xs font-medium text-brand-600 cursor-pointer">View Call Script</summary>
-            <div class="mt-2 bg-gray-50 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap">${escapeHtml(p.call_script)}</div>
-            ${p.voicemail_script ? `<div class="mt-1 text-xs text-gray-500"><strong>Voicemail:</strong> ${escapeHtml(p.voicemail_script)}</div>` : ''}
+            <div class="mt-2 bg-gray-50 rounded-lg p-3 text-xs text-gray-700 whitespace-pre-wrap">${escapeHtml(p.call_opener)}</div>
+            ${p.call_voicemail ? `<div class="mt-1 text-xs text-gray-500"><strong>Voicemail:</strong> ${escapeHtml(p.call_voicemail)}</div>` : ''}
           </details>` : ''}
 
           <!-- Actions per status -->
@@ -746,7 +769,7 @@ if (!session) {
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
             ` : ''}
             ${status === 'rejected' ? `
-              <span class="text-xs text-gray-400 italic">${p.rejection_reason ? 'Reason: ' + escapeHtml(p.rejection_reason) : 'No reason given'}</span>
+              <span class="text-xs text-gray-400 italic">${(p.properties?.rejection_reason) ? 'Reason: ' + escapeHtml(p.properties.rejection_reason) : 'No reason given'}</span>
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg ml-auto" data-id="${p.id}" title="Permanently delete">🗑️ Delete forever</button>
             ` : ''}
           </div>
@@ -765,6 +788,8 @@ if (!session) {
         const id = getAttr(btn, 'data-id');
         (btn as HTMLButtonElement).disabled = true;
         (btn as HTMLButtonElement).textContent = '⏳ Generating...';
+        activeGenerations++;
+        updateGenerationStatus();
         try {
           const res = await fetch('/api/recruitment-process', {
             method: 'POST',
@@ -785,6 +810,9 @@ if (!session) {
           showToast('Generation failed', 'error');
           (btn as HTMLButtonElement).disabled = false;
           (btn as HTMLButtonElement).textContent = '⚡ Generate Outreach';
+        } finally {
+          activeGenerations--;
+          updateGenerationStatus();
         }
       });
     });
@@ -894,7 +922,7 @@ if (!session) {
             </div>
             <div class="text-right">
               <span class="text-xs ${p.status === 'converted' ? 'text-green-600 font-bold' : 'text-gray-500'}">${p.status}</span>
-              ${p.email_sent_at ? `<p class="text-xs text-gray-400">Sent ${new Date(p.email_sent_at).toLocaleDateString()}</p>` : ''}
+              ${p.sent_at ? `<p class="text-xs text-gray-400">Sent ${new Date(p.sent_at).toLocaleDateString()}</p>` : ''}
               ${p.call_outcome ? `<p class="text-xs text-amber-600">Call: ${p.call_outcome}</p>` : ''}
             </div>
           </div>
@@ -949,12 +977,13 @@ if (!session) {
 
   function showToast(message: string, type: 'success' | 'error' = 'success') {
     const toast = document.createElement('div');
-    toast.className = `fixed bottom-4 right-4 px-4 py-2 rounded-lg text-sm font-medium z-50 shadow-lg transition-opacity ${
+    toast.className = `fixed bottom-4 right-4 max-w-md px-4 py-2 rounded-lg text-sm font-medium z-50 shadow-lg transition-opacity ${
       type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
     }`;
     toast.textContent = message;
     document.body.appendChild(toast);
-    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+    const duration = type === 'error' ? 8000 : 3000;
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, duration);
   }
 
   // ═══════════════════════════════════════════
@@ -1020,6 +1049,8 @@ if (!session) {
 
     testGenerateBtn.disabled = true;
     testGenerateBtn.textContent = '⚙️ Generating...';
+    activeGenerations++;
+    updateGenerationStatus();
     testOutput.innerHTML = `
       <div class="text-center py-8">
         <div class="animate-pulse text-brand-600 mb-2">
@@ -1053,6 +1084,8 @@ if (!session) {
     } catch {
       testOutput.innerHTML = `<div class="text-center py-8 text-red-500"><p class="text-sm">Generation failed. Is the AI model running?</p></div>`;
     } finally {
+      activeGenerations--;
+      updateGenerationStatus();
       testGenerateBtn.disabled = false;
       testGenerateBtn.textContent = '🧪 Generate Preview';
     }

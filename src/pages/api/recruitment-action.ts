@@ -56,19 +56,18 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    let update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    let update: Record<string, unknown> = {};
 
     switch (action) {
       case 'approve':
         update.status = 'approved';
         update.approved_at = new Date().toISOString();
-        update.approved_by = session.email;
-        if (editedEmailBody) update.edited_email_body = String(editedEmailBody).slice(0, 5000);
         break;
 
       case 'reject':
         update.status = 'rejected';
-        if (reason) update.rejection_reason = String(reason).slice(0, 500);
+        // Store rejection reason in properties JSONB (column may not exist yet)
+        update.properties = { ...(prospect.properties || {}), rejection_reason: reason || null };
         break;
 
       case 'delete': {
@@ -114,7 +113,7 @@ export const POST: APIRoute = async ({ request }) => {
           });
         }
 
-        const emailBody = prospect.edited_email_body || editedEmailBody || prospect.email_body;
+        const emailBody = editedEmailBody || prospect.email_body;
         const emailSubject = prospect.email_subject;
         if (!emailBody || !emailSubject) {
           return new Response(JSON.stringify({ error: 'No email content generated yet' }), {
@@ -149,12 +148,15 @@ export const POST: APIRoute = async ({ request }) => {
         }
 
         update.status = 'sent';
-        update.email_sent_at = new Date().toISOString();
+        update.sent_at = new Date().toISOString();
         break;
 
       case 'mark_called':
-        update.call_made_at = new Date().toISOString();
-        update.call_outcome = String(callOutcome || 'no_answer').slice(0, 50);
+        update.properties = {
+          ...(prospect.properties || {}),
+          call_made_at: new Date().toISOString(),
+          call_outcome: String(callOutcome || 'no_answer').slice(0, 50),
+        };
         if (callOutcome === 'scheduled' || callOutcome === 'spoke') {
           update.status = 'converted';
         }

@@ -340,12 +340,11 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
         fit_reason: String(parsed.fitReason || '').slice(0, 500),
         email_subject: String(email?.subject || '').slice(0, 200),
         email_body: String(email?.body || '').slice(0, 5000),
-        call_script: String(callScript?.opener || '').slice(0, 2000),
-        voicemail_script: String(callScript?.voicemail || '').slice(0, 1000),
+        call_opener: String(callScript?.opener || '').slice(0, 2000),
+        call_voicemail: String(callScript?.voicemail || '').slice(0, 1000),
         personal_notes: String(parsed.personalNotes || '').slice(0, 1000),
         processed_at: new Date().toISOString(),
         status: 'processed',
-        updated_at: new Date().toISOString(),
       }),
     }
   );
