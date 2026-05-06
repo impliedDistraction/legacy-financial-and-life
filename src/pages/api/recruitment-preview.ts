@@ -167,7 +167,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const ollamaData = await ollamaRes.json();
-    const rawContent = ollamaData?.message?.content || '';
+    const rawContent = ollamaData?.message?.content || ollamaData?.response || '';
     const cleaned = stripThinking(rawContent);
     const jsonStr = extractJson(cleaned);
 
@@ -181,14 +181,29 @@ export const POST: APIRoute = async ({ request }) => {
         return '';
       });
       parsed = JSON.parse(repaired);
-    } catch {
-      return new Response(JSON.stringify({
-        error: 'AI returned malformed response. Try again.',
-        raw: cleaned.slice(0, 500),
-      }), {
-        status: 422,
-        headers: { 'Content-Type': 'application/json' },
-      });
+    } catch (firstErr) {
+      // Second pass: try fixing trailing commas and other common issues
+      try {
+        let retry = jsonStr
+          .replace(/[\x00-\x1f]/g, (ch) => {
+            if (ch === '\n') return '\\n';
+            if (ch === '\r') return '\\r';
+            if (ch === '\t') return '\\t';
+            return '';
+          })
+          .replace(/,\s*([}\]])/g, '$1')       // trailing commas
+          .replace(/'/g, '"')                   // single quotes → double
+          .replace(/(\w+)\s*:/g, '"$1":');      // unquoted keys
+        parsed = JSON.parse(retry);
+      } catch {
+        return new Response(JSON.stringify({
+          error: 'AI returned malformed response. Try again.',
+          raw: rawContent.slice(0, 800),
+        }), {
+          status: 422,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     // Return the generated content - never store test domain prospects

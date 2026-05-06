@@ -933,7 +933,8 @@ if (!session) {
       const data = await res.json();
 
       if (data.error) {
-        testOutput.innerHTML = `<div class="text-center py-8 text-red-500"><p class="text-sm">${escapeHtml(data.error)}</p></div>`;
+        const rawHint = data.raw ? `<details class="mt-2 text-left"><summary class="cursor-pointer text-xs text-gray-400">Show raw AI output</summary><pre class="mt-1 text-xs bg-gray-100 p-2 rounded overflow-x-auto max-h-40 whitespace-pre-wrap">${escapeHtml(data.raw)}</pre></details>` : '';
+        testOutput.innerHTML = `<div class="text-center py-8 text-red-500"><p class="text-sm">${escapeHtml(data.error)}</p>${rawHint}</div>`;
         return;
       }
 

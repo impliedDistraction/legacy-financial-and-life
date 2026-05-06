@@ -217,7 +217,7 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
   }
 
   const ollamaData = await ollamaRes.json();
-  const rawContent = ollamaData?.message?.content || '';
+  const rawContent = ollamaData?.message?.content || ollamaData?.response || '';
   const cleaned = stripThinking(rawContent);
   const jsonStr = extractJson(cleaned);
 
@@ -231,7 +231,22 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
     });
     parsed = JSON.parse(repaired);
   } catch {
-    throw new Error('Failed to parse AI response as JSON');
+    // Second pass: try fixing trailing commas and other common issues
+    try {
+      let retry = jsonStr
+        .replace(/[\x00-\x1f]/g, (ch) => {
+          if (ch === '\n') return '\\n';
+          if (ch === '\r') return '\\r';
+          if (ch === '\t') return '\\t';
+          return '';
+        })
+        .replace(/,\s*([}\]])/g, '$1')       // trailing commas
+        .replace(/'/g, '"')                   // single quotes → double
+        .replace(/(\w+)\s*:/g, '"$1":');      // unquoted keys
+      parsed = JSON.parse(retry);
+    } catch {
+      throw new Error('Failed to parse AI response as JSON');
+    }
   }
 
   const email = parsed.email as Record<string, string> | undefined;
