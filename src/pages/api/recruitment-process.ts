@@ -294,7 +294,7 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
       stream: false,
       think: false,
       format: 'json',
-      options: { temperature: 0.7, top_p: 0.9, num_predict: 8192, num_ctx: 16384 },
+      options: { temperature: 0.7, top_p: 0.9, num_predict: 2048, num_ctx: 4096 },
     }),
   }).catch((err: Error) => {
     throw new Error(`Network error reaching AI: ${err.message}`);
