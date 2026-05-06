@@ -5,7 +5,8 @@ export const prerender = false;
 
 const OLLAMA_URL = import.meta.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_SECRET = import.meta.env.OLLAMA_SECRET || '';
-const MODEL = import.meta.env.AI_MODEL || 'legacy-messenger';
+// Use base model directly — legacy-messenger Modelfile has a chat system prompt that conflicts
+const MODEL = import.meta.env.AI_RECRUITMENT_MODEL || 'qwen3:30b';
 
 const BASE_SYSTEM_PROMPT = `You are a recruitment outreach specialist for Legacy Financial & Life, an insurance agency run by Tim & Beth Byrd.
 
