@@ -8,7 +8,7 @@ export default defineConfig({
     webAnalytics: {
       enabled: true,
     },
-    maxDuration: 60,
+    maxDuration: 120,
   }),
   prefetch: true
 });

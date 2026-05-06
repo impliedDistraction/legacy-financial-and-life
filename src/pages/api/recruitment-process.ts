@@ -282,23 +282,34 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
   if (OLLAMA_SECRET) ollamaHeaders['Authorization'] = `Bearer ${OLLAMA_SECRET}`;
   ollamaHeaders['X-OpenClaw-Client'] = 'recruitment';
 
-  const ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
-    method: 'POST',
-    headers: ollamaHeaders,
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}` },
-      ],
-      stream: false,
-      think: false,
-      format: 'json',
-      options: { temperature: 0.7, top_p: 0.9, num_predict: 2048, num_ctx: 4096 },
-    }),
-  }).catch((err: Error) => {
-    throw new Error(`Network error reaching AI: ${err.message}`);
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 110_000);
+
+  let ollamaRes: Response;
+  try {
+    ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: 'POST',
+      headers: ollamaHeaders,
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}` },
+        ],
+        stream: false,
+        think: false,
+        format: 'json',
+        options: { temperature: 0.7, top_p: 0.9, num_predict: 2048, num_ctx: 4096 },
+      }),
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const isAbort = msg.includes('abort') || (err instanceof Error && err.name === 'AbortError');
+    throw new Error(isAbort ? 'AI generation timed out (model too slow)' : `Network error reaching AI: ${msg}`);
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!ollamaRes.ok) {
     const errText = await ollamaRes.text().catch(() => '');

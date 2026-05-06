@@ -415,7 +415,8 @@ if (!session) {
            lower.includes('model requires more') ||
            lower.includes('ollama returned 5') ||
            lower.includes('fetch failed') ||
-           lower.includes('model not found');
+           lower.includes('model not found') ||
+           lower.includes('timed out');
   }
 
   function showAiErrorBanner(reason: string) {
@@ -425,7 +426,9 @@ if (!session) {
     lastAiError = reason;
     // Make the reason user-friendly
     let friendly = 'The AI model is not responding. Generation buttons will not work until the service is back online.';
-    if (reason.includes('system memory') || reason.includes('memory')) {
+    if (reason.includes('timed out') || reason.includes('too slow')) {
+      friendly = 'The AI model is responding but too slowly for the server time limit. Try again — the model may be faster once warmed up.';
+    } else if (reason.includes('system memory') || reason.includes('memory')) {
       friendly = 'The AI model requires more memory than is currently available on the server. Try restarting the AI server or freeing resources.';
     } else if (reason.includes('connection refused') || reason.includes('ECONNREFUSED') || reason.includes('fetch failed')) {
       friendly = 'Cannot connect to the AI server. Make sure OpenClaw/Ollama is running.';
@@ -679,6 +682,10 @@ if (!session) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ limit: 5 }),
         });
+        if (!res.ok && res.status === 504) {
+          processStatusText.textContent = 'Generation timed out — model too slow. Retrying...';
+          continue;
+        }
         const data = await res.json();
         processed += data.processed || 0;
         if ((data.processed || 0) === 0) break; // No more pending
@@ -716,6 +723,13 @@ if (!session) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ limit: 1 }),
       });
+      if (!res.ok && res.status === 504) {
+        showAiErrorBanner('Generation timed out — the model is too slow for the server time limit');
+        showToast('Generation timed out — try again (model may be warmed up now)', 'error');
+        loadReviewList();
+        refreshStats();
+        return;
+      }
       const data = await res.json();
       if (data.error) {
         if (isAiUnavailableError(data.error)) {
@@ -862,6 +876,12 @@ if (!session) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prospectIds: [id] }),
           });
+          if (!res.ok && res.status === 504) {
+            showToast('Generation timed out — try again (model needs warmup)', 'error');
+            (btn as HTMLButtonElement).disabled = false;
+            (btn as HTMLButtonElement).textContent = '⚡ Generate Outreach';
+            return;
+          }
           const data = await res.json();
           if (data.processed > 0) {
             hideAiErrorBanner();
@@ -1141,6 +1161,13 @@ if (!session) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prospect, feedback }),
       });
+
+      if (!res.ok && res.status === 504) {
+        showAiErrorBanner('Generation timed out — the model is too slow for the server time limit');
+        testOutput.innerHTML = `<div class="text-center py-8 text-amber-600"><p class="text-sm">⏱️ Generation timed out (the model took too long).</p><p class="text-xs text-gray-400 mt-1">The AI is working but too slowly for the server time limit. Try again — it may succeed on retry when the model is warmed up.</p></div>`;
+        return;
+      }
+
       const data = await res.json();
 
       if (data.error) {

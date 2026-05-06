@@ -233,21 +233,30 @@ export const POST: APIRoute = async ({ request }) => {
     };
     if (OLLAMA_SECRET) ollamaHeaders['Authorization'] = `Bearer ${OLLAMA_SECRET}`;
 
-    const ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
-      method: 'POST',
-      headers: ollamaHeaders,
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}` },
-        ],
-        stream: false,
-        think: false,
-        format: 'json',
-        options: { temperature: 0.7, top_p: 0.9, num_predict: 2048, num_ctx: 4096 },
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 110_000); // 110s — just under maxDuration
+
+    let ollamaRes: Response;
+    try {
+      ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
+        method: 'POST',
+        headers: ollamaHeaders,
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}` },
+          ],
+          stream: false,
+          think: false,
+          format: 'json',
+          options: { temperature: 0.7, top_p: 0.9, num_predict: 2048, num_ctx: 4096 },
+        }),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!ollamaRes.ok) {
       const status = ollamaRes.status;
@@ -288,9 +297,15 @@ export const POST: APIRoute = async ({ request }) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Recruitment preview error:', msg);
+    const isAbort = msg.includes('abort') || (err instanceof Error && err.name === 'AbortError');
     const isNetwork = msg.includes('ECONNREFUSED') || msg.includes('fetch failed') || msg.includes('network');
-    return new Response(JSON.stringify({ error: isNetwork ? `Network error reaching AI: ${msg}` : 'Request failed' }), {
-      status: 500,
+    const errorMsg = isAbort
+      ? 'AI generation timed out (model too slow). The model is running but needs more time than allowed.'
+      : isNetwork
+        ? `Network error reaching AI: ${msg}`
+        : 'Request failed';
+    return new Response(JSON.stringify({ error: errorMsg }), {
+      status: isAbort ? 504 : 500,
       headers: { 'Content-Type': 'application/json' },
     });
   }
