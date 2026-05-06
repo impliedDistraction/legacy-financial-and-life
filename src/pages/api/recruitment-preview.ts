@@ -122,10 +122,10 @@ export const POST: APIRoute = async ({ request }) => {
         model: MODEL,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}` },
+          { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}\n/no_think` },
         ],
         stream: false,
-        options: { temperature: 0.7, top_p: 0.9, num_predict: 2048 },
+        options: { temperature: 0.7, top_p: 0.9, num_predict: 4096 },
       }),
     });
 
@@ -144,7 +144,14 @@ export const POST: APIRoute = async ({ request }) => {
 
     let parsed: Record<string, unknown>;
     try {
-      parsed = JSON.parse(jsonStr);
+      // Repair common JSON issues: unescaped newlines/tabs inside string values
+      const repaired = jsonStr.replace(/[\x00-\x1f]/g, (ch) => {
+        if (ch === '\n') return '\\n';
+        if (ch === '\r') return '\\r';
+        if (ch === '\t') return '\\t';
+        return '';
+      });
+      parsed = JSON.parse(repaired);
     } catch {
       return new Response(JSON.stringify({
         error: 'AI returned malformed response. Try again.',
