@@ -31,8 +31,9 @@ CREATE TABLE IF NOT EXISTS recruitment_prospects (
   fit_score INTEGER,
   fit_reason TEXT,
   
-  -- Workflow status: pending → processed → approved → sent → converted
+  -- Workflow status: pending → processed → approved → sent → converted | rejected
   status TEXT NOT NULL DEFAULT 'pending',
+  rejection_reason TEXT,
   processed_at TIMESTAMPTZ,
   approved_at TIMESTAMPTZ,
   approved_by TEXT,

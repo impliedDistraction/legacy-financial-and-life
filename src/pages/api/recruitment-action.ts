@@ -10,8 +10,8 @@ const TABLE = 'recruitment_prospects';
 
 /**
  * POST /api/recruitment-action
- * Execute an action on a prospect: approve, reject, send email, mark called.
- * Body: { id, action, editedEmailBody?, callOutcome? }
+ * Execute an action on a prospect: approve, reject, send email, mark called, delete.
+ * Body: { id, action, editedEmailBody?, callOutcome?, reason? }
  */
 export const POST: APIRoute = async ({ request }) => {
   const session = await verifySessionCookie(request.headers.get('cookie'));
@@ -31,7 +31,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   try {
     const body = await request.json();
-    const { id, action, editedEmailBody, callOutcome } = body;
+    const { id, action, editedEmailBody, callOutcome, reason } = body;
 
     if (!id || !action) {
       return new Response(JSON.stringify({ error: 'id and action required' }), {
@@ -68,7 +68,30 @@ export const POST: APIRoute = async ({ request }) => {
 
       case 'reject':
         update.status = 'rejected';
+        if (reason) update.rejection_reason = String(reason).slice(0, 500);
         break;
+
+      case 'delete': {
+        // Permanently remove the record
+        const deleteRes = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: {
+            apikey: SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!deleteRes.ok) {
+          return new Response(JSON.stringify({ error: 'Delete failed' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response(JSON.stringify({ success: true, action: 'delete', id }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
 
       case 'send_email':
         if (!prospect.email) {

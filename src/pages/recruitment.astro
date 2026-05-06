@@ -727,17 +727,30 @@ if (!session) {
           <div class="flex gap-2 mt-3 flex-wrap">
             ${status === 'pending' ? `
               <button class="action-btn generate-btn bg-brand-600 hover:bg-brand-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">⚡ Generate Outreach</button>
-              <button class="action-btn reject-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Skip</button>
+              <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
+              <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
             ` : ''}
             ${status === 'processed' ? `
               <button class="action-btn approve-btn bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✓ Approve</button>
-              <button class="action-btn reject-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
+              <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
               ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Approve & Send</button>` : ''}
+              <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
             ` : ''}
             ${status === 'approved' ? `
               ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Send Email</button>` : ''}
               <button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>
+              <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
             ` : ''}
+            ${status === 'rejected' ? `
+              <span class="text-xs text-gray-400 italic">${p.rejection_reason ? 'Reason: ' + escapeHtml(p.rejection_reason) : 'No reason given'}</span>
+              <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg ml-auto" data-id="${p.id}" title="Permanently delete">🗑️ Delete forever</button>
+            ` : ''}
+          </div>
+          <!-- Reject reason inline (hidden by default) -->
+          <div class="reject-reason-row hidden mt-2 flex items-center gap-2" data-id="${p.id}">
+            <input type="text" class="reject-reason-input flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1.5" placeholder="Reason (optional): wrong state, not a fit, etc." data-id="${p.id}" />
+            <button class="reject-confirm-btn bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">Confirm Reject</button>
+            <button class="reject-cancel-btn text-xs text-gray-400 hover:text-gray-600" data-id="${p.id}">Cancel</button>
           </div>
         </div>`;
     }).join('');
@@ -774,8 +787,44 @@ if (!session) {
     reviewList.querySelectorAll('.approve-btn').forEach(btn => {
       btn.addEventListener('click', () => doAction(getAttr(btn, 'data-id'), 'approve'));
     });
-    reviewList.querySelectorAll('.reject-btn').forEach(btn => {
-      btn.addEventListener('click', () => doAction(getAttr(btn, 'data-id'), 'reject'));
+    reviewList.querySelectorAll('.reject-open-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = getAttr(btn, 'data-id');
+        const row = reviewList.querySelector(`.reject-reason-row[data-id="${id}"]`);
+        row?.classList.remove('hidden');
+        (btn as HTMLButtonElement).classList.add('hidden');
+      });
+    });
+    reviewList.querySelectorAll('.reject-confirm-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = getAttr(btn, 'data-id');
+        const input = reviewList.querySelector(`.reject-reason-input[data-id="${id}"]`) as HTMLInputElement;
+        const reason = input?.value.trim() || '';
+        await doAction(id, 'reject', undefined, reason);
+        showToast('Prospect rejected');
+        loadReviewList();
+        refreshStats();
+      });
+    });
+    reviewList.querySelectorAll('.reject-cancel-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = getAttr(btn, 'data-id');
+        const row = reviewList.querySelector(`.reject-reason-row[data-id="${id}"]`);
+        row?.classList.add('hidden');
+        // Re-show the reject button
+        const openBtn = reviewList.querySelector(`.reject-open-btn[data-id="${id}"]`);
+        openBtn?.classList.remove('hidden');
+      });
+    });
+    reviewList.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = getAttr(btn, 'data-id');
+        if (!confirm('Permanently delete this prospect? This cannot be undone.')) return;
+        await doAction(id, 'delete');
+        showToast('Prospect permanently deleted');
+        loadReviewList();
+        refreshStats();
+      });
     });
     reviewList.querySelectorAll('.send-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -800,12 +849,12 @@ if (!session) {
     refreshStats();
   });
 
-  async function doAction(id: string, action: string, editedEmailBody?: string) {
+  async function doAction(id: string, action: string, editedEmailBody?: string, reason?: string) {
     try {
       await fetch('/api/recruitment-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action, editedEmailBody }),
+        body: JSON.stringify({ id, action, editedEmailBody, reason }),
       });
       // Remove the card from view
       const card = reviewList.querySelector(`[data-id="${id}"]`);
