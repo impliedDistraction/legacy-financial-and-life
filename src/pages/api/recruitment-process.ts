@@ -240,7 +240,7 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const results: { id: string; success: boolean; fitScore?: number }[] = [];
+    const results: { id: string; success: boolean; fitScore?: number; error?: string }[] = [];
 
     // Process each prospect sequentially (GPU constraint)
     for (const prospect of prospects) {
@@ -248,14 +248,16 @@ export const POST: APIRoute = async ({ request }) => {
         const result = await processProspect(prospect);
         results.push({ id: prospect.id, success: true, fitScore: result.fitScore });
       } catch (err) {
-        console.error(`Failed to process prospect ${prospect.id}:`, err);
-        results.push({ id: prospect.id, success: false });
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`Failed to process prospect ${prospect.id}:`, msg);
+        results.push({ id: prospect.id, success: false, error: msg.slice(0, 200) });
       }
     }
 
     return new Response(JSON.stringify({
       processed: results.filter(r => r.success).length,
       failed: results.filter(r => !r.success).length,
+      failReason: results.find(r => !r.success)?.error || null,
       results,
     }), {
       status: 200,
@@ -294,10 +296,13 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
       format: 'json',
       options: { temperature: 0.7, top_p: 0.9, num_predict: 8192, num_ctx: 16384 },
     }),
+  }).catch((err: Error) => {
+    throw new Error(`Network error reaching AI: ${err.message}`);
   });
 
   if (!ollamaRes.ok) {
     const errText = await ollamaRes.text().catch(() => '');
+    console.error(`Ollama ${ollamaRes.status} for prospect ${prospect.id}:`, errText.slice(0, 300));
     throw new Error(`Ollama returned ${ollamaRes.status}: ${errText.slice(0, 200)}`);
   }
 

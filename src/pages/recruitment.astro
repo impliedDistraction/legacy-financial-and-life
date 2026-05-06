@@ -639,15 +639,19 @@ if (!session) {
         body: JSON.stringify({ limit: 1 }),
       });
       const data = await res.json();
-      if (data.processed > 0) {
+      if (data.error) {
+        showToast(`Error: ${data.error}`, 'error');
+      } else if (data.processed > 0) {
         showToast(`Generated outreach for ${data.processed} prospect`);
+      } else if (data.failed > 0) {
+        showToast(`AI failed: ${data.failReason || 'unknown error'}. Try again.`, 'error');
       } else {
         showToast('No pending prospects to process');
       }
       loadReviewList();
       refreshStats();
     } catch {
-      showToast('Processing failed', 'error');
+      showToast('Processing failed — check connection', 'error');
     } finally {
       processBatchBtn.disabled = false;
       processBatchBtn.textContent = '⚡ Generate Next';
@@ -772,7 +776,7 @@ if (!session) {
             showToast('Outreach generated');
             loadReviewList();
           } else {
-            showToast('Generation failed — try again', 'error');
+            showToast(data.failReason || 'Generation failed — try again', 'error');
             (btn as HTMLButtonElement).disabled = false;
             (btn as HTMLButtonElement).textContent = '⚡ Generate Outreach';
           }
