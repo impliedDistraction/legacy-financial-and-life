@@ -99,6 +99,57 @@ function extractJson(text: string): string {
 }
 
 /**
+ * Attempt to repair truncated JSON by closing unclosed strings, arrays, and objects.
+ * This handles the common case where AI output is cut off mid-generation.
+ */
+function repairTruncatedJson(text: string): string {
+  // Escape raw control chars in string values first
+  let json = text.replace(/[\x00-\x1f]/g, (ch) => {
+    if (ch === '\n') return '\\n';
+    if (ch === '\r') return '\\r';
+    if (ch === '\t') return '\\t';
+    return '';
+  });
+
+  // Walk through to figure out what's unclosed
+  const stack: string[] = [];
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < json.length; i++) {
+    const ch = json[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') {
+      if (inString) { inString = false; }
+      else { inString = true; }
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') stack.push('}');
+    else if (ch === '[') stack.push(']');
+    else if (ch === '}' || ch === ']') stack.pop();
+  }
+
+  // If we're still inside a string, close it
+  if (inString) {
+    // Remove trailing backslash if present (broken escape)
+    if (json.endsWith('\\')) json = json.slice(0, -1);
+    json += '"';
+  }
+
+  // Remove trailing comma after closing the string
+  json = json.replace(/,\s*$/, '');
+
+  // Close any remaining open brackets/braces
+  while (stack.length > 0) {
+    json += stack.pop();
+  }
+
+  return json;
+}
+
+/**
  * POST /api/recruitment-preview
  * Dry-run: processes a prospect through AI without storing anything.
  * Used for the test/preview tab so Tim can see what would go out.
@@ -198,13 +249,18 @@ export const POST: APIRoute = async ({ request }) => {
           .replace(/(\w+)\s*:/g, '"$1":');      // unquoted keys
         parsed = JSON.parse(retry);
       } catch {
-        return new Response(JSON.stringify({
-          error: 'AI returned malformed response. Try again.',
-          raw: rawContent.slice(0, 800),
-        }), {
-          status: 422,
-          headers: { 'Content-Type': 'application/json' },
-        });
+        // Third pass: attempt truncation repair (model output cut off mid-string)
+        try {
+          parsed = JSON.parse(repairTruncatedJson(jsonStr));
+        } catch {
+          return new Response(JSON.stringify({
+            error: 'AI returned malformed response. Try again.',
+            raw: rawContent.slice(0, 800),
+          }), {
+            status: 422,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
       }
     }
 

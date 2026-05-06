@@ -55,19 +55,19 @@ if (!session) {
         <div class="text-2xl font-bold text-gray-900" id="stat-total">0</div>
         <div class="text-xs text-gray-500">Total</div>
       </div>
-      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center cursor-pointer hover:border-amber-300 transition-colors" data-stat-tab="review" data-stat-filter="pending">
         <div class="text-2xl font-bold text-amber-600" id="stat-pending">0</div>
         <div class="text-xs text-gray-500">Pending</div>
       </div>
-      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center cursor-pointer hover:border-blue-300 transition-colors" data-stat-tab="review" data-stat-filter="processed">
         <div class="text-2xl font-bold text-blue-600" id="stat-processed">0</div>
         <div class="text-xs text-gray-500">Ready</div>
       </div>
-      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center cursor-pointer hover:border-green-300 transition-colors" data-stat-tab="sent" data-stat-filter="sent">
         <div class="text-2xl font-bold text-green-600" id="stat-sent">0</div>
         <div class="text-xs text-gray-500">Sent</div>
       </div>
-      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center cursor-pointer hover:border-purple-300 transition-colors" data-stat-tab="sent" data-stat-filter="converted">
         <div class="text-2xl font-bold text-purple-600" id="stat-converted">0</div>
         <div class="text-xs text-gray-500">Converted</div>
       </div>
@@ -1114,6 +1114,43 @@ if (!session) {
 
   // Initial load
   refreshStats();
+
+  // Clickable stats → navigate to relevant tab + filter
+  document.querySelectorAll('[data-stat-tab]').forEach(el => {
+    el.addEventListener('click', () => {
+      const tab = (el as HTMLElement).dataset.statTab!;
+      const filter = (el as HTMLElement).dataset.statFilter!;
+      // Switch tab
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`tab-${tab}`)?.classList.remove('hidden');
+      // Set filter and load
+      if (tab === 'review') {
+        reviewFilter.value = filter;
+        currentOffset = 0;
+        loadReviewList();
+      } else if (tab === 'sent') {
+        sentFilter.value = filter;
+        loadSentList();
+      }
+    });
+  });
+
+  // Auto-switch to Review tab if there are pending/processed prospects
+  (async () => {
+    try {
+      const res = await fetch('/api/recruitment-upload?status=pending&limit=1');
+      const data = await res.json();
+      if ((data.total || 0) > 0) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector('[data-tab="review"]')?.classList.add('active');
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById('tab-review')?.classList.remove('hidden');
+        loadReviewList();
+      }
+    } catch { /* ignore — stays on upload tab */ }
+  })();
 </script>
 
 </Base>

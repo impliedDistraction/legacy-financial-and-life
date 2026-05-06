@@ -102,6 +102,47 @@ function extractJson(text: string): string {
 }
 
 /**
+ * Attempt to repair truncated JSON by closing unclosed strings, arrays, and objects.
+ */
+function repairTruncatedJson(text: string): string {
+  let json = text.replace(/[\x00-\x1f]/g, (ch) => {
+    if (ch === '\n') return '\\n';
+    if (ch === '\r') return '\\r';
+    if (ch === '\t') return '\\t';
+    return '';
+  });
+
+  const stack: string[] = [];
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < json.length; i++) {
+    const ch = json[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') {
+      if (inString) { inString = false; }
+      else { inString = true; }
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') stack.push('}');
+    else if (ch === '[') stack.push(']');
+    else if (ch === '}' || ch === ']') stack.pop();
+  }
+
+  if (inString) {
+    if (json.endsWith('\\')) json = json.slice(0, -1);
+    json += '"';
+  }
+  json = json.replace(/,\s*$/, '');
+  while (stack.length > 0) {
+    json += stack.pop();
+  }
+  return json;
+}
+
+/**
  * POST /api/recruitment-process
  * Process a batch of pending prospects through the AI.
  * Body: { prospectIds?: string[], limit?: number }
@@ -247,7 +288,12 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
         .replace(/(\w+)\s*:/g, '"$1":');      // unquoted keys
       parsed = JSON.parse(retry);
     } catch {
-      throw new Error('Failed to parse AI response as JSON');
+      // Third pass: attempt truncation repair
+      try {
+        parsed = JSON.parse(repairTruncatedJson(jsonStr));
+      } catch {
+        throw new Error('Failed to parse AI response as JSON');
+      }
     }
   }
 
