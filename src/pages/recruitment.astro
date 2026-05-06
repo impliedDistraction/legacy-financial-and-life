@@ -201,7 +201,7 @@ if (!session) {
             <option value="rejected">Rejected</option>
           </select>
           <button id="process-batch-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors">
-            ⚡ Generate Next 5
+            ⚡ Generate Next
           </button>
           <button id="approve-all-btn" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors hidden">
             ✓ Approve All Visible
@@ -636,11 +636,11 @@ if (!session) {
       const res = await fetch('/api/recruitment-process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 5 }),
+        body: JSON.stringify({ limit: 1 }),
       });
       const data = await res.json();
       if (data.processed > 0) {
-        showToast(`Generated outreach for ${data.processed} prospects`);
+        showToast(`Generated outreach for ${data.processed} prospect`);
       } else {
         showToast('No pending prospects to process');
       }
@@ -650,7 +650,7 @@ if (!session) {
       showToast('Processing failed', 'error');
     } finally {
       processBatchBtn.disabled = false;
-      processBatchBtn.textContent = '⚡ Generate Next 5';
+      processBatchBtn.textContent = '⚡ Generate Next';
     }
   });
 

@@ -150,6 +150,44 @@ function repairTruncatedJson(text: string): string {
 }
 
 /**
+ * Try multiple approaches to parse AI JSON output, handling truncation gracefully.
+ */
+function robustJsonParse(rawContent: string): Record<string, unknown> | null {
+  const cleaned = stripThinking(rawContent);
+
+  // Attempt 1: Direct parse (works for complete, compact JSON)
+  try {
+    return JSON.parse(cleaned);
+  } catch { /* continue */ }
+
+  // Attempt 2: Extract JSON region and parse
+  const extracted = extractJson(cleaned);
+  try {
+    return JSON.parse(extracted);
+  } catch { /* continue */ }
+
+  // Attempt 3: Repair the FULL cleaned content (handles truncation best)
+  try {
+    return JSON.parse(repairTruncatedJson(cleaned));
+  } catch { /* continue */ }
+
+  // Attempt 4: Repair the extracted portion
+  try {
+    return JSON.parse(repairTruncatedJson(extracted));
+  } catch { /* continue */ }
+
+  // Attempt 5: Aggressive cleanup then repair
+  try {
+    let aggressive = cleaned
+      .replace(/,\s*([}\]])/g, '$1')
+      .replace(/(\w+)\s*:/g, '"$1":');
+    return JSON.parse(repairTruncatedJson(aggressive));
+  } catch { /* continue */ }
+
+  return null;
+}
+
+/**
  * POST /api/recruitment-preview
  * Dry-run: processes a prospect through AI without storing anything.
  * Used for the test/preview tab so Tim can see what would go out.
@@ -221,47 +259,16 @@ export const POST: APIRoute = async ({ request }) => {
 
     const ollamaData = await ollamaRes.json();
     const rawContent = ollamaData?.message?.content || ollamaData?.response || '';
-    const cleaned = stripThinking(rawContent);
-    const jsonStr = extractJson(cleaned);
 
-    let parsed: Record<string, unknown>;
-    try {
-      // Repair common JSON issues: unescaped newlines/tabs inside string values
-      const repaired = jsonStr.replace(/[\x00-\x1f]/g, (ch) => {
-        if (ch === '\n') return '\\n';
-        if (ch === '\r') return '\\r';
-        if (ch === '\t') return '\\t';
-        return '';
+    const parsed = robustJsonParse(rawContent);
+    if (!parsed) {
+      return new Response(JSON.stringify({
+        error: 'AI returned malformed response. Try again.',
+        raw: rawContent.slice(0, 800),
+      }), {
+        status: 422,
+        headers: { 'Content-Type': 'application/json' },
       });
-      parsed = JSON.parse(repaired);
-    } catch (firstErr) {
-      // Second pass: try fixing trailing commas and other common issues
-      try {
-        let retry = jsonStr
-          .replace(/[\x00-\x1f]/g, (ch) => {
-            if (ch === '\n') return '\\n';
-            if (ch === '\r') return '\\r';
-            if (ch === '\t') return '\\t';
-            return '';
-          })
-          .replace(/,\s*([}\]])/g, '$1')       // trailing commas
-          .replace(/'/g, '"')                   // single quotes → double
-          .replace(/(\w+)\s*:/g, '"$1":');      // unquoted keys
-        parsed = JSON.parse(retry);
-      } catch {
-        // Third pass: attempt truncation repair (model output cut off mid-string)
-        try {
-          parsed = JSON.parse(repairTruncatedJson(jsonStr));
-        } catch {
-          return new Response(JSON.stringify({
-            error: 'AI returned malformed response. Try again.',
-            raw: rawContent.slice(0, 800),
-          }), {
-            status: 422,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-      }
     }
 
     // Return the generated content - never store test domain prospects

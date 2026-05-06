@@ -143,6 +143,47 @@ function repairTruncatedJson(text: string): string {
 }
 
 /**
+ * Try multiple approaches to parse AI JSON output, handling truncation gracefully.
+ * Returns parsed object or null if all attempts fail.
+ */
+function robustJsonParse(rawContent: string): Record<string, unknown> | null {
+  const cleaned = stripThinking(rawContent);
+
+  // Attempt 1: Direct parse (works for complete, compact JSON)
+  try {
+    return JSON.parse(cleaned);
+  } catch { /* continue */ }
+
+  // Attempt 2: Extract JSON region and parse
+  const extracted = extractJson(cleaned);
+  try {
+    return JSON.parse(extracted);
+  } catch { /* continue */ }
+
+  // Attempt 3: Repair the FULL cleaned content (not just extracted portion)
+  // This handles truncation better because extractJson's lastIndexOf('}') fallback
+  // may cut off later fields that repairTruncatedJson could recover
+  try {
+    return JSON.parse(repairTruncatedJson(cleaned));
+  } catch { /* continue */ }
+
+  // Attempt 4: Repair the extracted portion
+  try {
+    return JSON.parse(repairTruncatedJson(extracted));
+  } catch { /* continue */ }
+
+  // Attempt 5: Aggressive cleanup then repair
+  try {
+    let aggressive = cleaned
+      .replace(/,\s*([}\]])/g, '$1')    // trailing commas
+      .replace(/(\w+)\s*:/g, '"$1":');  // unquoted keys
+    return JSON.parse(repairTruncatedJson(aggressive));
+  } catch { /* continue */ }
+
+  return null;
+}
+
+/**
  * POST /api/recruitment-process
  * Process a batch of pending prospects through the AI.
  * Body: { prospectIds?: string[], limit?: number }
@@ -268,42 +309,10 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
     throw new Error('AI returned empty response — model may need reload');
   }
 
-  const cleaned = stripThinking(rawContent);
-  const jsonStr = extractJson(cleaned);
-
-  let parsed: Record<string, unknown>;
-  try {
-    const repaired = jsonStr.replace(/[\x00-\x1f]/g, (ch) => {
-      if (ch === '\n') return '\\n';
-      if (ch === '\r') return '\\r';
-      if (ch === '\t') return '\\t';
-      return '';
-    });
-    parsed = JSON.parse(repaired);
-  } catch {
-    // Second pass: try fixing trailing commas and other common issues
-    try {
-      let retry = jsonStr
-        .replace(/[\x00-\x1f]/g, (ch) => {
-          if (ch === '\n') return '\\n';
-          if (ch === '\r') return '\\r';
-          if (ch === '\t') return '\\t';
-          return '';
-        })
-        .replace(/,\s*([}\]])/g, '$1')       // trailing commas
-        .replace(/'/g, '"')                   // single quotes → double
-        .replace(/(\w+)\s*:/g, '"$1":');      // unquoted keys
-      parsed = JSON.parse(retry);
-    } catch {
-      // Third pass: attempt truncation repair
-      try {
-        parsed = JSON.parse(repairTruncatedJson(jsonStr));
-      } catch {
-        console.error('AI parse failure — raw content (first 500 chars):', rawContent.slice(0, 500));
-        console.error('AI parse failure — extracted json (first 500 chars):', jsonStr.slice(0, 500));
-        throw new Error('Failed to parse AI response as JSON');
-      }
-    }
+  const parsed = robustJsonParse(rawContent);
+  if (!parsed) {
+    console.error('All JSON parse attempts failed. Raw (500 chars):', rawContent.slice(0, 500));
+    throw new Error('Failed to parse AI response as JSON');
   }
 
   const email = parsed.email as Record<string, string> | undefined;
