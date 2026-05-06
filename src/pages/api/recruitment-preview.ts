@@ -43,29 +43,57 @@ RESPOND IN THIS EXACT JSON FORMAT (no markdown fencing, no other text):
   "personalNotes": "Brief note to Tim about this recruit",
   "fitScore": 7,
   "fitReason": "Brief explanation"
-}`;
+}
+
+/no_think`;
 
 function stripThinking(text: string): string {
-  // Qwen3 may output <think>...</think> or just </think> at the start
-  const thinkEnd = text.indexOf('</think>');
-  if (thinkEnd !== -1) return text.substring(thinkEnd + 8).trimStart();
-  // Also handle <think> without closing (model cut off mid-think)
-  const thinkStart = text.indexOf('<think>');
-  if (thinkStart === 0) {
-    // Everything before first { is thinking
-    const jsonStart = text.indexOf('{');
-    if (jsonStart > 0) return text.substring(jsonStart);
+  // Strip all <think>...</think> blocks (including multiline)
+  let result = text.replace(/<think>[\s\S]*?<\/think>/g, '').trimStart();
+  // Handle unclosed <think> tag — take everything after it until first {
+  if (result.includes('<think>')) {
+    const jsonStart = result.indexOf('{', result.indexOf('<think>'));
+    if (jsonStart !== -1) return result.substring(jsonStart);
   }
-  return text;
+  // Handle orphan </think> at start
+  const thinkEnd = result.indexOf('</think>');
+  if (thinkEnd !== -1) result = result.substring(thinkEnd + 8).trimStart();
+  // Strip untagged thinking (lines before first {)
+  if (result.length > 0 && result[0] !== '{') {
+    const jsonStart = result.indexOf('{');
+    if (jsonStart > 0) return result.substring(jsonStart);
+  }
+  return result;
 }
 
 function extractJson(text: string): string {
   // Strip markdown code fences if present
   let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
-  // Find the outermost JSON object
+  // Remove any remaining think tags
+  cleaned = cleaned.replace(/<\/?think>/g, '');
+  // Find the outermost JSON object using bracket matching (respecting strings)
   const start = cleaned.indexOf('{');
-  const end = cleaned.lastIndexOf('}');
-  if (start !== -1 && end !== -1 && end > start) return cleaned.substring(start, end + 1);
+  if (start === -1) return cleaned;
+  let depth = 0;
+  let end = -1;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+  if (end !== -1) return cleaned.substring(start, end + 1);
+  // Fallback to lastIndexOf
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (lastBrace > start) return cleaned.substring(start, lastBrace + 1);
   return cleaned;
 }
 
@@ -122,9 +150,10 @@ export const POST: APIRoute = async ({ request }) => {
         model: MODEL,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}\n/no_think` },
+          { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}` },
         ],
         stream: false,
+        think: false,
         options: { temperature: 0.7, top_p: 0.9, num_predict: 4096 },
       }),
     });
