@@ -251,7 +251,9 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (!ollamaRes.ok) {
       const status = ollamaRes.status;
-      return new Response(JSON.stringify({ error: `AI model returned ${status}. Is it running?` }), {
+      const errBody = await ollamaRes.text().catch(() => '');
+      const detail = errBody.slice(0, 200);
+      return new Response(JSON.stringify({ error: `AI model returned ${status}: ${detail || 'Is it running?'}` }), {
         status: 502,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -284,8 +286,10 @@ export const POST: APIRoute = async ({ request }) => {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    console.error('Recruitment preview error:', err);
-    return new Response(JSON.stringify({ error: 'Request failed' }), {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Recruitment preview error:', msg);
+    const isNetwork = msg.includes('ECONNREFUSED') || msg.includes('fetch failed') || msg.includes('network');
+    return new Response(JSON.stringify({ error: isNetwork ? `Network error reaching AI: ${msg}` : 'Request failed' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

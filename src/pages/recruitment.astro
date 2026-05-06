@@ -216,6 +216,23 @@ if (!session) {
           <span id="review-count" class="text-xs text-gray-400 ml-auto"></span>
         </div>
 
+        <!-- AI Unavailable Banner -->
+        <div id="ai-error-banner" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+          <div class="flex-shrink-0 w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+            <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-semibold text-red-800">AI Service Unavailable</h4>
+            <p id="ai-error-detail" class="text-xs text-red-600 mt-0.5">The AI model is not responding. Generation buttons will not work until the service is back online.</p>
+            <p class="text-xs text-red-500 mt-1">This usually means the local AI server (OpenClaw/Ollama) is not running or the model requires more memory than available.</p>
+          </div>
+          <button id="ai-error-dismiss" class="flex-shrink-0 text-red-400 hover:text-red-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
         <!-- Prospect Cards -->
         <div id="review-list" class="space-y-3">
           <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
@@ -376,6 +393,7 @@ if (!session) {
   let currentOffset = 0;
   const PAGE_SIZE = 20;
   let activeGenerations = 0;
+  let lastAiError: string | null = null;
 
   function updateGenerationStatus() {
     const badge = document.getElementById('ai-busy-badge');
@@ -387,6 +405,45 @@ if (!session) {
       badge.classList.add('hidden');
     }
   }
+
+  function isAiUnavailableError(msg: string): boolean {
+    const lower = msg.toLowerCase();
+    return lower.includes('system memory') ||
+           lower.includes('connection refused') ||
+           lower.includes('network error') ||
+           lower.includes('econnrefused') ||
+           lower.includes('model requires more') ||
+           lower.includes('ollama returned 5') ||
+           lower.includes('fetch failed') ||
+           lower.includes('model not found');
+  }
+
+  function showAiErrorBanner(reason: string) {
+    const banner = document.getElementById('ai-error-banner');
+    const detail = document.getElementById('ai-error-detail');
+    if (!banner || !detail) return;
+    lastAiError = reason;
+    // Make the reason user-friendly
+    let friendly = 'The AI model is not responding. Generation buttons will not work until the service is back online.';
+    if (reason.includes('system memory') || reason.includes('memory')) {
+      friendly = 'The AI model requires more memory than is currently available on the server. Try restarting the AI server or freeing resources.';
+    } else if (reason.includes('connection refused') || reason.includes('ECONNREFUSED') || reason.includes('fetch failed')) {
+      friendly = 'Cannot connect to the AI server. Make sure OpenClaw/Ollama is running.';
+    } else if (reason.includes('model not found')) {
+      friendly = 'The AI model is not loaded. Make sure the model is pulled on the Ollama server.';
+    }
+    detail.textContent = friendly;
+    banner.classList.remove('hidden');
+  }
+
+  function hideAiErrorBanner() {
+    const banner = document.getElementById('ai-error-banner');
+    if (banner) banner.classList.add('hidden');
+    lastAiError = null;
+  }
+
+  // Wire dismiss button
+  document.getElementById('ai-error-dismiss')?.addEventListener('click', hideAiErrorBanner);
 
   // ═══════════════════════════════════════════
   // TAB SWITCHING
@@ -661,17 +718,26 @@ if (!session) {
       });
       const data = await res.json();
       if (data.error) {
+        if (isAiUnavailableError(data.error)) {
+          showAiErrorBanner(data.error);
+        }
         showToast(`Error: ${data.error}`, 'error');
       } else if (data.processed > 0) {
+        hideAiErrorBanner();
         showToast(`Generated outreach for ${data.processed} prospect`);
       } else if (data.failed > 0) {
-        showToast(`AI failed: ${data.failReason || 'unknown error'}. Try again.`, 'error');
+        const reason = data.failReason || 'unknown error';
+        if (isAiUnavailableError(reason)) {
+          showAiErrorBanner(reason);
+        }
+        showToast(`AI failed: ${reason}. Try again.`, 'error');
       } else {
         showToast('No pending prospects to process');
       }
       loadReviewList();
       refreshStats();
     } catch {
+      showAiErrorBanner('Network error: could not reach server');
       showToast('Processing failed — check connection', 'error');
     } finally {
       activeGenerations--;
@@ -798,16 +864,22 @@ if (!session) {
           });
           const data = await res.json();
           if (data.processed > 0) {
+            hideAiErrorBanner();
             showToast('Outreach generated');
             loadReviewList();
           } else {
-            showToast(data.failReason || 'Generation failed — try again', 'error');
+            const reason = data.failReason || 'Generation failed — try again';
+            if (isAiUnavailableError(reason)) {
+              showAiErrorBanner(reason);
+            }
+            showToast(reason, 'error');
             (btn as HTMLButtonElement).disabled = false;
             (btn as HTMLButtonElement).textContent = '⚡ Generate Outreach';
           }
           refreshStats();
         } catch {
-          showToast('Generation failed', 'error');
+          showAiErrorBanner('Network error: could not reach server');
+          showToast('Generation failed — AI service unreachable', 'error');
           (btn as HTMLButtonElement).disabled = false;
           (btn as HTMLButtonElement).textContent = '⚡ Generate Outreach';
         } finally {
@@ -1072,17 +1144,22 @@ if (!session) {
       const data = await res.json();
 
       if (data.error) {
+        if (isAiUnavailableError(data.error)) {
+          showAiErrorBanner(data.error);
+        }
         const rawHint = data.raw ? `<details class="mt-2 text-left"><summary class="cursor-pointer text-xs text-gray-400">Show raw AI output</summary><pre class="mt-1 text-xs bg-gray-100 p-2 rounded overflow-x-auto max-h-40 whitespace-pre-wrap">${escapeHtml(data.raw)}</pre></details>` : '';
         testOutput.innerHTML = `<div class="text-center py-8 text-red-500"><p class="text-sm">${escapeHtml(data.error)}</p>${rawHint}</div>`;
         return;
       }
 
+      hideAiErrorBanner();
       renderPreviewOutput(data, prospect);
       testFeedbackSection.classList.remove('hidden');
       testMeta.classList.remove('hidden');
       renderMeta(data, prospect);
     } catch {
-      testOutput.innerHTML = `<div class="text-center py-8 text-red-500"><p class="text-sm">Generation failed. Is the AI model running?</p></div>`;
+      showAiErrorBanner('Network error: could not reach server');
+      testOutput.innerHTML = `<div class="text-center py-8 text-red-500"><p class="text-sm">Generation failed. The AI service appears to be offline.</p></div>`;
     } finally {
       activeGenerations--;
       updateGenerationStatus();
