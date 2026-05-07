@@ -1111,6 +1111,13 @@ if (!session) {
     { name: 'Robert Kim', state: 'MI', city: 'Grand Rapids', experience: '3-5yr', email: 'robert.k@test.legacy', phone: '(616) 555-0394', agency: 'Globe Life', notes: 'Solid producer, wants mentorship on IUL and annuities to move upmarket.' },
   ];
 
+
+  testGenerateBtn.addEventListener('click', () => generatePreview());
+
+  async function generatePreview() {
+    const prospect = {
+      name: (document.getElementById('test-name') as HTMLInputElement).value.trim(),
+
   testRandomBtn.addEventListener('click', () => {
     const p = TEST_PROSPECTS[Math.floor(Math.random() * TEST_PROSPECTS.length)];
     (document.getElementById('test-name') as HTMLInputElement).value = p.name;
@@ -1121,14 +1128,7 @@ if (!session) {
     (document.getElementById('test-phone') as HTMLInputElement).value = p.phone;
     (document.getElementById('test-agency') as HTMLInputElement).value = p.agency;
     (document.getElementById('test-notes') as HTMLTextAreaElement).value = p.notes;
-  });
-
-  testGenerateBtn.addEventListener('click', () => generatePreview());
-
-  async function generatePreview() {
-    const prospect = {
-      name: (document.getElementById('test-name') as HTMLInputElement).value.trim(),
-      state: (document.getElementById('test-state') as HTMLInputElement).value.trim(),
+  });      state: (document.getElementById('test-state') as HTMLInputElement).value.trim(),
       city: (document.getElementById('test-city') as HTMLInputElement).value.trim(),
       experience_level: (document.getElementById('test-experience') as HTMLSelectElement).value,
       email: (document.getElementById('test-email') as HTMLInputElement).value.trim(),
