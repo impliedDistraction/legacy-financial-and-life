@@ -145,7 +145,7 @@ if (!session) {
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">Run Every (minutes)</label>
-                <input type="number" id="cmp-interval" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="60" min="15" max="1440" />
+                <input type="number" id="cmp-interval" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="60" min="1" max="1440" />
               </div>
               <!-- Review toggle -->
               <label class="flex items-center gap-3 py-2 cursor-pointer">
@@ -401,7 +401,7 @@ if (!session) {
               </div>
               <div>
                 <label class="text-xs font-medium text-gray-600">Notes (anything you know about them)</label>
-                <textarea id="test-notes" rows="2" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Met at a conference, focused on final expense">Recently got licensed, looking for better training support. Met at an industry mixer.</textarea>
+                <textarea id="test-notes" rows="2" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Recently licensed, focused on final expense">Recently got licensed, looking for better training support.</textarea>
               </div>
             </div>
 
@@ -573,9 +573,13 @@ if (!session) {
       list.innerHTML = '<div class="text-sm text-gray-500 text-center py-8">No searches yet. Click "+ New Search" to start finding agents on Prophog.</div>';
       return;
     }
-    list.innerHTML = campaignsCache.map(c => {
+
+    const activeCampaigns = campaignsCache.filter(c => c.status === 'active' || c.status === 'paused');
+    const pastCampaigns = campaignsCache.filter(c => c.status === 'completed');
+
+    function renderCard(c: any, isPast: boolean) {
       const statusColor = c.status === 'active' ? 'green' : c.status === 'paused' ? 'amber' : 'gray';
-      const budgetPct = c.credit_budget > 0 ? Math.round((c.credits_used / c.credit_budget) * 100) : 0;
+      const budgetPct = c.credit_budget > 0 ? Math.round(((c.credits_used || 0) / c.credit_budget) * 100) : 0;
       const counts = c.prospect_counts || {};
       const totalProspects = Object.values(counts).reduce((a: number, b: any) => a + (b || 0), 0);
       const lastRun = c.last_run_at ? new Date(c.last_run_at).toLocaleString() : 'Never';
@@ -583,8 +587,13 @@ if (!session) {
       const reviewBadge = c.require_review
         ? '<span class="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Review first</span>'
         : '<span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Auto-send</span>';
+
+      const actionButtons = isPast ? '' : `
+              <button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}" title="${c.status === 'active' ? 'Pause' : 'Resume'}">${c.status === 'active' ? '⏸' : '▶'}</button>
+              <button class="text-xs text-red-500 hover:text-red-700 font-medium" data-campaign-action="stop" data-campaign-id="${c.id}" title="Stop campaign">⏹</button>`;
+
       return `
-        <div class="bg-white rounded-xl border border-gray-200 p-4 hover:border-brand-300 transition-colors">
+        <div class="bg-white rounded-xl border border-gray-200 p-4 ${isPast ? 'opacity-75' : 'hover:border-brand-300'} transition-colors">
           <div class="flex items-start justify-between mb-3">
             <div>
               <h3 class="font-semibold text-gray-900">${escapeHtml(c.name)}</h3>
@@ -593,7 +602,7 @@ if (!session) {
             <div class="flex items-center gap-2">
               ${reviewBadge}
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-700">${c.status}</span>
-              <button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}">${c.status === 'active' ? '⏸' : '▶'}</button>
+              ${actionButtons}
             </div>
           </div>
           <div class="grid grid-cols-4 gap-2 text-center mb-3">
@@ -603,15 +612,29 @@ if (!session) {
             <div><div class="text-lg font-bold text-green-600">${counts.sent || 0}</div><div class="text-xs text-gray-500">Sent</div></div>
           </div>
           <div class="flex items-center gap-3 text-xs text-gray-500 mb-2">
-            <span>${c.credits_used}/${c.credit_budget} credits</span>
+            <span>${c.credits_used || 0}/${c.credit_budget} credits</span>
             <div class="flex-1 bg-gray-200 rounded-full h-1.5"><div class="${budgetPct >= 90 ? 'bg-red-500' : 'bg-brand-600'} h-1.5 rounded-full" style="width: ${Math.min(100, budgetPct)}%"></div></div>
           </div>
           <div class="flex items-center justify-between text-xs text-gray-400">
             <span>Last run: ${lastRun}</span>
-            <span>Next: ${nextRun}</span>
+            ${isPast ? `<span>Ended: ${c.updated_at ? new Date(c.updated_at).toLocaleString() : '—'}</span>` : `<span>Next: ${nextRun}</span>`}
           </div>
         </div>`;
-    }).join('');
+    }
+
+    let html = '';
+    if (activeCampaigns.length > 0) {
+      html += activeCampaigns.map(c => renderCard(c, false)).join('');
+    } else {
+      html += '<div class="text-sm text-gray-500 text-center py-4">No active searches. Click "+ New Search" to start.</div>';
+    }
+
+    if (pastCampaigns.length > 0) {
+      html += `<div class="mt-6 mb-3"><h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Past Campaigns</h3></div>`;
+      html += pastCampaigns.map(c => renderCard(c, true)).join('');
+    }
+
+    list.innerHTML = html;
 
     // Wire action buttons
     list.querySelectorAll('[data-campaign-action]').forEach(btn => {
@@ -619,6 +642,7 @@ if (!session) {
         const el = e.currentTarget as HTMLElement;
         const action = el.dataset.campaignAction;
         const id = el.dataset.campaignId;
+        if (action === 'stop' && !confirm('Stop this campaign? It will be moved to Past Campaigns.')) return;
         try {
           await fetch('/api/recruitment-campaigns', {
             method: 'POST',
@@ -1347,7 +1371,7 @@ if (!session) {
 
   // Random test prospects
   const TEST_PROSPECTS = [
-    { name: 'Marcus Johnson', state: 'GA', city: 'Atlanta', experience: '1-3yr', email: 'marcus.j@test.legacy', phone: '(404) 555-0199', agency: 'Family First Insurance Group', notes: 'Recently got licensed, looking for better training. Met at industry mixer.' },
+    { name: 'Marcus Johnson', state: 'GA', city: 'Atlanta', experience: '1-3yr', email: 'marcus.j@test.legacy', phone: '(404) 555-0199', agency: 'Family First Insurance Group', notes: 'Recently got licensed, looking for better training.' },
     { name: 'Sarah Mitchell', state: 'TX', city: 'Dallas', experience: '3-5yr', email: 'sarah.m@test.legacy', phone: '(214) 555-0342', agency: 'Shield Life Agency', notes: 'Experienced but unhappy with current upline support. Focus on final expense.' },
     { name: 'David Chen', state: 'OH', city: 'Columbus', experience: 'new', email: 'david.c@test.legacy', phone: '(614) 555-0271', agency: '', notes: 'Career changer from finance. Has Series 6 & 63. Interested in IUL market.' },
     { name: 'Lisa Rodriguez', state: 'AL', city: 'Birmingham', experience: '5+yr', email: 'lisa.r@test.legacy', phone: '(205) 555-0188', agency: 'Cornerstone Benefits', notes: 'Top producer but wants to build her own team. Already has 3 agents under her.' },

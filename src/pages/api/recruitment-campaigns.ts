@@ -87,7 +87,7 @@ export const POST: APIRoute = async ({ request }) => {
         search_filters: body.searchFilters || {},
         credit_budget: Math.max(1, Math.min(10000, parseInt(body.creditBudget) || 100)),
         max_pages_per_run: Math.max(1, Math.min(50, parseInt(body.maxPagesPerRun) || 20)),
-        schedule_interval_minutes: Math.max(15, Math.min(1440, parseInt(body.intervalMinutes) || 60)),
+        schedule_interval_minutes: Math.max(1, Math.min(1440, parseInt(body.intervalMinutes) || 60)),
         schedule_jitter_minutes: Math.max(0, Math.min(30, parseInt(body.jitterMinutes) || 15)),
         require_review: body.requireReview !== false,
         status: 'active',
@@ -119,7 +119,7 @@ export const POST: APIRoute = async ({ request }) => {
       if (updates.status !== undefined) allowed.status = String(updates.status).slice(0, 20);
       if (updates.creditBudget !== undefined) allowed.credit_budget = Math.max(1, parseInt(updates.creditBudget) || 100);
       if (updates.maxPagesPerRun !== undefined) allowed.max_pages_per_run = Math.max(1, Math.min(50, parseInt(updates.maxPagesPerRun) || 20));
-      if (updates.intervalMinutes !== undefined) allowed.schedule_interval_minutes = Math.max(15, parseInt(updates.intervalMinutes) || 60);
+      if (updates.intervalMinutes !== undefined) allowed.schedule_interval_minutes = Math.max(1, parseInt(updates.intervalMinutes) || 60);
       if (updates.notes !== undefined) allowed.notes = String(updates.notes).slice(0, 500);
       if (updates.searchFilters !== undefined) allowed.search_filters = updates.searchFilters;
 
@@ -133,15 +133,16 @@ export const POST: APIRoute = async ({ request }) => {
       return jsonRes({ campaign: updated });
     }
 
-    if (action === 'pause' || action === 'resume') {
+    if (action === 'pause' || action === 'resume' || action === 'stop') {
       const { id } = body;
       if (!id) return jsonRes({ error: 'id required' }, 400);
 
+      const newStatus = action === 'stop' ? 'completed' : action === 'pause' ? 'paused' : 'active';
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { ...supaHeaders(), Prefer: 'return=representation' },
         body: JSON.stringify({
-          status: action === 'pause' ? 'paused' : 'active',
+          status: newStatus,
           next_run_at: action === 'resume' ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
         }),
