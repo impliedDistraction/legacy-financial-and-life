@@ -87,6 +87,9 @@ if (!session) {
       <button class="tab-btn active px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="upload">
         📤 Upload
       </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="campaigns">
+        🎯 Campaigns
+      </button>
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="review">
         ✅ Review & Approve
       </button>
@@ -101,6 +104,72 @@ if (!session) {
 
   <!-- Tab Content -->
   <div class="max-w-7xl mx-auto px-4 py-4">
+
+    <!-- ═══════════════ CAMPAIGNS TAB ═══════════════ -->
+    <div id="tab-campaigns" class="tab-panel hidden">
+      <div class="grid lg:grid-cols-3 gap-6">
+        <!-- Campaign List -->
+        <div class="lg:col-span-2 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Active Campaigns</h2>
+            <button id="new-campaign-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">+ New Campaign</button>
+          </div>
+          <div id="campaign-list" class="space-y-3">
+            <div class="text-sm text-gray-500 text-center py-8">Loading campaigns...</div>
+          </div>
+        </div>
+
+        <!-- New Campaign Form -->
+        <div class="space-y-4">
+          <div id="campaign-form" class="bg-white rounded-xl border border-gray-200 p-5 hidden">
+            <h3 class="text-sm font-semibold text-gray-900 mb-4">Create Campaign</h3>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Campaign Name</label>
+                <input type="text" id="cmp-name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g., May GA Agents" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Search State</label>
+                <input type="text" id="cmp-state" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="Georgia" />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Credit Budget</label>
+                  <input type="number" id="cmp-budget" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="100" min="1" max="10000" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Max Pages/Run</label>
+                  <input type="number" id="cmp-pages" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="20" min="1" max="50" />
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Interval (min)</label>
+                  <input type="number" id="cmp-interval" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="60" min="15" max="1440" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Jitter (min)</label>
+                  <input type="number" id="cmp-jitter" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="15" min="0" max="30" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                <textarea id="cmp-notes" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Optional notes..."></textarea>
+              </div>
+              <button id="cmp-submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors">Create Campaign</button>
+            </div>
+          </div>
+
+          <!-- Live Feed -->
+          <div class="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 class="text-sm font-semibold text-gray-900 mb-3">Recent Leads</h3>
+            <div id="live-feed" class="space-y-2 max-h-96 overflow-y-auto">
+              <div class="text-xs text-gray-400 text-center py-4">Loading...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- ═══════════════ UPLOAD TAB ═══════════════ -->
     <div id="tab-upload" class="tab-panel">
@@ -460,7 +529,156 @@ if (!session) {
       document.getElementById(`tab-${tab}`)?.classList.remove('hidden');
       if (tab === 'review') loadReviewList();
       if (tab === 'sent') loadSentList();
+      if (tab === 'campaigns') loadCampaigns();
     });
+  });
+
+  // ═══════════════════════════════════════════
+  // CAMPAIGNS MANAGEMENT
+  // ═══════════════════════════════════════════
+  let campaignsCache: any[] = [];
+
+  async function loadCampaigns() {
+    const list = document.getElementById('campaign-list');
+    if (!list) return;
+    try {
+      const res = await fetch('/api/recruitment-campaigns');
+      const data = await res.json();
+      campaignsCache = data.campaigns || [];
+      renderCampaigns();
+      loadLiveFeed();
+    } catch (err) {
+      list.innerHTML = '<div class="text-sm text-red-500 text-center py-4">Failed to load campaigns</div>';
+    }
+  }
+
+  function renderCampaigns() {
+    const list = document.getElementById('campaign-list');
+    if (!list) return;
+    if (campaignsCache.length === 0) {
+      list.innerHTML = '<div class="text-sm text-gray-500 text-center py-8">No campaigns yet. Create one to start automated lead scraping.</div>';
+      return;
+    }
+    list.innerHTML = campaignsCache.map(c => {
+      const statusColor = c.status === 'active' ? 'green' : c.status === 'paused' ? 'amber' : 'gray';
+      const budgetPct = c.credit_budget > 0 ? Math.round((c.credits_used / c.credit_budget) * 100) : 0;
+      const counts = c.prospect_counts || {};
+      const totalProspects = Object.values(counts).reduce((a: number, b: any) => a + (b || 0), 0);
+      const lastRun = c.last_run_at ? new Date(c.last_run_at).toLocaleString() : 'Never';
+      const nextRun = c.next_run_at ? new Date(c.next_run_at).toLocaleString() : 'Pending';
+      return `
+        <div class="bg-white rounded-xl border border-gray-200 p-4 hover:border-brand-300 transition-colors">
+          <div class="flex items-start justify-between mb-3">
+            <div>
+              <h3 class="font-semibold text-gray-900 text-sm">${escapeHtml(c.name)}</h3>
+              <p class="text-xs text-gray-500">${c.search_state} · ${c.schedule_interval_minutes}min interval</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-700">${c.status}</span>
+              <button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}">${c.status === 'active' ? '⏸ Pause' : '▶ Resume'}</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-4 gap-2 text-center mb-3">
+            <div><div class="text-lg font-bold text-gray-900">${totalProspects}</div><div class="text-xs text-gray-500">Leads</div></div>
+            <div><div class="text-lg font-bold text-amber-600">${counts.pending || 0}</div><div class="text-xs text-gray-500">Pending</div></div>
+            <div><div class="text-lg font-bold text-blue-600">${counts.processed || 0}</div><div class="text-xs text-gray-500">Processed</div></div>
+            <div><div class="text-lg font-bold text-green-600">${counts.approved || 0}</div><div class="text-xs text-gray-500">Approved</div></div>
+          </div>
+          <div class="flex items-center gap-3 text-xs text-gray-500 mb-2">
+            <span>Credits: ${c.credits_used}/${c.credit_budget}</span>
+            <div class="flex-1 bg-gray-200 rounded-full h-1.5"><div class="bg-brand-600 h-1.5 rounded-full" style="width: ${Math.min(100, budgetPct)}%"></div></div>
+          </div>
+          <div class="flex items-center justify-between text-xs text-gray-400">
+            <span>Last: ${lastRun}</span>
+            <span>Next: ${nextRun}</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    // Wire action buttons
+    list.querySelectorAll('[data-campaign-action]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const el = e.currentTarget as HTMLElement;
+        const action = el.dataset.campaignAction;
+        const id = el.dataset.campaignId;
+        try {
+          await fetch('/api/recruitment-campaigns', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, id }),
+          });
+          loadCampaigns();
+        } catch (err) {
+          console.error('Campaign action failed:', err);
+        }
+      });
+    });
+  }
+
+  async function loadLiveFeed() {
+    const feed = document.getElementById('live-feed');
+    if (!feed) return;
+    try {
+      const res = await fetch('/api/recruitment-upload?limit=20');
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      const prospects = data.prospects || [];
+      if (prospects.length === 0) {
+        feed.innerHTML = '<div class="text-xs text-gray-400 text-center py-4">No leads yet</div>';
+        return;
+      }
+      feed.innerHTML = prospects.map((p: any) => {
+        const scoreEmoji = p.research_score >= 7 ? '🌟' : p.research_score >= 4 ? '✅' : p.research_status === 'unscored' ? '⏳' : '📋';
+        const scoreText = p.research_score != null ? `${p.research_score}/10` : 'unscored';
+        const time = new Date(p.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        return `
+          <div class="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 text-xs">
+            <span class="text-base">${scoreEmoji}</span>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-gray-900 truncate">${escapeHtml(p.name)}</div>
+              <div class="text-gray-500">${escapeHtml(p.city || '')}${p.city && p.state ? ', ' : ''}${escapeHtml(p.state || '')} · ${scoreText}</div>
+            </div>
+            <div class="text-gray-400 whitespace-nowrap">${time}</div>
+          </div>`;
+      }).join('');
+    } catch {
+      feed.innerHTML = '<div class="text-xs text-red-400 text-center py-4">Failed to load</div>';
+    }
+  }
+
+  // New campaign form
+  document.getElementById('new-campaign-btn')?.addEventListener('click', () => {
+    document.getElementById('campaign-form')?.classList.toggle('hidden');
+  });
+
+  document.getElementById('cmp-submit')?.addEventListener('click', async () => {
+    const btn = document.getElementById('cmp-submit') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+    try {
+      const res = await fetch('/api/recruitment-campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          name: (document.getElementById('cmp-name') as HTMLInputElement).value,
+          searchState: (document.getElementById('cmp-state') as HTMLInputElement).value,
+          creditBudget: (document.getElementById('cmp-budget') as HTMLInputElement).value,
+          maxPagesPerRun: (document.getElementById('cmp-pages') as HTMLInputElement).value,
+          intervalMinutes: (document.getElementById('cmp-interval') as HTMLInputElement).value,
+          jitterMinutes: (document.getElementById('cmp-jitter') as HTMLInputElement).value,
+          notes: (document.getElementById('cmp-notes') as HTMLTextAreaElement).value,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to create');
+      document.getElementById('campaign-form')?.classList.add('hidden');
+      loadCampaigns();
+    } catch (err) {
+      alert('Failed to create campaign');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Create Campaign';
+    }
   });
 
   // ═══════════════════════════════════════════
@@ -800,6 +1018,7 @@ if (!session) {
                 ${p.fit_score ? `<span class="text-xs font-bold text-${scoreColor}-600">${p.fit_score}/10</span>` : ''}
                 ${stateMatch ? '<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Licensed State</span>' : ''}
                 <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">${escapeHtml(p.status)}</span>
+                ${p.research_score != null ? `<span class="text-xs ${p.research_score >= 7 ? 'bg-green-100 text-green-700' : p.research_score >= 4 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'} px-1.5 py-0.5 rounded">🔍 ${p.research_score}/10</span>` : p.research_status === 'unscored' ? '<span class="text-xs bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded">⏳ unscored</span>' : ''}
               </div>
               <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
                 ${p.state ? `<span>📍 ${escapeHtml(p.state)}${p.city ? ', ' + escapeHtml(p.city) : ''}</span>` : ''}
@@ -1114,10 +1333,6 @@ if (!session) {
 
   testGenerateBtn.addEventListener('click', () => generatePreview());
 
-  async function generatePreview() {
-    const prospect = {
-      name: (document.getElementById('test-name') as HTMLInputElement).value.trim(),
-
   testRandomBtn.addEventListener('click', () => {
     const p = TEST_PROSPECTS[Math.floor(Math.random() * TEST_PROSPECTS.length)];
     (document.getElementById('test-name') as HTMLInputElement).value = p.name;
@@ -1128,7 +1343,12 @@ if (!session) {
     (document.getElementById('test-phone') as HTMLInputElement).value = p.phone;
     (document.getElementById('test-agency') as HTMLInputElement).value = p.agency;
     (document.getElementById('test-notes') as HTMLTextAreaElement).value = p.notes;
-  });      state: (document.getElementById('test-state') as HTMLInputElement).value.trim(),
+  });
+
+  async function generatePreview() {
+    const prospect = {
+      name: (document.getElementById('test-name') as HTMLInputElement).value.trim(),
+      state: (document.getElementById('test-state') as HTMLInputElement).value.trim(),
       city: (document.getElementById('test-city') as HTMLInputElement).value.trim(),
       experience_level: (document.getElementById('test-experience') as HTMLSelectElement).value,
       email: (document.getElementById('test-email') as HTMLInputElement).value.trim(),
