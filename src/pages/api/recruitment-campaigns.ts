@@ -90,6 +90,7 @@ export const POST: APIRoute = async ({ request }) => {
         schedule_interval_minutes: Math.max(1, Math.min(1440, parseInt(body.intervalMinutes) || 60)),
         schedule_jitter_minutes: Math.max(0, Math.min(30, parseInt(body.jitterMinutes) || 15)),
         require_review: body.requireReview !== false,
+        auto_relaunch: body.autoRelaunch === true,
         status: 'active',
         created_by: session.email || 'unknown',
         notes: String(body.notes || '').slice(0, 500),
@@ -121,6 +122,7 @@ export const POST: APIRoute = async ({ request }) => {
       if (updates.maxPagesPerRun !== undefined) allowed.max_pages_per_run = Math.max(1, Math.min(50, parseInt(updates.maxPagesPerRun) || 20));
       if (updates.intervalMinutes !== undefined) allowed.schedule_interval_minutes = Math.max(1, parseInt(updates.intervalMinutes) || 60);
       if (updates.notes !== undefined) allowed.notes = String(updates.notes).slice(0, 500);
+      if (updates.autoRelaunch !== undefined) allowed.auto_relaunch = updates.autoRelaunch === true;
       if (updates.searchFilters !== undefined) allowed.search_filters = updates.searchFilters;
 
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}`, {

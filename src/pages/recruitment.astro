@@ -131,7 +131,19 @@ if (!session) {
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-600 mb-1">State</label>
-                <input type="text" id="cmp-state" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="Georgia" />
+                <select id="cmp-state" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                  <option value="Georgia" selected>Georgia (GA)</option>
+                  <option value="Ohio">Ohio (OH)</option>
+                  <option value="Oklahoma">Oklahoma (OK)</option>
+                  <option value="South Carolina">South Carolina (SC)</option>
+                  <option value="Mississippi">Mississippi (MS)</option>
+                  <option value="Michigan">Michigan (MI)</option>
+                  <option value="Texas">Texas (TX)</option>
+                  <option value="Utah">Utah (UT)</option>
+                  <option value="Alabama">Alabama (AL)</option>
+                  <option value="Louisiana">Louisiana (LA)</option>
+                </select>
+                <p class="text-xs text-gray-400 mt-0.5">Only states Legacy Financial is licensed in</p>
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -153,6 +165,14 @@ if (!session) {
                 <div>
                   <span class="text-sm font-medium text-gray-800">Require review before sending</span>
                   <p class="text-xs text-gray-500">Leads go to Review & Approve. Uncheck to auto-send.</p>
+                </div>
+              </label>
+              <!-- Auto-relaunch toggle -->
+              <label class="flex items-center gap-3 py-2 cursor-pointer">
+                <input type="checkbox" id="cmp-relaunch" class="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500" />
+                <div>
+                  <span class="text-sm font-medium text-gray-800">Auto-relaunch when budget used</span>
+                  <p class="text-xs text-gray-500">Resets credits and resumes automatically. Runs indefinitely until stopped.</p>
                 </div>
               </label>
               <!-- Advanced (hidden by default) -->
@@ -587,6 +607,9 @@ if (!session) {
       const reviewBadge = c.require_review
         ? '<span class="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Review first</span>'
         : '<span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Auto-send</span>';
+      const relaunchBadge = c.auto_relaunch
+        ? '<span class="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Auto-relaunch</span>'
+        : '';
 
       const actionButtons = isPast ? '' : `
               <button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}" title="${c.status === 'active' ? 'Pause' : 'Resume'}">${c.status === 'active' ? '⏸' : '▶'}</button>
@@ -601,6 +624,7 @@ if (!session) {
             </div>
             <div class="flex items-center gap-2">
               ${reviewBadge}
+              ${relaunchBadge}
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-700">${c.status}</span>
               ${actionButtons}
             </div>
@@ -697,6 +721,15 @@ if (!session) {
     const btn = document.getElementById('cmp-submit') as HTMLButtonElement;
     const nameVal = (document.getElementById('cmp-name') as HTMLInputElement).value.trim();
     if (!nameVal) { (document.getElementById('cmp-name') as HTMLInputElement).focus(); return; }
+
+    const budget = parseInt((document.getElementById('cmp-budget') as HTMLInputElement).value) || 100;
+    const pages = parseInt((document.getElementById('cmp-pages') as HTMLInputElement).value) || 20;
+    if (pages > budget) {
+      showToast('Pages per run cannot exceed credit budget', 'error');
+      (document.getElementById('cmp-pages') as HTMLInputElement).focus();
+      return;
+    }
+
     btn.disabled = true;
     btn.textContent = 'Starting...';
     try {
@@ -712,6 +745,7 @@ if (!session) {
           intervalMinutes: (document.getElementById('cmp-interval') as HTMLInputElement).value,
           jitterMinutes: (document.getElementById('cmp-jitter') as HTMLInputElement)?.value || '15',
           requireReview: (document.getElementById('cmp-review') as HTMLInputElement).checked,
+          autoRelaunch: (document.getElementById('cmp-relaunch') as HTMLInputElement).checked,
           notes: (document.getElementById('cmp-notes') as HTMLTextAreaElement)?.value || '',
         }),
       });
