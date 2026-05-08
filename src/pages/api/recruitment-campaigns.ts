@@ -91,6 +91,8 @@ export const POST: APIRoute = async ({ request }) => {
         schedule_jitter_minutes: Math.max(0, Math.min(30, parseInt(body.jitterMinutes) || 15)),
         require_review: body.requireReview !== false,
         auto_relaunch: body.autoRelaunch === true,
+        sign_off: String(body.signOff || 'Legacy Financial Recruiting Team').slice(0, 200),
+        reply_to_email: body.replyToEmail ? String(body.replyToEmail).slice(0, 200) : null,
         status: 'active',
         created_by: session.email || 'unknown',
         notes: String(body.notes || '').slice(0, 500),
@@ -124,6 +126,8 @@ export const POST: APIRoute = async ({ request }) => {
       if (updates.notes !== undefined) allowed.notes = String(updates.notes).slice(0, 500);
       if (updates.autoRelaunch !== undefined) allowed.auto_relaunch = updates.autoRelaunch === true;
       if (updates.searchFilters !== undefined) allowed.search_filters = updates.searchFilters;
+      if (updates.signOff !== undefined) allowed.sign_off = String(updates.signOff).slice(0, 200);
+      if (updates.replyToEmail !== undefined) allowed.reply_to_email = updates.replyToEmail ? String(updates.replyToEmail).slice(0, 200) : null;
 
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH',

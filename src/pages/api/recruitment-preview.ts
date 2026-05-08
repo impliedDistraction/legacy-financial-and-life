@@ -8,7 +8,7 @@ const OLLAMA_SECRET = import.meta.env.OLLAMA_SECRET || '';
 // Use base model directly — legacy-messenger Modelfile has a chat system prompt that conflicts
 const MODEL = import.meta.env.AI_RECRUITMENT_MODEL || 'qwen3:30b';
 
-const BASE_SYSTEM_PROMPT = `You are a recruitment outreach specialist for Legacy Financial & Life, an insurance agency run by Tim & Beth Byrd.
+const BASE_SYSTEM_PROMPT = `You are a recruitment outreach specialist for Legacy Financial & Life, an insurance agency.
 
 About Legacy Financial & Life:
 - Tim and Beth Byrd, 300+ policies sold
@@ -23,17 +23,22 @@ EMAIL RULES:
 - 150-250 words, warm, direct, professional
 - Brief intro → value prop → soft CTA
 - Reference their state/experience if known
-- Write as a recruiter introducing the Legacy Financial team — NOT from Tim's first-person perspective
-- NEVER reference specific meeting topics or fabricate shared experiences (e.g., "great meeting you at the mixer")
-- NEVER mention how many years Tim & Beth have been in the business or any specific duration of experience
+- Write as a recruiter introducing the Legacy Financial team — NOT from any individual's first-person perspective
+- The sign-off will be provided in the user message as SIGN_OFF — use that exact text at the end of the email
+- NEVER use placeholder brackets like [Your Name], [Name], [Company], etc. — always use actual values
+- Use the prospect's actual first name in the greeting (e.g., "Hi Juan," not "Hi [Name],")
+- NEVER reference specific meeting topics or fabricate shared experiences
+- NEVER mention how many years anyone has been in the business or any specific duration of experience
 - NEVER use MLM language, income claims, "unlimited earning potential", "be your own boss"
 - NEVER guarantee income or disparage their current agency
 
 CALL SCRIPT RULES:
 - 30-second opener, friendly, unhurried, to the point
 - Include a voicemail version
+- Use the prospect's actual first name — NEVER use [Name] or any bracket placeholders
 - Do NOT fabricate meeting contexts or claim to have met the prospect
 - Do NOT mention years of experience — focus on what the team offers
+- Voicemail must include callback number: (561) 365-4523
 
 RESPOND IN THIS EXACT JSON FORMAT (no markdown fencing, no other text):
 {
@@ -42,10 +47,10 @@ RESPOND IN THIS EXACT JSON FORMAT (no markdown fencing, no other text):
     "body": "Email body with \\n for line breaks"
   },
   "callScript": {
-    "opener": "Hi [Name], this is Tim Byrd from Legacy Financial...",
-    "voicemail": "Hey [Name], this is Tim Byrd..."
+    "opener": "Hi Juan, this is the Legacy Financial recruiting team...",
+    "voicemail": "Hey Juan, this is Legacy Financial & Life..."
   },
-  "personalNotes": "Brief note to Tim about this recruit",
+  "personalNotes": "Brief note about this recruit",
   "fitScore": 7,
   "fitReason": "Brief explanation"
 }
@@ -208,7 +213,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   try {
     const body = await request.json();
-    const { prospect, feedback } = body;
+    const { prospect, feedback, signOff } = body;
 
     if (!prospect?.name) {
       return new Response(JSON.stringify({ error: 'Prospect name required' }), {
@@ -224,11 +229,14 @@ export const POST: APIRoute = async ({ request }) => {
         .slice(0, 10)
         .map((f: unknown) => String(f).slice(0, 200))
         .join('\n- ');
-      systemPrompt += `\n\nADDITIONAL GUIDELINES (from Tim's feedback):\n- ${adjustments}`;
+      systemPrompt += `\n\nADDITIONAL GUIDELINES (from feedback):\n- ${adjustments}`;
     }
 
-    // Build prospect profile
+    // Build prospect profile with sign-off instruction
+    const emailSignOff = String(signOff || 'Legacy Financial Recruiting Team').slice(0, 200);
     const profile = buildProfile(prospect);
+    const userMessage = `Generate recruitment outreach for this prospect:\n\n${profile}\n\nSIGN_OFF: Best,\\n${emailSignOff}`;
+
 
     const ollamaHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -250,7 +258,7 @@ export const POST: APIRoute = async ({ request }) => {
           model: MODEL,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}` },
+            { role: 'user', content: userMessage },
           ],
           stream: false,
           think: false,

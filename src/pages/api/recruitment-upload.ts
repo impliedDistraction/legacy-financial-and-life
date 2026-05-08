@@ -141,12 +141,28 @@ export const GET: APIRoute = async ({ request }) => {
   const url = new URL(request.url);
   const campaignId = url.searchParams.get('campaign_id');
   const status = url.searchParams.get('status');
+  const search = url.searchParams.get('search')?.trim();
+  const order = url.searchParams.get('order');
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 200);
   const offset = parseInt(url.searchParams.get('offset') || '0');
 
-  let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?order=fit_score.desc.nullslast,created_at.desc&limit=${limit}&offset=${offset}`;
+  // Support composite status filters like "in.(sent,approved,converted)"
+  const defaultOrder = 'fit_score.desc.nullslast,created_at.desc';
+  const orderClause = order || defaultOrder;
+  let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?order=${orderClause}&limit=${limit}&offset=${offset}`;
   if (campaignId) queryUrl += `&campaign_id=eq.${encodeURIComponent(campaignId)}`;
-  if (status) queryUrl += `&status=eq.${encodeURIComponent(status)}`;
+  if (status) {
+    if (status.startsWith('in.')) {
+      queryUrl += `&status=${encodeURIComponent(status)}`;
+    } else {
+      queryUrl += `&status=eq.${encodeURIComponent(status)}`;
+    }
+  }
+  // Text search across name, email, state, city
+  if (search) {
+    const s = search.replace(/[%_]/g, '');
+    queryUrl += `&or=(name.ilike.*${encodeURIComponent(s)}*,email.ilike.*${encodeURIComponent(s)}*,state.ilike.*${encodeURIComponent(s)}*,city.ilike.*${encodeURIComponent(s)}*)`;
+  }
 
   const response = await fetch(queryUrl, {
     headers: {

@@ -11,7 +11,7 @@ const OLLAMA_SECRET = import.meta.env.OLLAMA_SECRET || '';
 const MODEL = import.meta.env.AI_RECRUITMENT_MODEL || 'qwen3:30b';
 const TABLE = 'recruitment_prospects';
 
-const SYSTEM_PROMPT = `You are a recruitment outreach specialist for Legacy Financial & Life, an insurance agency run by Tim & Beth Byrd.
+const SYSTEM_PROMPT = `You are a recruitment outreach specialist for Legacy Financial & Life, an insurance agency.
 
 About Legacy Financial & Life:
 - Tim and Beth Byrd, 300+ policies sold
@@ -26,17 +26,22 @@ EMAIL RULES:
 - 150-250 words, warm, direct, professional
 - Brief intro → value prop → soft CTA
 - Reference their state/experience if known
-- Write as a recruiter introducing the Legacy Financial team — NOT from Tim's first-person perspective
-- NEVER reference specific meeting topics or fabricate shared experiences (e.g., "great meeting you at the mixer")
-- NEVER mention how many years Tim & Beth have been in the business or any specific duration of experience
+- Write as a recruiter introducing the Legacy Financial team — NOT from any individual's first-person perspective
+- The sign-off will be provided in the user message as SIGN_OFF — use that exact text at the end of the email
+- NEVER use placeholder brackets like [Your Name], [Name], [Company], etc. — always use actual values
+- Use the prospect's actual first name in the greeting (e.g., "Hi Juan," not "Hi [Name],")
+- NEVER reference specific meeting topics or fabricate shared experiences
+- NEVER mention how many years anyone has been in the business or any specific duration of experience
 - NEVER use MLM language, income claims, "unlimited earning potential", "be your own boss"
 - NEVER guarantee income or disparage their current agency
 
 CALL SCRIPT RULES:
 - 30-second opener, friendly, unhurried, to the point
 - Include a voicemail version
+- Use the prospect's actual first name — NEVER use [Name] or any bracket placeholders
 - Do NOT fabricate meeting contexts or claim to have met the prospect
 - Do NOT mention years of experience — focus on what the team offers
+- Voicemail must include callback number: (561) 365-4523
 
 RESPOND IN THIS EXACT JSON FORMAT (no markdown fencing, no other text):
 {
@@ -45,10 +50,10 @@ RESPOND IN THIS EXACT JSON FORMAT (no markdown fencing, no other text):
     "body": "Email body with \\n for line breaks"
   },
   "callScript": {
-    "opener": "Hi [Name], this is Tim Byrd from Legacy Financial...",
-    "voicemail": "Hey [Name], this is Tim Byrd..."
+    "opener": "Hi Juan, this is the Legacy Financial recruiting team...",
+    "voicemail": "Hey Juan, this is Legacy Financial & Life..."
   },
-  "personalNotes": "Brief note to Tim about this recruit",
+  "personalNotes": "Brief note about this recruit",
   "fitScore": 7,
   "fitReason": "Brief explanation"
 }
@@ -244,12 +249,31 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    // Fetch campaign sign-off setting if available
+    const campaignIds = [...new Set(prospects.map((p: Record<string, unknown>) => p.campaign_id).filter(Boolean))];
+    const campaignSignOffs: Record<string, string> = {};
+    if (campaignIds.length > 0) {
+      try {
+        const campRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/recruitment_campaigns?id=in.(${campaignIds.join(',')})&select=id,sign_off,reply_to_email`,
+          { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' } }
+        );
+        if (campRes.ok) {
+          const camps = await campRes.json();
+          for (const c of camps) {
+            if (c.sign_off) campaignSignOffs[c.id] = c.sign_off;
+          }
+        }
+      } catch { /* use default */ }
+    }
+
     const results: { id: string; success: boolean; fitScore?: number; error?: string }[] = [];
 
     // Process each prospect sequentially (GPU constraint)
     for (const prospect of prospects) {
       try {
-        const result = await processProspect(prospect);
+        const signOff = campaignSignOffs[prospect.campaign_id as string] || 'Legacy Financial Recruiting Team';
+        const result = await processProspect(prospect, signOff);
         results.push({ id: prospect.id, success: true, fitScore: result.fitScore });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -276,8 +300,9 @@ export const POST: APIRoute = async ({ request }) => {
   }
 };
 
-async function processProspect(prospect: Record<string, unknown>): Promise<{ fitScore: number }> {
+async function processProspect(prospect: Record<string, unknown>, signOff: string): Promise<{ fitScore: number }> {
   const profile = buildProfileDescription(prospect);
+  const userMessage = `Generate recruitment outreach for this prospect:\n\n${profile}\n\nSIGN_OFF: Best,\\n${signOff}`;
 
   const ollamaHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -299,7 +324,7 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
         model: MODEL,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Generate recruitment outreach for this prospect:\n\n${profile}` },
+          { role: 'user', content: userMessage },
         ],
         stream: false,
         think: false,

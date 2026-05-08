@@ -8,6 +8,9 @@ const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.tri
 const RESEND_API_KEY = import.meta.env.RESEND_API_KEY?.trim();
 const TABLE = 'recruitment_prospects';
 
+// ── Send lock: set to false once client approves email content ──
+const RECRUITMENT_SENDS_ENABLED = import.meta.env.RECRUITMENT_SENDS_ENABLED === 'true';
+
 /**
  * POST /api/recruitment-action
  * Execute an action on a prospect: approve, reject, send email, mark called, delete.
@@ -93,6 +96,12 @@ export const POST: APIRoute = async ({ request }) => {
       }
 
       case 'send_email':
+        if (!RECRUITMENT_SENDS_ENABLED) {
+          return new Response(JSON.stringify({ error: 'Recruitment email sending is locked — client review in progress. Set RECRUITMENT_SENDS_ENABLED=true to unlock.' }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
         if (!prospect.email) {
           return new Response(JSON.stringify({ error: 'Prospect has no email address' }), {
             status: 400,
@@ -122,6 +131,21 @@ export const POST: APIRoute = async ({ request }) => {
           });
         }
 
+        // Look up campaign reply-to if prospect has a campaign
+        let replyTo = 'recruiting@legacyfinancial.app';
+        if (prospect.campaign_id) {
+          try {
+            const campRes = await fetch(
+              `${SUPABASE_URL}/rest/v1/recruitment_campaigns?id=eq.${encodeURIComponent(prospect.campaign_id)}&select=reply_to_email&limit=1`,
+              { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY!, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' } }
+            );
+            if (campRes.ok) {
+              const [camp] = await campRes.json();
+              if (camp?.reply_to_email) replyTo = camp.reply_to_email;
+            }
+          } catch { /* use default */ }
+        }
+
         // Send via Resend
         const sendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
@@ -134,7 +158,11 @@ export const POST: APIRoute = async ({ request }) => {
             to: [prospect.email],
             subject: emailSubject,
             text: emailBody,
-            reply_to: 'tim@legacyf-l.com',
+            reply_to: replyTo,
+            headers: {
+              'X-Legacy-Template': 'recruitment',
+              'X-Legacy-Prospect-Id': String(id),
+            },
           }),
         });
 

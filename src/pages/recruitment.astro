@@ -175,6 +175,23 @@ if (!session) {
                   <p class="text-xs text-gray-500">Resets credits and resumes automatically. Runs indefinitely until stopped.</p>
                 </div>
               </label>
+              <!-- Email Sign-off -->
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Email Sign-off</label>
+                <select id="cmp-signoff" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                  <option value="Legacy Financial Recruiting Team" selected>Legacy Financial Recruiting Team</option>
+                  <option value="Legacy Financial & Life">Legacy Financial & Life</option>
+                  <option value="The Legacy Financial Team">The Legacy Financial Team</option>
+                  <option value="Legacy Financial AI Recruiting">Legacy Financial AI Recruiting</option>
+                </select>
+                <p class="text-xs text-gray-400 mt-0.5">Appears at bottom of every email in this campaign</p>
+              </div>
+              <!-- Reply-to Email -->
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Reply-to Email</label>
+                <input type="email" id="cmp-reply-to" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="recruiting@legacyfinancial.app" />
+                <p class="text-xs text-gray-400 mt-0.5">Where replies go. Leave blank for default (recruiting@legacyfinancial.app)</p>
+              </div>
               <!-- Advanced (hidden by default) -->
               <details class="border-t border-gray-100 pt-2">
                 <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600">Advanced options</summary>
@@ -191,6 +208,13 @@ if (!session) {
                 </div>
               </details>
               <button id="cmp-submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors mt-2">Start Search</button>
+              <button id="cmp-preview-btn" type="button" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-lg text-sm transition-colors mt-1">
+                👁️ Preview Sample Email
+              </button>
+              <div id="cmp-preview-output" class="hidden mt-3 border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                <div class="px-3 py-2 bg-gray-100 border-b border-gray-200 text-xs font-medium text-gray-500">Sample Email Preview</div>
+                <div id="cmp-preview-content" class="p-3 text-xs text-gray-700 space-y-2"></div>
+              </div>
             </div>
           </div>
 
@@ -287,7 +311,7 @@ if (!session) {
               <li>Upload your CSV list of potential agents</li>
               <li>AI generates personalized emails & call scripts for each</li>
               <li>Review, edit, and approve each outreach</li>
-              <li>Send emails with one click (from tim@legacyf-l.com)</li>
+              <li>Send emails with one click (from recruiting@legacyfinancial.app)</li>
               <li>Track opens, replies, and conversions</li>
             </ol>
           </div>
@@ -352,19 +376,50 @@ if (!session) {
       </div>
     </div>
 
-    <!-- ═══════════════ SENT TAB ═══════════════ -->
+    <!-- ═══════════════ SENT & TRACKING TAB (CRM) ═══════════════ -->
     <div id="tab-sent" class="tab-panel hidden">
       <div class="space-y-4">
-        <div class="flex items-center gap-3">
-          <select id="sent-filter" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
-            <option value="sent">Sent</option>
-            <option value="converted">Converted</option>
-          </select>
+        <!-- Controls Bar -->
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+          <div class="flex items-center gap-3 flex-wrap">
+            <select id="sent-filter" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+              <option value="sent">📧 Sent</option>
+              <option value="approved">✅ Approved (unsent)</option>
+              <option value="converted">🎉 Converted</option>
+              <option value="bounced">⚠️ Bounced</option>
+              <option value="all_active">📋 All Active</option>
+            </select>
+            <div class="flex-1 min-w-[200px]">
+              <input type="text" id="sent-search" class="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" placeholder="Search by name, email, state..." />
+            </div>
+            <select id="sent-sort" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+              <option value="recent">Most Recent</option>
+              <option value="name">Name A-Z</option>
+              <option value="score">Fit Score ↓</option>
+              <option value="interaction">Last Interaction</option>
+            </select>
+            <span id="sent-count" class="text-xs text-gray-400 ml-auto"></span>
+          </div>
+          <!-- Quick Stats -->
+          <div class="flex gap-4 mt-3 pt-3 border-t border-gray-100" id="tracking-stats">
+            <div class="text-center"><span class="text-lg font-bold text-blue-600" id="stat-track-sent">-</span><p class="text-xs text-gray-400">Sent</p></div>
+            <div class="text-center"><span class="text-lg font-bold text-green-600" id="stat-track-opened">-</span><p class="text-xs text-gray-400">Opened</p></div>
+            <div class="text-center"><span class="text-lg font-bold text-purple-600" id="stat-track-replied">-</span><p class="text-xs text-gray-400">Replied</p></div>
+            <div class="text-center"><span class="text-lg font-bold text-emerald-600" id="stat-track-converted">-</span><p class="text-xs text-gray-400">Converted</p></div>
+            <div class="text-center"><span class="text-lg font-bold text-red-500" id="stat-track-bounced">-</span><p class="text-xs text-gray-400">Bounced</p></div>
+          </div>
         </div>
+
+        <!-- Prospect Cards -->
         <div id="sent-list" class="space-y-3">
           <div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
             <p class="text-sm">No outreach sent yet.</p>
           </div>
+        </div>
+
+        <!-- Load More -->
+        <div class="text-center">
+          <button id="sent-load-more" class="hidden text-sm text-brand-600 hover:text-brand-700 font-medium py-2">Load more...</button>
         </div>
       </div>
     </div>
@@ -776,6 +831,8 @@ if (!session) {
           jitterMinutes: (document.getElementById('cmp-jitter') as HTMLInputElement)?.value || '15',
           requireReview: (document.getElementById('cmp-review') as HTMLInputElement).checked,
           autoRelaunch: (document.getElementById('cmp-relaunch') as HTMLInputElement).checked,
+          signOff: (document.getElementById('cmp-signoff') as HTMLSelectElement).value,
+          replyToEmail: (document.getElementById('cmp-reply-to') as HTMLInputElement).value.trim() || null,
           notes: (document.getElementById('cmp-notes') as HTMLTextAreaElement)?.value || '',
         }),
       });
@@ -792,6 +849,52 @@ if (!session) {
     } finally {
       btn.disabled = false;
       btn.textContent = 'Start Search';
+    }
+  });
+
+  // Campaign preview — generates a sample email with the selected sign-off
+  document.getElementById('cmp-preview-btn')?.addEventListener('click', async () => {
+    const previewBtn = document.getElementById('cmp-preview-btn') as HTMLButtonElement;
+    const previewOutput = document.getElementById('cmp-preview-output')!;
+    const previewContent = document.getElementById('cmp-preview-content')!;
+    const stateVal = (document.getElementById('cmp-state') as HTMLSelectElement).value;
+    const signOff = (document.getElementById('cmp-signoff') as HTMLSelectElement).value;
+
+    previewBtn.disabled = true;
+    previewBtn.textContent = '⚙️ Generating sample...';
+    previewOutput.classList.remove('hidden');
+    previewContent.innerHTML = '<div class="text-center text-gray-400 py-4"><div class="animate-spin w-5 h-5 border-2 border-brand-600 border-t-transparent rounded-full mx-auto mb-2"></div>Generating preview with current settings...</div>';
+
+    try {
+      const sampleProspect = {
+        name: 'Sample Agent',
+        state: stateVal.slice(0, 2).toUpperCase() === 'GE' ? 'GA' : stateVal.replace(/\s*\(.*\)/, '').trim(),
+        city: 'Your City',
+        experience_level: 'new',
+        email: 'sample@test.legacy',
+      };
+      const res = await fetch('/api/recruitment-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospect: sampleProspect, signOff }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        previewContent.innerHTML = `<p class="text-red-500">${escapeHtml(data.error)}</p>`;
+        return;
+      }
+      previewContent.innerHTML = `
+        <div class="space-y-2">
+          <div><span class="text-gray-400">From:</span> Legacy Financial Recruiting &lt;recruiting@legacyfinancial.app&gt;</div>
+          <div><span class="text-gray-400">Subject:</span> <strong>${escapeHtml(data.email?.subject || '')}</strong></div>
+          <div class="border-t border-gray-200 pt-2 whitespace-pre-wrap text-gray-700">${escapeHtml(data.email?.body || '')}</div>
+          <div class="border-t border-gray-200 pt-2 text-gray-400 italic">Sign-off: "${escapeHtml(signOff)}"</div>
+        </div>`;
+    } catch {
+      previewContent.innerHTML = '<p class="text-red-500">Preview failed. Is the AI service running?</p>';
+    } finally {
+      previewBtn.disabled = false;
+      previewBtn.textContent = '👁️ Preview Sample Email';
     }
   });
 
@@ -1334,39 +1437,235 @@ if (!session) {
   }
 
   // ═══════════════════════════════════════════
-  // SENT LIST
+  // SENT / CRM TRACKING
   // ═══════════════════════════════════════════
   const sentList = document.getElementById('sent-list')!;
   const sentFilter = document.getElementById('sent-filter') as HTMLSelectElement;
-  sentFilter.addEventListener('change', loadSentList);
+  const sentSearch = document.getElementById('sent-search') as HTMLInputElement;
+  const sentSort = document.getElementById('sent-sort') as HTMLSelectElement;
+  const sentLoadMore = document.getElementById('sent-load-more') as HTMLButtonElement;
+  let sentOffset = 0;
+  const SENT_PAGE = 30;
+  let sentProspects: any[] = [];
 
-  async function loadSentList() {
+  sentFilter.addEventListener('change', () => { sentOffset = 0; sentProspects = []; loadSentList(); });
+  sentSort.addEventListener('change', () => { sentOffset = 0; sentProspects = []; loadSentList(); });
+  let sentSearchTimer: ReturnType<typeof setTimeout>;
+  sentSearch.addEventListener('input', () => {
+    clearTimeout(sentSearchTimer);
+    sentSearchTimer = setTimeout(() => { sentOffset = 0; sentProspects = []; loadSentList(); }, 300);
+  });
+  sentLoadMore.addEventListener('click', () => { sentOffset += SENT_PAGE; loadSentList(true); });
+
+  async function loadSentList(append = false) {
     const status = sentFilter.value;
+    const search = sentSearch.value.trim();
+    const sort = sentSort.value;
+
+    // Build query params
+    let statusFilter = `status=eq.${status}`;
+    if (status === 'all_active') {
+      statusFilter = 'status=in.(sent,approved,converted)';
+    }
+    let orderBy = 'sent_at.desc.nullslast,created_at.desc';
+    if (sort === 'name') orderBy = 'name.asc';
+    else if (sort === 'score') orderBy = 'fit_score.desc.nullslast';
+    else if (sort === 'interaction') orderBy = 'last_interaction_at.desc.nullslast,sent_at.desc.nullslast';
+
     try {
-      const res = await fetch(`/api/recruitment-upload?status=${status}&limit=50`);
+      let url = `/api/recruitment-upload?${statusFilter}&limit=${SENT_PAGE}&offset=${sentOffset}&order=${orderBy}`;
+      if (search) url += `&search=${encodeURIComponent(search)}`;
+      const res = await fetch(url);
       const data = await res.json();
-      if (!data.prospects?.length) {
+      const prospects = data.prospects || [];
+
+      if (append) {
+        sentProspects = [...sentProspects, ...prospects];
+      } else {
+        sentProspects = prospects;
+      }
+
+      const count = data.total || sentProspects.length;
+      document.getElementById('sent-count')!.textContent = count > 0 ? `${count} total` : '';
+      sentLoadMore.classList.toggle('hidden', prospects.length < SENT_PAGE);
+
+      if (sentProspects.length === 0) {
         sentList.innerHTML = '<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><p class="text-sm">No outreach in this category yet.</p></div>';
         return;
       }
-      sentList.innerHTML = data.prospects.map((p: any) => `
-        <div class="bg-white rounded-xl border border-gray-200 p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="font-semibold text-gray-900 text-sm">${escapeHtml(p.name)}</h3>
-              <p class="text-xs text-gray-500">${escapeHtml(p.email || '')} • ${escapeHtml(p.state || '')}</p>
-            </div>
-            <div class="text-right">
-              <span class="text-xs ${p.status === 'converted' ? 'text-green-600 font-bold' : 'text-gray-500'}">${p.status}</span>
-              ${p.sent_at ? `<p class="text-xs text-gray-400">Sent ${new Date(p.sent_at).toLocaleDateString()}</p>` : ''}
-              ${p.call_outcome ? `<p class="text-xs text-amber-600">Call: ${p.call_outcome}</p>` : ''}
-            </div>
-          </div>
-        </div>
-      `).join('');
+
+      renderSentCards(sentProspects);
+      loadTrackingStats();
     } catch {
       sentList.innerHTML = '<div class="text-center text-red-500 text-sm py-4">Failed to load</div>';
     }
+  }
+
+  function renderSentCards(prospects: any[]) {
+    sentList.innerHTML = prospects.map((p: any) => {
+      const scoreColor = (p.fit_score || 0) >= 7 ? 'green' : (p.fit_score || 0) >= 4 ? 'amber' : 'red';
+      const stateMatch = ['GA','OH','OK','SC','MS','MI','TX','UT','AL','LA'].includes(p.state?.toUpperCase());
+      const props = p.properties || {};
+
+      // Interaction indicators
+      const indicators: string[] = [];
+      if (p.sent_at) indicators.push(`<span class="text-blue-600" title="Sent ${new Date(p.sent_at).toLocaleDateString()}">📧</span>`);
+      if (props.email_opened_at || p.email_opened_at) indicators.push(`<span class="text-green-600" title="Opened">👁️</span>`);
+      if (props.email_clicked_at || p.email_clicked_at) indicators.push(`<span class="text-purple-600" title="Clicked">🔗</span>`);
+      if (p.replied_at || props.replied_at) indicators.push(`<span class="text-indigo-600" title="Replied">💬</span>`);
+      if (p.status === 'converted') indicators.push(`<span class="text-emerald-600" title="Converted">🎉</span>`);
+      if (p.status === 'bounced' || props.bounced_at) indicators.push(`<span class="text-red-500" title="Bounced">⚠️</span>`);
+      if (props.call_made_at) indicators.push(`<span class="text-amber-600" title="Called: ${escapeHtml(props.call_outcome || '')}">📞</span>`);
+
+      // Stage badge
+      const stage = p.interaction_stage || (p.status === 'sent' ? 'outreach_sent' : p.status);
+      const stageLabels: Record<string, { label: string; color: string }> = {
+        new: { label: 'New', color: 'gray' },
+        outreach_sent: { label: 'Outreach Sent', color: 'blue' },
+        opened: { label: 'Opened', color: 'green' },
+        engaged: { label: 'Engaged', color: 'purple' },
+        replied: { label: 'Replied', color: 'indigo' },
+        scheduled: { label: 'Call Scheduled', color: 'amber' },
+        converted: { label: 'Converted', color: 'emerald' },
+        approved: { label: 'Approved', color: 'sky' },
+        sent: { label: 'Sent', color: 'blue' },
+        bounced: { label: 'Bounced', color: 'red' },
+      };
+      const stageInfo = stageLabels[stage] || { label: stage, color: 'gray' };
+
+      return `
+        <div class="bg-white rounded-xl border border-gray-200 p-4 hover:border-brand-200 transition-colors">
+          <div class="flex items-start justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1 flex-wrap">
+                <h3 class="font-semibold text-gray-900 text-sm">${escapeHtml(p.name)}</h3>
+                ${p.fit_score ? `<span class="text-xs font-bold text-${scoreColor}-600">${p.fit_score}/10</span>` : ''}
+                <span class="text-xs bg-${stageInfo.color}-100 text-${stageInfo.color}-700 px-1.5 py-0.5 rounded font-medium">${stageInfo.label}</span>
+                ${stateMatch ? '<span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Licensed</span>' : ''}
+                ${p.research_score != null ? `<span class="text-xs ${p.research_score >= 7 ? 'bg-green-50 text-green-600' : p.research_score >= 4 ? 'bg-amber-50 text-amber-600' : 'bg-gray-50 text-gray-500'} px-1.5 py-0.5 rounded">🔍 ${p.research_score}</span>` : ''}
+              </div>
+              <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
+                ${p.email ? `<span>✉️ ${escapeHtml(p.email)}</span>` : '<span class="text-gray-400">No email</span>'}
+                ${p.state ? `<span>📍 ${escapeHtml(p.state)}${p.city ? ', ' + escapeHtml(p.city) : ''}</span>` : ''}
+                ${p.phone ? `<span>📞 ${escapeHtml(p.phone)}</span>` : ''}
+              </div>
+              ${p.fit_reason ? `<p class="text-xs text-gray-500 mt-1 italic">${escapeHtml(p.fit_reason)}</p>` : ''}
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="flex gap-1 justify-end mb-1">${indicators.join('')}</div>
+              ${p.sent_at ? `<p class="text-xs text-gray-400">Sent ${new Date(p.sent_at).toLocaleDateString()}</p>` : ''}
+              ${p.follow_up_count ? `<p class="text-xs text-gray-400">${p.follow_up_count} follow-up${p.follow_up_count > 1 ? 's' : ''}</p>` : ''}
+            </div>
+          </div>
+
+          <!-- Interaction Timeline -->
+          <details class="mt-3">
+            <summary class="text-xs font-medium text-brand-600 cursor-pointer">Timeline & Details</summary>
+            <div class="mt-2 space-y-2">
+              <!-- Timeline -->
+              <div class="bg-gray-50 rounded-lg p-3">
+                <div class="space-y-1.5 text-xs">
+                  ${p.created_at ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(p.created_at).toLocaleDateString()}</span><span class="text-gray-600">📋 Added to pipeline</span></div>` : ''}
+                  ${p.processed_at ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(p.processed_at).toLocaleDateString()}</span><span class="text-gray-600">🤖 AI outreach generated</span></div>` : ''}
+                  ${p.approved_at ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(p.approved_at).toLocaleDateString()}</span><span class="text-gray-600">✅ Approved${props.auto_approved ? ' (auto)' : ''}</span></div>` : ''}
+                  ${p.sent_at ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(p.sent_at).toLocaleDateString()}</span><span class="text-gray-600">📧 Email sent</span></div>` : ''}
+                  ${(props.email_opened_at || p.email_opened_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(props.email_opened_at || p.email_opened_at).toLocaleDateString()}</span><span class="text-green-600">👁️ Email opened</span></div>` : ''}
+                  ${(props.email_clicked_at || p.email_clicked_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(props.email_clicked_at || p.email_clicked_at).toLocaleDateString()}</span><span class="text-purple-600">🔗 Link clicked</span></div>` : ''}
+                  ${(p.replied_at || props.replied_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(p.replied_at || props.replied_at).toLocaleDateString()}</span><span class="text-indigo-600">💬 Replied</span></div>` : ''}
+                  ${props.call_made_at ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(props.call_made_at).toLocaleDateString()}</span><span class="text-amber-600">📞 Call: ${escapeHtml(props.call_outcome || 'unknown')}</span></div>` : ''}
+                </div>
+              </div>
+
+              <!-- Email Content -->
+              ${p.email_body ? `
+              <div class="bg-gray-50 rounded-lg p-3">
+                <p class="text-xs font-medium text-gray-500 mb-1">Subject: ${escapeHtml(p.email_subject || '')}</p>
+                <p class="text-xs text-gray-600 whitespace-pre-wrap max-h-32 overflow-y-auto">${escapeHtml(p.email_body)}</p>
+              </div>` : ''}
+
+              <!-- Actions -->
+              <div class="flex gap-2 flex-wrap">
+                ${p.status === 'approved' && p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Send Email</button>` : ''}
+                ${p.status === 'sent' ? `<button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>` : ''}
+                ${p.status === 'sent' || p.status === 'approved' ? `<button class="action-btn convert-btn bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">🎉 Mark Converted</button>` : ''}
+              </div>
+            </div>
+          </details>
+        </div>`;
+    }).join('');
+
+    // Bind action buttons
+    sentList.querySelectorAll('.send-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = (btn as HTMLElement).dataset.id;
+        if (!confirm('Send email to this prospect?')) return;
+        try {
+          const res = await fetch('/api/recruitment-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, action: 'send_email' }),
+          });
+          const data = await res.json();
+          if (data.error) { showToast(data.error, 'error'); return; }
+          showToast('Email sent!', 'success');
+          sentOffset = 0; sentProspects = []; loadSentList();
+        } catch { showToast('Send failed', 'error'); }
+      });
+    });
+
+    sentList.querySelectorAll('.call-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = (btn as HTMLElement).dataset.id;
+        const outcome = prompt('Call outcome (no_answer, spoke, scheduled, voicemail):');
+        if (!outcome) return;
+        try {
+          const res = await fetch('/api/recruitment-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, action: 'mark_called', callOutcome: outcome }),
+          });
+          const data = await res.json();
+          if (data.error) { showToast(data.error, 'error'); return; }
+          showToast('Call logged', 'success');
+          sentOffset = 0; sentProspects = []; loadSentList();
+        } catch { showToast('Failed', 'error'); }
+      });
+    });
+
+    sentList.querySelectorAll('.convert-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = (btn as HTMLElement).dataset.id;
+        try {
+          const res = await fetch('/api/recruitment-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, action: 'approve' }),
+          });
+          // Then update status to converted
+          await fetch('/api/recruitment-action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, action: 'mark_called', callOutcome: 'scheduled' }),
+          });
+          showToast('Marked as converted!', 'success');
+          sentOffset = 0; sentProspects = []; loadSentList();
+        } catch { showToast('Failed', 'error'); }
+      });
+    });
+  }
+
+  async function loadTrackingStats() {
+    try {
+      const [sentRes, convertedRes] = await Promise.all([
+        fetch('/api/recruitment-upload?status=sent&limit=1'),
+        fetch('/api/recruitment-upload?status=converted&limit=1'),
+      ]);
+      const sentData = await sentRes.json();
+      const convertedData = await convertedRes.json();
+      document.getElementById('stat-track-sent')!.textContent = String(sentData.total || 0);
+      document.getElementById('stat-track-converted')!.textContent = String(convertedData.total || 0);
+      // Opened/replied/bounced would need server-side counts — show '-' until available
+    } catch { /* silent */ }
   }
 
   // ═══════════════════════════════════════════
@@ -1541,10 +1840,11 @@ if (!session) {
 
     try {
       const feedback = loadFeedback();
+      const signOff = (document.getElementById('cmp-signoff') as HTMLSelectElement)?.value || 'Legacy Financial Recruiting Team';
       const res = await fetch('/api/recruitment-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prospect, feedback }),
+        body: JSON.stringify({ prospect, feedback, signOff }),
       });
       if (!res.ok && res.status === 504) {
         showAiErrorBanner('Generation timed out');
@@ -1624,10 +1924,11 @@ if (!session) {
 
     try {
       const feedback = loadFeedback();
+      const signOff = (document.getElementById('cmp-signoff') as HTMLSelectElement)?.value || 'Legacy Financial Recruiting Team';
       const res = await fetch('/api/recruitment-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prospect, feedback }),
+        body: JSON.stringify({ prospect, feedback, signOff }),
       });
 
       if (!res.ok && res.status === 504) {
@@ -1666,6 +1967,7 @@ if (!session) {
   function renderPreviewOutput(data: any, prospect: any) {
     const scoreColor = (data.fitScore || 0) >= 7 ? 'green' : (data.fitScore || 0) >= 4 ? 'amber' : 'red';
     const isTestDomain = prospect.email?.endsWith('@test.legacy');
+    const hasEmail = prospect.email && !isTestDomain;
 
     testOutput.innerHTML = `
       <div class="space-y-4">
@@ -1691,16 +1993,27 @@ if (!session) {
             <span class="text-xs font-medium">${escapeHtml(prospect.name)} &lt;${escapeHtml(prospect.email || 'no email')}&gt;</span>
           </div>
           <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center gap-2">
+            <span class="text-xs text-gray-400">Reply-To:</span>
+            <span class="text-xs text-gray-600">tim@legacyf-l.com</span>
+          </div>
+          <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center gap-2">
             <span class="text-xs text-gray-400">Subject:</span>
             <span class="text-xs font-bold text-gray-800">${escapeHtml(data.email?.subject || '(no subject)')}</span>
           </div>
           <div class="px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">${escapeHtml(data.email?.body || '(no body)')}</div>
         </div>
 
+        <!-- Send status -->
+        <div class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+          <p class="text-xs text-amber-800 font-medium">🔒 Sending is locked — client review in progress</p>
+          <p class="text-xs text-amber-600 mt-0.5">${hasEmail ? 'This email will NOT be sent until content is approved.' : 'No email address on file — outreach will be phone-only.'}</p>
+        </div>
+
         <!-- Call Script Preview -->
         <div class="border border-gray-200 rounded-lg overflow-hidden">
-          <div class="bg-amber-50 px-4 py-2 border-b border-gray-200">
+          <div class="bg-amber-50 px-4 py-2 border-b border-gray-200 flex items-center justify-between">
             <span class="text-xs font-semibold text-amber-800">📞 Call Script (30-second opener)</span>
+            <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">AI-Generated Draft</span>
           </div>
           <div class="px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap">${escapeHtml(data.callScript?.opener || '(no script)')}</div>
           ${data.callScript?.voicemail ? `
@@ -1708,6 +2021,9 @@ if (!session) {
             <span class="text-xs font-semibold text-gray-500">📱 Voicemail</span>
           </div>
           <div class="px-4 py-3 text-xs text-gray-600 whitespace-pre-wrap">${escapeHtml(data.callScript.voicemail)}</div>` : ''}
+          <div class="bg-blue-50 px-4 py-2 border-t border-gray-200">
+            <p class="text-xs text-blue-700">ℹ️ Client's custom call script will replace this AI draft once provided. Phone agent will follow the approved script.</p>
+          </div>
         </div>
       </div>`;
   }
