@@ -79,7 +79,7 @@ export const POST: APIRoute = async ({ request }) => {
     const { action } = body;
 
     if (action === 'create') {
-      const name = String(body.name || 'Untitled Campaign').slice(0, 200);
+      const name = String(body.name || 'Untitled Search').slice(0, 200);
       const record = {
         name,
         client: String(body.client || 'legacy').slice(0, 50),
@@ -89,6 +89,7 @@ export const POST: APIRoute = async ({ request }) => {
         max_pages_per_run: Math.max(1, Math.min(50, parseInt(body.maxPagesPerRun) || 20)),
         schedule_interval_minutes: Math.max(15, Math.min(1440, parseInt(body.intervalMinutes) || 60)),
         schedule_jitter_minutes: Math.max(0, Math.min(30, parseInt(body.jitterMinutes) || 15)),
+        require_review: body.requireReview !== false,
         status: 'active',
         created_by: session.email || 'unknown',
         notes: String(body.notes || '').slice(0, 500),

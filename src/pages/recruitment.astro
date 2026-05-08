@@ -88,7 +88,7 @@ if (!session) {
         📤 Upload
       </button>
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="campaigns">
-        🎯 Campaigns
+        🔍 Prophog
       </button>
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="review">
         ✅ Review & Approve
@@ -105,31 +105,32 @@ if (!session) {
   <!-- Tab Content -->
   <div class="max-w-7xl mx-auto px-4 py-4">
 
-    <!-- ═══════════════ CAMPAIGNS TAB ═══════════════ -->
+    <!-- ═══════════════ PROPHOG TAB ═══════════════ -->
     <div id="tab-campaigns" class="tab-panel hidden">
       <div class="grid lg:grid-cols-3 gap-6">
-        <!-- Campaign List -->
+        <!-- Search List -->
         <div class="lg:col-span-2 space-y-4">
           <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900">Active Campaigns</h2>
-            <button id="new-campaign-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">+ New Campaign</button>
+            <h2 class="text-lg font-semibold text-gray-900">Prophog Searches</h2>
+            <button id="new-campaign-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">+ New Search</button>
           </div>
           <div id="campaign-list" class="space-y-3">
-            <div class="text-sm text-gray-500 text-center py-8">Loading campaigns...</div>
+            <div class="text-sm text-gray-500 text-center py-8">Loading...</div>
           </div>
         </div>
 
-        <!-- New Campaign Form -->
+        <!-- Sidebar: Form + Live Feed -->
         <div class="space-y-4">
+          <!-- New Search Form -->
           <div id="campaign-form" class="bg-white rounded-xl border border-gray-200 p-5 hidden">
-            <h3 class="text-sm font-semibold text-gray-900 mb-4">Create Campaign</h3>
+            <h3 class="text-sm font-semibold text-gray-900 mb-4">Search Prophog</h3>
             <div class="space-y-3">
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Campaign Name</label>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Search Name</label>
                 <input type="text" id="cmp-name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g., May GA Agents" />
               </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Search State</label>
+                <label class="block text-xs font-medium text-gray-600 mb-1">State</label>
                 <input type="text" id="cmp-state" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="Georgia" />
               </div>
               <div class="grid grid-cols-2 gap-3">
@@ -138,32 +139,45 @@ if (!session) {
                   <input type="number" id="cmp-budget" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="100" min="1" max="10000" />
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-gray-600 mb-1">Max Pages/Run</label>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Pages per Run</label>
                   <input type="number" id="cmp-pages" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="20" min="1" max="50" />
                 </div>
               </div>
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-xs font-medium text-gray-600 mb-1">Interval (min)</label>
-                  <input type="number" id="cmp-interval" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="60" min="15" max="1440" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-600 mb-1">Jitter (min)</label>
-                  <input type="number" id="cmp-jitter" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="15" min="0" max="30" />
-                </div>
-              </div>
               <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Notes</label>
-                <textarea id="cmp-notes" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Optional notes..."></textarea>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Run Every (minutes)</label>
+                <input type="number" id="cmp-interval" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="60" min="15" max="1440" />
               </div>
-              <button id="cmp-submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors">Create Campaign</button>
+              <!-- Review toggle -->
+              <label class="flex items-center gap-3 py-2 cursor-pointer">
+                <input type="checkbox" id="cmp-review" checked class="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500" />
+                <div>
+                  <span class="text-sm font-medium text-gray-800">Require review before sending</span>
+                  <p class="text-xs text-gray-500">Leads go to Review & Approve. Uncheck to auto-send.</p>
+                </div>
+              </label>
+              <!-- Advanced (hidden by default) -->
+              <details class="border-t border-gray-100 pt-2">
+                <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600">Advanced options</summary>
+                <div class="mt-2 space-y-3">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Schedule Jitter (min)</label>
+                    <input type="number" id="cmp-jitter" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="15" min="0" max="30" />
+                    <p class="text-xs text-gray-400 mt-0.5">Randomizes run time ± this many minutes</p>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                    <textarea id="cmp-notes" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Internal notes..."></textarea>
+                  </div>
+                </div>
+              </details>
+              <button id="cmp-submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors mt-2">Start Search</button>
             </div>
           </div>
 
           <!-- Live Feed -->
           <div class="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 class="text-sm font-semibold text-gray-900 mb-3">Recent Leads</h3>
-            <div id="live-feed" class="space-y-2 max-h-96 overflow-y-auto">
+            <h3 class="text-sm font-semibold text-gray-900 mb-3">Recent Finds</h3>
+            <div id="live-feed" class="space-y-1 max-h-96 overflow-y-auto">
               <div class="text-xs text-gray-400 text-center py-4">Loading...</div>
             </div>
           </div>
@@ -548,7 +562,7 @@ if (!session) {
       renderCampaigns();
       loadLiveFeed();
     } catch (err) {
-      list.innerHTML = '<div class="text-sm text-red-500 text-center py-4">Failed to load campaigns</div>';
+      list.innerHTML = '<div class="text-sm text-red-500 text-center py-4">Failed to load searches</div>';
     }
   }
 
@@ -556,7 +570,7 @@ if (!session) {
     const list = document.getElementById('campaign-list');
     if (!list) return;
     if (campaignsCache.length === 0) {
-      list.innerHTML = '<div class="text-sm text-gray-500 text-center py-8">No campaigns yet. Create one to start automated lead scraping.</div>';
+      list.innerHTML = '<div class="text-sm text-gray-500 text-center py-8">No searches yet. Click "+ New Search" to start finding agents on Prophog.</div>';
       return;
     }
     list.innerHTML = campaignsCache.map(c => {
@@ -565,31 +579,35 @@ if (!session) {
       const counts = c.prospect_counts || {};
       const totalProspects = Object.values(counts).reduce((a: number, b: any) => a + (b || 0), 0);
       const lastRun = c.last_run_at ? new Date(c.last_run_at).toLocaleString() : 'Never';
-      const nextRun = c.next_run_at ? new Date(c.next_run_at).toLocaleString() : 'Pending';
+      const nextRun = c.next_run_at ? new Date(c.next_run_at).toLocaleString() : 'Queued';
+      const reviewBadge = c.require_review
+        ? '<span class="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Review first</span>'
+        : '<span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Auto-send</span>';
       return `
         <div class="bg-white rounded-xl border border-gray-200 p-4 hover:border-brand-300 transition-colors">
           <div class="flex items-start justify-between mb-3">
             <div>
-              <h3 class="font-semibold text-gray-900 text-sm">${escapeHtml(c.name)}</h3>
-              <p class="text-xs text-gray-500">${c.search_state} · ${c.schedule_interval_minutes}min interval</p>
+              <h3 class="font-semibold text-gray-900">${escapeHtml(c.name)}</h3>
+              <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(c.search_state)} · every ${c.schedule_interval_minutes} min</p>
             </div>
             <div class="flex items-center gap-2">
+              ${reviewBadge}
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-700">${c.status}</span>
-              <button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}">${c.status === 'active' ? '⏸ Pause' : '▶ Resume'}</button>
+              <button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}">${c.status === 'active' ? '⏸' : '▶'}</button>
             </div>
           </div>
           <div class="grid grid-cols-4 gap-2 text-center mb-3">
-            <div><div class="text-lg font-bold text-gray-900">${totalProspects}</div><div class="text-xs text-gray-500">Leads</div></div>
+            <div><div class="text-lg font-bold text-gray-900">${totalProspects}</div><div class="text-xs text-gray-500">Found</div></div>
             <div><div class="text-lg font-bold text-amber-600">${counts.pending || 0}</div><div class="text-xs text-gray-500">Pending</div></div>
-            <div><div class="text-lg font-bold text-blue-600">${counts.processed || 0}</div><div class="text-xs text-gray-500">Processed</div></div>
-            <div><div class="text-lg font-bold text-green-600">${counts.approved || 0}</div><div class="text-xs text-gray-500">Approved</div></div>
+            <div><div class="text-lg font-bold text-blue-600">${counts.processed || 0}</div><div class="text-xs text-gray-500">Ready</div></div>
+            <div><div class="text-lg font-bold text-green-600">${counts.sent || 0}</div><div class="text-xs text-gray-500">Sent</div></div>
           </div>
           <div class="flex items-center gap-3 text-xs text-gray-500 mb-2">
-            <span>Credits: ${c.credits_used}/${c.credit_budget}</span>
-            <div class="flex-1 bg-gray-200 rounded-full h-1.5"><div class="bg-brand-600 h-1.5 rounded-full" style="width: ${Math.min(100, budgetPct)}%"></div></div>
+            <span>${c.credits_used}/${c.credit_budget} credits</span>
+            <div class="flex-1 bg-gray-200 rounded-full h-1.5"><div class="${budgetPct >= 90 ? 'bg-red-500' : 'bg-brand-600'} h-1.5 rounded-full" style="width: ${Math.min(100, budgetPct)}%"></div></div>
           </div>
           <div class="flex items-center justify-between text-xs text-gray-400">
-            <span>Last: ${lastRun}</span>
+            <span>Last run: ${lastRun}</span>
             <span>Next: ${nextRun}</span>
           </div>
         </div>`;
@@ -653,31 +671,39 @@ if (!session) {
 
   document.getElementById('cmp-submit')?.addEventListener('click', async () => {
     const btn = document.getElementById('cmp-submit') as HTMLButtonElement;
+    const nameVal = (document.getElementById('cmp-name') as HTMLInputElement).value.trim();
+    if (!nameVal) { (document.getElementById('cmp-name') as HTMLInputElement).focus(); return; }
     btn.disabled = true;
-    btn.textContent = 'Creating...';
+    btn.textContent = 'Starting...';
     try {
       const res = await fetch('/api/recruitment-campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'create',
-          name: (document.getElementById('cmp-name') as HTMLInputElement).value,
+          name: nameVal,
           searchState: (document.getElementById('cmp-state') as HTMLInputElement).value,
           creditBudget: (document.getElementById('cmp-budget') as HTMLInputElement).value,
           maxPagesPerRun: (document.getElementById('cmp-pages') as HTMLInputElement).value,
           intervalMinutes: (document.getElementById('cmp-interval') as HTMLInputElement).value,
-          jitterMinutes: (document.getElementById('cmp-jitter') as HTMLInputElement).value,
-          notes: (document.getElementById('cmp-notes') as HTMLTextAreaElement).value,
+          jitterMinutes: (document.getElementById('cmp-jitter') as HTMLInputElement)?.value || '15',
+          requireReview: (document.getElementById('cmp-review') as HTMLInputElement).checked,
+          notes: (document.getElementById('cmp-notes') as HTMLTextAreaElement)?.value || '',
         }),
       });
-      if (!res.ok) throw new Error('Failed to create');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
       document.getElementById('campaign-form')?.classList.add('hidden');
+      (document.getElementById('cmp-name') as HTMLInputElement).value = '';
       loadCampaigns();
-    } catch (err) {
-      alert('Failed to create campaign');
+      showToast('Search started!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to start search', 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Create Campaign';
+      btn.textContent = 'Start Search';
     }
   });
 
