@@ -99,6 +99,9 @@ if (!session) {
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="preview">
         🧪 Preview & Test
       </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="pipeline">
+        ⚙️ Pipeline
+      </button>
     </div>
   </div>
 
@@ -563,6 +566,76 @@ if (!session) {
       </div>
     </div>
 
+    <!-- ═══════════════ PIPELINE TAB ═══════════════ -->
+    <div id="tab-pipeline" class="tab-panel hidden">
+      <div class="grid lg:grid-cols-2 gap-6">
+        <!-- Pipeline Status -->
+        <div class="space-y-4">
+          <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Pipeline Status</h2>
+            <div id="pipeline-stats" class="space-y-3">
+              <div class="text-sm text-gray-500">Loading...</div>
+            </div>
+            <button id="pipeline-refresh-btn" class="mt-4 text-xs text-brand-600 hover:text-brand-700 font-medium">↻ Refresh</button>
+          </div>
+
+          <!-- Review Agent Settings -->
+          <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Review Agent</h2>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-sm font-medium text-gray-700">Send Lock</div>
+                  <div class="text-xs text-gray-500">When locked, review agent moves to "ready to send" instead of sending</div>
+                </div>
+                <div id="send-lock-badge" class="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-700">🔒 Locked</div>
+              </div>
+
+              <div>
+                <label class="text-sm font-medium text-gray-700 block mb-1">Outreach batch size per cycle</label>
+                <select id="pipeline-outreach-limit" class="rounded-lg border border-gray-300 text-sm px-3 py-1.5">
+                  <option value="1">1 (conservative)</option>
+                  <option value="3" selected>3 (default)</option>
+                  <option value="5">5 (faster)</option>
+                  <option value="10">10 (aggressive)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-sm font-medium text-gray-700 block mb-1">Review agent auto-approve threshold</label>
+                <select id="pipeline-approve-threshold" class="rounded-lg border border-gray-300 text-sm px-3 py-1.5">
+                  <option value="2">≥ 2 (lenient — almost everyone)</option>
+                  <option value="4" selected>≥ 4 (default — high quality)</option>
+                  <option value="6">≥ 6 (strict — best only)</option>
+                </select>
+              </div>
+
+              <div class="flex gap-2 pt-2">
+                <button id="pipeline-run-outreach" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                  ▶ Run Outreach Now
+                </button>
+                <button id="pipeline-run-review" class="bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                  ▶ Run Review Now
+                </button>
+                <button id="pipeline-run-research" class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
+                  ▶ Run Research Now
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ready to Send Queue -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Ready to Send</h2>
+          <p class="text-xs text-gray-500 mb-4">Prospects the review agent has approved. Preview their email before unlocking sends.</p>
+          <div id="ready-to-send-list" class="space-y-3 max-h-[600px] overflow-y-auto">
+            <div class="text-sm text-gray-500">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -649,6 +722,7 @@ if (!session) {
       if (tab === 'review') loadReviewList();
       if (tab === 'sent') loadSentList();
       if (tab === 'campaigns') loadCampaigns();
+      if (tab === 'pipeline') loadPipelineStatus();
     });
   });
 
@@ -2129,6 +2203,177 @@ if (!session) {
       }
     } catch { /* ignore — stays on upload tab */ }
   })();
+
+  // ═══════════════════════════════════════════
+  // PIPELINE TAB
+  // ═══════════════════════════════════════════
+
+  async function loadPipelineStatus() {
+    const statsEl = document.getElementById('pipeline-stats');
+    const listEl = document.getElementById('ready-to-send-list');
+    if (!statsEl) return;
+
+    try {
+      // Fetch counts for each status
+      const statuses = ['pending', 'processed', 'ready_to_send', 'approved', 'sent', 'rejected'];
+      const counts: Record<string, number> = {};
+
+      await Promise.all(statuses.map(async (s) => {
+        const res = await fetch(`/api/recruitment-upload?status=${s}&limit=0`);
+        const data = await res.json();
+        counts[s] = data.total || 0;
+      }));
+
+      const stages = [
+        { key: 'pending', label: '⏳ Pending (need outreach)', color: 'text-gray-600' },
+        { key: 'processed', label: '📝 Processed (outreach generated)', color: 'text-blue-600' },
+        { key: 'ready_to_send', label: '✅ Ready to Send (reviewed)', color: 'text-green-600' },
+        { key: 'approved', label: '👍 Approved', color: 'text-emerald-600' },
+        { key: 'sent', label: '📧 Sent', color: 'text-purple-600' },
+        { key: 'rejected', label: '❌ Rejected', color: 'text-red-600' },
+      ];
+
+      statsEl.innerHTML = stages.map(s => `
+        <div class="flex items-center justify-between py-1 border-b border-gray-100 last:border-0">
+          <span class="text-sm ${s.color}">${s.label}</span>
+          <span class="text-sm font-semibold ${s.color}">${counts[s.key] || 0}</span>
+        </div>
+      `).join('') + `
+        <div class="pt-2 text-xs text-gray-400">
+          Flow: Pending → Processed → Ready to Send → Sent<br>
+          Cron loop: every 90s • Outreach: 3/loop • Research: 10/loop • Review: 20/loop
+        </div>
+      `;
+    } catch (err) {
+      statsEl.innerHTML = `<div class="text-sm text-red-500">Failed to load: ${err}</div>`;
+    }
+
+    // Load ready-to-send prospects
+    if (listEl) {
+      try {
+        const res = await fetch('/api/recruitment-upload?status=ready_to_send&limit=20&sort=recent');
+        const data = await res.json();
+        const prospects = data.prospects || [];
+
+        if (prospects.length === 0) {
+          listEl.innerHTML = '<div class="text-sm text-gray-400">No prospects ready to send yet. The pipeline is working on it.</div>';
+        } else {
+          listEl.innerHTML = prospects.map((p: any) => `
+            <div class="border border-gray-100 rounded-lg p-3 hover:border-brand-200 transition-colors">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-sm font-medium text-gray-900">${p.name || 'Unknown'}</span>
+                <span class="text-xs px-1.5 py-0.5 rounded ${p.fit_score >= 7 ? 'bg-green-100 text-green-700' : p.fit_score >= 5 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}">${p.fit_score || '?'}/10</span>
+              </div>
+              <div class="text-xs text-gray-500">${p.state || ''} ${p.city ? '• ' + p.city : ''} ${p.email ? '• ' + p.email : ''}</div>
+              ${p.email_subject ? `<div class="mt-2 text-xs text-gray-700 bg-gray-50 rounded p-2"><strong>Subject:</strong> ${p.email_subject}</div>` : ''}
+              ${p.email_body ? `<details class="mt-1"><summary class="text-xs text-brand-600 cursor-pointer">Preview email body</summary><pre class="mt-1 text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 rounded p-2 max-h-40 overflow-y-auto">${p.email_body}</pre></details>` : ''}
+              <div class="mt-2 flex gap-2">
+                <button class="pipeline-send-btn text-xs bg-brand-600 hover:bg-brand-700 text-white px-2 py-1 rounded" data-id="${p.id}" ${!p.email ? 'disabled title="No email"' : ''}>
+                  📧 Approve & Queue Send
+                </button>
+                <button class="pipeline-reject-btn text-xs bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1 rounded" data-id="${p.id}">
+                  ✕ Reject
+                </button>
+              </div>
+            </div>
+          `).join('');
+
+          // Wire buttons
+          listEl.querySelectorAll('.pipeline-send-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const id = (btn as HTMLElement).dataset.id;
+              (btn as HTMLButtonElement).disabled = true;
+              (btn as HTMLButtonElement).textContent = '...';
+              await fetch('/api/recruitment-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, action: 'approve' }),
+              });
+              loadPipelineStatus();
+            });
+          });
+          listEl.querySelectorAll('.pipeline-reject-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const id = (btn as HTMLElement).dataset.id;
+              (btn as HTMLButtonElement).disabled = true;
+              await fetch('/api/recruitment-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, action: 'reject', reason: 'Rejected from pipeline tab' }),
+              });
+              loadPipelineStatus();
+            });
+          });
+        }
+      } catch {
+        listEl.innerHTML = '<div class="text-sm text-red-500">Failed to load</div>';
+      }
+    }
+  }
+
+  // Pipeline manual triggers
+  document.getElementById('pipeline-run-outreach')?.addEventListener('click', async function() {
+    const btn = this as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = '⏳ Running...';
+    try {
+      const limit = (document.getElementById('pipeline-outreach-limit') as HTMLSelectElement)?.value || '3';
+      const res = await fetch('/api/recruitment-pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'outreach', limit: parseInt(limit) }),
+      });
+      const data = await res.json();
+      btn.textContent = `✅ ${data.processed || 0} done`;
+      setTimeout(() => { btn.textContent = '▶ Run Outreach Now'; btn.disabled = false; }, 3000);
+      loadPipelineStatus();
+    } catch {
+      btn.textContent = '❌ Failed';
+      setTimeout(() => { btn.textContent = '▶ Run Outreach Now'; btn.disabled = false; }, 3000);
+    }
+  });
+
+  document.getElementById('pipeline-run-review')?.addEventListener('click', async function() {
+    const btn = this as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = '⏳ Running...';
+    try {
+      const res = await fetch('/api/recruitment-pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'review' }),
+      });
+      const data = await res.json();
+      btn.textContent = `✅ ${data.reviewed || 0} reviewed`;
+      setTimeout(() => { btn.textContent = '▶ Run Review Now'; btn.disabled = false; }, 3000);
+      loadPipelineStatus();
+    } catch {
+      btn.textContent = '❌ Failed';
+      setTimeout(() => { btn.textContent = '▶ Run Review Now'; btn.disabled = false; }, 3000);
+    }
+  });
+
+  document.getElementById('pipeline-run-research')?.addEventListener('click', async function() {
+    const btn = this as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = '⏳ Running...';
+    try {
+      const res = await fetch('/api/recruitment-pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'research' }),
+      });
+      const data = await res.json();
+      btn.textContent = `✅ ${data.processed || 0} scored`;
+      setTimeout(() => { btn.textContent = '▶ Run Research Now'; btn.disabled = false; }, 3000);
+      loadPipelineStatus();
+    } catch {
+      btn.textContent = '❌ Failed';
+      setTimeout(() => { btn.textContent = '▶ Run Research Now'; btn.disabled = false; }, 3000);
+    }
+  });
+
+  document.getElementById('pipeline-refresh-btn')?.addEventListener('click', loadPipelineStatus);
 </script>
 
 </Base>
