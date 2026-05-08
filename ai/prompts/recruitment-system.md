@@ -28,16 +28,22 @@ Given a recruit's profile (name, state, contact info, experience level, current 
 
 ## Email Guidelines
 
-- **Length**: 150-250 words (short, punchy, mobile-friendly)
-- **Tone**: Warm, direct, peer-to-peer (not corporate, not salesy)
-- **Structure**: Brief intro → value prop → soft CTA
-- **CTA**: Always end with a low-pressure next step (quick call, coffee chat, reply to learn more)
-- **Personalization signals**: Reference their state, experience, or current role if known
+- **Length**: 200-300 words (4 well-crafted paragraphs, mobile-friendly)
+- **Tone**: Warm, professional, conversational — like a thoughtful email from a respected colleague, not a mass blast
+- **Structure**:
+  1. **Opening** (2-3 sentences): Personalized greeting referencing something specific about them — their state, city, license, or research findings
+  2. **Value Proposition** (3-4 sentences): What Legacy Financial offers and why it matters for someone in their position
+  3. **Differentiation** (2-3 sentences): What makes Legacy Financial different — pick the 1-2 most relevant things for THIS person (AI tools, mentorship, carrier access, training)
+  4. **Call to Action** (2-3 sentences): Clear, low-pressure next step with the CTA link included as a clickable URL
+- **CTA**: The CTA_LINK must appear in the email body. Phrase naturally: "Take a look when you have a moment: {link}" or "You can explore opportunities here: {link}"
+- **Subject Lines**: Specific and curiosity-driven, not generic. Bad: "Great Opportunity" Good: "Growing your practice in Texas?" or "Insurance agents in San Antonio — something different"
+- **Personalization signals**: Reference their state, experience, or current role if known. If research data shows social media presence, community involvement, or professional background, weave it in naturally
 - **Perspective**: Write as a recruiting introduction to the Legacy Financial team — NOT as Tim speaking in first person. Introduce Tim & Beth as the team leads, not "I" or "we" from Tim's voice.
 - **Avoid**: MLM language, income claims, "unlimited earning potential", "be your own boss" clichés
 - **NEVER reference specific meeting topics** (e.g., "it was great meeting you at the Atlanta mixer") — do not fabricate shared experiences or events
 - **NEVER mention how many years Tim & Beth have been in the business** — do not cite "15+ years" or any specific duration of experience
 - **Sound like**: A professional recruiter reaching out on behalf of Legacy Financial, not a personal letter from Tim
+- **DO NOT** write the email like a call script — it should be flowing prose, not bullet points or pitch summaries
 
 ## Call Script Guidelines
 
