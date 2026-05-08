@@ -1,0 +1,174 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import '../styles/tailwind.css';
+
+export const prerender = false;
+---
+<Base
+  title="Join Legacy Financial & Life"
+  description="Explore a career opportunity with Legacy Financial & Life — mentorship, training, and proven systems for insurance professionals."
+>
+  <Header />
+
+  <!-- Hero -->
+  <section class="relative isolate overflow-hidden bg-gradient-to-br from-brand-50 to-white">
+    <div class="mx-auto max-w-4xl px-4 py-16 sm:py-24 text-center">
+      <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
+        Your Next Step in Insurance Starts Here
+      </h1>
+      <p class="mt-6 text-lg text-slate-700 max-w-2xl mx-auto">
+        Legacy Financial & Life is expanding. We offer mentorship from experienced agents,
+        proven systems, weekly training, and the tools you need to build a sustainable book of business.
+      </p>
+    </div>
+  </section>
+
+  <!-- What We Offer -->
+  <section class="mx-auto max-w-4xl px-4 py-12">
+    <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <div class="text-3xl mb-3">👨‍🏫</div>
+        <h3 class="font-bold text-slate-900 mb-2">Direct Mentorship</h3>
+        <p class="text-sm text-slate-600">1-on-1 guidance from agents with 300+ policies sold.</p>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <div class="text-3xl mb-3">📋</div>
+        <h3 class="font-bold text-slate-900 mb-2">Proven Systems</h3>
+        <p class="text-sm text-slate-600">Established processes for prospecting, presenting, and closing.</p>
+      </div>
+      <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+        <div class="text-3xl mb-3">🤝</div>
+        <h3 class="font-bold text-slate-900 mb-2">Team Support</h3>
+        <p class="text-sm text-slate-600">Weekly training, shared leads, and a collaborative culture.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interest Form -->
+  <section class="bg-slate-50 py-16" id="interest">
+    <div class="mx-auto max-w-lg px-4">
+      <h2 class="text-2xl font-bold text-center text-slate-900 mb-2">Interested? Let's Talk.</h2>
+      <p class="text-center text-slate-600 mb-8">
+        Fill out the form below and our hiring manager will reach out to schedule a brief 20–30 minute conversation.
+      </p>
+
+      <form id="joinForm" class="space-y-5 bg-white rounded-xl border border-slate-200 p-8 shadow-sm">
+        <div>
+          <label for="name" class="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+          <input type="text" id="name" name="name" required autocomplete="name"
+            class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-200" />
+        </div>
+
+        <div>
+          <label for="email" class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+          <input type="email" id="email" name="email" required autocomplete="email"
+            class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-200" />
+        </div>
+
+        <div>
+          <label for="phone" class="block text-sm font-medium text-slate-700 mb-1">Phone Number</label>
+          <input type="tel" id="phone" name="phone" required autocomplete="tel"
+            class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-200" />
+        </div>
+
+        <div>
+          <label for="state" class="block text-sm font-medium text-slate-700 mb-1">Licensed State</label>
+          <select id="state" name="state"
+            class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-brand-500 focus:ring-2 focus:ring-brand-200">
+            <option value="">Select your state</option>
+            <option value="AL">Alabama</option>
+            <option value="FL">Florida</option>
+            <option value="GA">Georgia</option>
+            <option value="LA">Louisiana</option>
+            <option value="MI">Michigan</option>
+            <option value="MS">Mississippi</option>
+            <option value="OH">Ohio</option>
+            <option value="OK">Oklahoma</option>
+            <option value="SC">South Carolina</option>
+            <option value="TN">Tennessee</option>
+            <option value="TX">Texas</option>
+            <option value="UT">Utah</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <!-- TCPA-compliant text consent -->
+        <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" id="textConsent" name="textConsent" required
+              class="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+            <span class="text-xs text-slate-600 leading-relaxed">
+              By checking this box, I consent to receive text messages and phone calls from Legacy Financial & Life
+              regarding career opportunities at the phone number provided. Message and data rates may apply.
+              Message frequency varies. Reply STOP to opt out at any time. This consent is not a condition of employment.
+            </span>
+          </label>
+        </div>
+
+        <button type="submit" id="submitBtn"
+          class="w-full rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          Schedule My Conversation
+        </button>
+
+        <div id="formMessage" class="hidden text-center text-sm py-2 rounded-lg"></div>
+      </form>
+    </div>
+  </section>
+
+  <Footer />
+</Base>
+
+<script>
+  const form = document.getElementById('joinForm') as HTMLFormElement;
+  const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement;
+  const msgEl = document.getElementById('formMessage') as HTMLDivElement;
+
+  // Extract prospect ID from URL if present (from email CTA tracking)
+  const params = new URLSearchParams(window.location.search);
+  const prospectId = params.get('pid') || '';
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+    msgEl.classList.add('hidden');
+
+    const data = {
+      name: (form.elements.namedItem('name') as HTMLInputElement).value.trim(),
+      email: (form.elements.namedItem('email') as HTMLInputElement).value.trim(),
+      phone: (form.elements.namedItem('phone') as HTMLInputElement).value.trim(),
+      state: (form.elements.namedItem('state') as HTMLSelectElement).value,
+      textConsent: (form.elements.namedItem('textConsent') as HTMLInputElement).checked,
+      prospectId,
+    };
+
+    try {
+      const res = await fetch('/api/join-interest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      if (res.ok) {
+        msgEl.textContent = 'Thank you! Our hiring manager will be in touch soon.';
+        msgEl.className = 'text-center text-sm py-3 rounded-lg bg-green-50 text-green-700 border border-green-200';
+        msgEl.classList.remove('hidden');
+        form.reset();
+      } else {
+        const err = await res.json().catch(() => ({ error: 'Something went wrong' }));
+        msgEl.textContent = err.error || 'Something went wrong. Please try again.';
+        msgEl.className = 'text-center text-sm py-3 rounded-lg bg-red-50 text-red-700 border border-red-200';
+        msgEl.classList.remove('hidden');
+      }
+    } catch {
+      msgEl.textContent = 'Network error. Please check your connection and try again.';
+      msgEl.className = 'text-center text-sm py-3 rounded-lg bg-red-50 text-red-700 border border-red-200';
+      msgEl.classList.remove('hidden');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Schedule My Conversation';
+    }
+  });
+</script>

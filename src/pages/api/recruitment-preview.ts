@@ -31,6 +31,9 @@ EMAIL RULES:
 - NEVER mention how many years anyone has been in the business or any specific duration of experience
 - NEVER use MLM language, income claims, "unlimited earning potential", "be your own boss"
 - NEVER guarantee income or disparage their current agency
+- The CTA should direct them to learn more at: CTA_LINK (provided in the user message)
+- Phrase the CTA naturally, e.g., "If you're curious, you can learn more and schedule a quick conversation here: {link}"
+- If RESEARCH FINDINGS are provided, use them to personalize: mention their community involvement, professional background, or specific strengths you noticed — but do NOT sound stalkerish or reference private info
 
 CALL SCRIPT RULES:
 - 30-second opener, friendly, unhurried, to the point
@@ -232,10 +235,11 @@ export const POST: APIRoute = async ({ request }) => {
       systemPrompt += `\n\nADDITIONAL GUIDELINES (from feedback):\n- ${adjustments}`;
     }
 
-    // Build prospect profile with sign-off instruction
+    // Build prospect profile with sign-off instruction and CTA link
     const emailSignOff = String(signOff || 'Legacy Financial Recruiting Team').slice(0, 200);
     const profile = buildProfile(prospect);
-    const userMessage = `Generate recruitment outreach for this prospect:\n\n${profile}\n\nSIGN_OFF: Best,\\n${emailSignOff}`;
+    const ctaLink = `https://legacyfinancial.app/join`;
+    const userMessage = `Generate recruitment outreach for this prospect:\n\n${profile}\n\nSIGN_OFF: Best,\\n${emailSignOff}\nCTA_LINK: ${ctaLink}`;
 
 
     const ollamaHeaders: Record<string, string> = {
@@ -346,6 +350,17 @@ function buildProfile(prospect: Record<string, unknown>): string {
     if (wp.linkedin) parts.push(`LinkedIn: ${wp.linkedin}`);
     if (Array.isArray(wp.websites) && wp.websites.length) parts.push(`Websites: ${wp.websites.join(', ')}`);
     if (Array.isArray(wp.signals) && wp.signals.length) parts.push(`Signals: ${wp.signals.join(', ')}`);
+    // Insurance-specific trait breakdown
+    const traits = wp.traitScores as Record<string, number> | undefined;
+    if (traits) {
+      const traitLines = [];
+      if (traits.trustNetwork > 0) traitLines.push(`Trust Network: ${traits.trustNetwork}/2`);
+      if (traits.professionalPresence > 0) traitLines.push(`Professional Presence: ${traits.professionalPresence}/2`);
+      if (traits.salesAdjacent > 0) traitLines.push(`Sales Background: ${traits.salesAdjacent}/1.5`);
+      if (traits.opportunitySignals > 0) traitLines.push(`Opportunity: ${traits.opportunitySignals}/1 (areas we can help)`);
+      if (traits.complianceTemp < 0) traitLines.push(`⚠️ Compliance Concerns: ${traits.complianceTemp}`);
+      if (traitLines.length) parts.push(`Trait Scores: ${traitLines.join('; ')}`);
+    }
     if (wp.notes) parts.push(`Research Notes: ${wp.notes}`);
   }
 
