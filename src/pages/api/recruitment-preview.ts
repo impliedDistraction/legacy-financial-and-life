@@ -327,5 +327,19 @@ function buildProfile(prospect: Record<string, unknown>): string {
   if (prospect.email) parts.push(`Email: ${prospect.email}`);
   if (prospect.phone) parts.push(`Phone: ${prospect.phone}`);
   if (prospect.notes) parts.push(`Notes: ${prospect.notes}`);
+
+  // Include research findings if available
+  const wp = prospect.web_presence as Record<string, unknown> | undefined;
+  if (wp && Object.keys(wp).length > 0) {
+    parts.push('');
+    parts.push('--- RESEARCH FINDINGS ---');
+    if (prospect.research_score) parts.push(`Research Score: ${prospect.research_score}/10`);
+    if (wp.summary) parts.push(`Summary: ${wp.summary}`);
+    if (wp.linkedin) parts.push(`LinkedIn: ${wp.linkedin}`);
+    if (Array.isArray(wp.websites) && wp.websites.length) parts.push(`Websites: ${wp.websites.join(', ')}`);
+    if (Array.isArray(wp.signals) && wp.signals.length) parts.push(`Signals: ${wp.signals.join(', ')}`);
+    if (wp.notes) parts.push(`Research Notes: ${wp.notes}`);
+  }
+
   return parts.join('\n') || 'Minimal profile information available.';
 }

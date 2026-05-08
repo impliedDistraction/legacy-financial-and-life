@@ -372,12 +372,48 @@ if (!session) {
     <!-- ═══════════════ PREVIEW & TEST TAB ═══════════════ -->
     <div id="tab-preview" class="tab-panel hidden">
       <div class="grid lg:grid-cols-2 gap-4">
-        <!-- Left: Input Form -->
+        <!-- Left: Real Agents + Input Form -->
         <div class="space-y-4">
+          <!-- Real Pending Agents -->
           <div class="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-1">Test Prospect</h2>
-            <p class="text-sm text-gray-500 mb-4">Enter a synthetic prospect to preview exactly what the AI would generate. Nothing is sent — this is a dry run.</p>
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-lg font-semibold text-gray-900">Dry-Run Preview</h2>
+              <button id="preview-refresh-btn" class="text-xs text-brand-600 hover:text-brand-700 font-medium">↻ Refresh</button>
+            </div>
+            <p class="text-sm text-gray-500 mb-4">Select a real pending agent to preview exactly what the system would send. Nothing is actually sent — this is a dry run.</p>
 
+            <!-- Agent selector -->
+            <div class="relative mb-4">
+              <select id="preview-agent-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                <option value="">Loading agents...</option>
+              </select>
+            </div>
+
+            <!-- Agent details card (populated when selected) -->
+            <div id="preview-agent-card" class="hidden border border-gray-100 rounded-lg p-4 bg-gray-50 mb-4">
+              <div class="flex items-center gap-2 mb-2">
+                <h3 id="preview-agent-name" class="font-semibold text-gray-900 text-sm"></h3>
+                <span id="preview-agent-score" class="text-xs font-bold px-1.5 py-0.5 rounded"></span>
+              </div>
+              <div id="preview-agent-details" class="text-xs text-gray-600 space-y-1"></div>
+              <div id="preview-agent-research" class="mt-3 hidden">
+                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Research Findings</h4>
+                <div id="preview-agent-research-content" class="text-xs text-gray-600 space-y-1"></div>
+              </div>
+            </div>
+
+            <div class="flex gap-2">
+              <button id="preview-generate-btn" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                🧪 Generate Preview
+              </button>
+            </div>
+            <p class="text-xs text-gray-400 mt-2">Email will send from: <strong>Legacy Financial Recruiting &lt;recruiting@legacyfinancial.app&gt;</strong></p>
+          </div>
+
+          <!-- Manual Test (collapsed) -->
+          <details class="bg-white rounded-xl border border-gray-200 p-6">
+            <summary class="text-sm font-semibold text-gray-700 cursor-pointer">🎲 Manual / Synthetic Test</summary>
+            <p class="text-xs text-gray-500 mt-2 mb-3">Enter a synthetic prospect to test the AI without using a real agent from the database.</p>
             <div class="space-y-3">
               <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -420,20 +456,14 @@ if (!session) {
                 <input type="text" id="test-agency" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="Family First Insurance Group" />
               </div>
               <div>
-                <label class="text-xs font-medium text-gray-600">Notes (anything you know about them)</label>
+                <label class="text-xs font-medium text-gray-600">Notes</label>
                 <textarea id="test-notes" rows="2" class="mt-0.5 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Recently licensed, focused on final expense">Recently got licensed, looking for better training support.</textarea>
               </div>
-            </div>
-
-            <div class="flex gap-2 mt-4">
-              <button id="test-generate-btn" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg transition-colors">
-                🧪 Generate Preview
-              </button>
-              <button id="test-random-btn" class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2.5 rounded-lg transition-colors text-sm">
-                🎲 Random
+              <button id="test-generate-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2.5 rounded-lg transition-colors">
+                🧪 Generate Synthetic Preview
               </button>
             </div>
-          </div>
+          </details>
 
           <!-- Feedback Section -->
           <div id="test-feedback-section" class="hidden bg-white rounded-xl border border-amber-200 p-6">
@@ -464,8 +494,8 @@ if (!session) {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
               </svg>
-              <p class="text-sm">Click "Generate Preview" to see what the recruit would receive</p>
-              <p class="text-xs text-gray-300 mt-1">The AI will generate a personalized email and call script</p>
+              <p class="text-sm">Select an agent and click "Generate Preview" to see the exact email they would receive</p>
+              <p class="text-xs text-gray-300 mt-1">Emails come from: recruiting@legacyfinancial.app</p>
             </div>
           </div>
 
@@ -1114,6 +1144,17 @@ if (!session) {
               ${p.notes ? `<p class="text-xs text-gray-400 mt-1">${escapeHtml(p.notes)}</p>` : ''}
               ${p.fit_reason ? `<p class="text-xs text-gray-500 mt-1 italic">${escapeHtml(p.fit_reason)}</p>` : ''}
               ${p.personal_notes ? `<p class="text-xs text-blue-600 mt-1">💡 ${escapeHtml(p.personal_notes)}</p>` : ''}
+              ${p.web_presence && Object.keys(p.web_presence).length > 0 ? `
+              <details class="mt-2">
+                <summary class="text-xs font-medium text-purple-600 cursor-pointer">🔬 Research Details</summary>
+                <div class="mt-1 text-xs text-gray-600 bg-purple-50 rounded p-2 space-y-1">
+                  ${p.web_presence.summary ? `<div>${escapeHtml(p.web_presence.summary)}</div>` : ''}
+                  ${p.web_presence.linkedin ? `<div>🔗 <a href="${escapeHtml(p.web_presence.linkedin)}" target="_blank" class="text-brand-600 hover:underline">LinkedIn Profile</a></div>` : ''}
+                  ${p.web_presence.websites?.length ? `<div>🌐 ${p.web_presence.websites.map((u: string) => `<a href="${escapeHtml(u)}" target="_blank" class="text-brand-600 hover:underline">${escapeHtml(new URL(u).hostname)}</a>`).join(', ')}</div>` : ''}
+                  ${p.web_presence.signals?.length ? `<div>📊 ${p.web_presence.signals.map((s: string) => `<span class="inline-block bg-white text-gray-600 px-1.5 py-0.5 rounded text-xs mr-1 border">${escapeHtml(s)}</span>`).join('')}</div>` : ''}
+                  ${p.web_presence.notes ? `<div class="italic">${escapeHtml(p.web_presence.notes)}</div>` : ''}
+                </div>
+              </details>` : ''}
             </div>
           </div>
 
@@ -1384,14 +1425,160 @@ if (!session) {
   // ═══════════════════════════════════════════
   // PREVIEW & TEST
   // ═══════════════════════════════════════════
+  const previewAgentSelect = document.getElementById('preview-agent-select') as HTMLSelectElement;
+  const previewGenerateBtn = document.getElementById('preview-generate-btn') as HTMLButtonElement;
+  const previewRefreshBtn = document.getElementById('preview-refresh-btn') as HTMLButtonElement;
+  const previewAgentCard = document.getElementById('preview-agent-card')!;
   const testGenerateBtn = document.getElementById('test-generate-btn') as HTMLButtonElement;
-  const testRandomBtn = document.getElementById('test-random-btn') as HTMLButtonElement;
   const testOutput = document.getElementById('test-output')!;
   const testMeta = document.getElementById('test-meta')!;
   const testMetaContent = document.getElementById('test-meta-content')!;
   const testFeedbackSection = document.getElementById('test-feedback-section')!;
   const testFeedbackText = document.getElementById('test-feedback-text') as HTMLTextAreaElement;
   const testFeedbackSubmit = document.getElementById('test-feedback-submit') as HTMLButtonElement;
+
+  let previewAgents: any[] = [];
+
+  async function loadPreviewAgents() {
+    try {
+      const res = await fetch('/api/recruitment-upload?status=pending&limit=100');
+      const data = await res.json();
+      previewAgents = data.prospects || [];
+      previewAgentSelect.innerHTML = previewAgents.length === 0
+        ? '<option value="">No pending agents found</option>'
+        : `<option value="">Select an agent (${previewAgents.length} pending)...</option>` +
+          previewAgents.map((p: any, i: number) => {
+            const score = p.research_score != null ? ` [🔍${p.research_score}]` : '';
+            return `<option value="${i}">${escapeHtml(p.name)} — ${escapeHtml(p.state || '?')}, ${escapeHtml(p.city || '?')}${score}</option>`;
+          }).join('');
+      previewGenerateBtn.disabled = true;
+    } catch {
+      previewAgentSelect.innerHTML = '<option value="">Failed to load agents</option>';
+    }
+  }
+
+  previewAgentSelect.addEventListener('change', () => {
+    const idx = previewAgentSelect.value;
+    if (idx === '') {
+      previewAgentCard.classList.add('hidden');
+      previewGenerateBtn.disabled = true;
+      return;
+    }
+    const agent = previewAgents[parseInt(idx)];
+    previewGenerateBtn.disabled = false;
+    previewAgentCard.classList.remove('hidden');
+
+    document.getElementById('preview-agent-name')!.textContent = agent.name;
+    const scoreEl = document.getElementById('preview-agent-score')!;
+    if (agent.research_score != null) {
+      const color = agent.research_score >= 7 ? 'green' : agent.research_score >= 4 ? 'amber' : 'gray';
+      scoreEl.textContent = `🔍 ${agent.research_score}/10`;
+      scoreEl.className = `text-xs font-bold px-1.5 py-0.5 rounded bg-${color}-100 text-${color}-700`;
+    } else {
+      scoreEl.textContent = agent.research_status === 'unscored' ? '⏳ Unscored' : '';
+      scoreEl.className = 'text-xs text-gray-400';
+    }
+
+    const details: string[] = [];
+    if (agent.state) details.push(`📍 ${escapeHtml(agent.state)}${agent.city ? ', ' + escapeHtml(agent.city) : ''}`);
+    if (agent.email) details.push(`✉️ ${escapeHtml(agent.email)}`);
+    if (agent.phone) details.push(`📞 ${escapeHtml(agent.phone)}`);
+    if (agent.experience_level && agent.experience_level !== 'unknown') details.push(`⭐ ${escapeHtml(agent.experience_level)}`);
+    if (agent.current_agency) details.push(`🏢 ${escapeHtml(agent.current_agency)}`);
+    if (agent.notes) details.push(`📝 ${escapeHtml(agent.notes)}`);
+    document.getElementById('preview-agent-details')!.innerHTML = details.map(d => `<div>${d}</div>`).join('');
+
+    // Research findings
+    const researchSection = document.getElementById('preview-agent-research')!;
+    const researchContent = document.getElementById('preview-agent-research-content')!;
+    if (agent.web_presence && Object.keys(agent.web_presence).length > 0) {
+      researchSection.classList.remove('hidden');
+      const wp = agent.web_presence;
+      const findings: string[] = [];
+      if (wp.summary) findings.push(`<div class="text-gray-700">${escapeHtml(wp.summary)}</div>`);
+      if (wp.linkedin) findings.push(`<div>🔗 LinkedIn: <a href="${escapeHtml(wp.linkedin)}" target="_blank" class="text-brand-600 hover:underline">${escapeHtml(wp.linkedin)}</a></div>`);
+      if (wp.websites?.length) findings.push(`<div>🌐 ${wp.websites.map((u: string) => `<a href="${escapeHtml(u)}" target="_blank" class="text-brand-600 hover:underline">${escapeHtml(u)}</a>`).join(', ')}</div>`);
+      if (wp.signals?.length) findings.push(`<div>📊 Signals: ${wp.signals.map((s: string) => `<span class="inline-block bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-xs mr-1">${escapeHtml(s)}</span>`).join('')}</div>`);
+      if (wp.notes) findings.push(`<div class="italic text-gray-500">${escapeHtml(wp.notes)}</div>`);
+      researchContent.innerHTML = findings.join('') || '<div class="text-gray-400 italic">No details available</div>';
+    } else {
+      researchSection.classList.add('hidden');
+    }
+  });
+
+  previewGenerateBtn.addEventListener('click', async () => {
+    const idx = previewAgentSelect.value;
+    if (idx === '') return;
+    const agent = previewAgents[parseInt(idx)];
+
+    const prospect = {
+      name: agent.name,
+      state: agent.state,
+      city: agent.city,
+      experience_level: agent.experience_level,
+      email: agent.email,
+      phone: agent.phone,
+      current_agency: agent.current_agency,
+      notes: agent.notes,
+      web_presence: agent.web_presence,
+      research_score: agent.research_score,
+    };
+
+    previewGenerateBtn.disabled = true;
+    previewGenerateBtn.textContent = '⚙️ Generating...';
+    activeGenerations++;
+    updateGenerationStatus();
+    testOutput.innerHTML = `
+      <div class="text-center py-8">
+        <div class="animate-pulse text-brand-600 mb-2">
+          <svg class="w-8 h-8 mx-auto animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </div>
+        <p class="text-sm text-gray-600">AI is generating personalized outreach for ${escapeHtml(agent.name)}...</p>
+        <p class="text-xs text-gray-400 mt-1">This takes 20-60 seconds (full inference)</p>
+      </div>`;
+
+    try {
+      const feedback = loadFeedback();
+      const res = await fetch('/api/recruitment-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospect, feedback }),
+      });
+      if (!res.ok && res.status === 504) {
+        showAiErrorBanner('Generation timed out');
+        testOutput.innerHTML = `<div class="text-center py-8 text-amber-600"><p class="text-sm">⏱️ Timed out. Try again.</p></div>`;
+        return;
+      }
+      const data = await res.json();
+      if (data.error) {
+        if (isAiUnavailableError(data.error)) showAiErrorBanner(data.error);
+        testOutput.innerHTML = `<div class="text-center py-8 text-red-500"><p class="text-sm">${escapeHtml(data.error)}</p></div>`;
+        return;
+      }
+      hideAiErrorBanner();
+      renderPreviewOutput(data, prospect);
+      testFeedbackSection.classList.remove('hidden');
+      testMeta.classList.remove('hidden');
+      renderMeta(data, prospect);
+    } catch {
+      showAiErrorBanner('Network error');
+      testOutput.innerHTML = `<div class="text-center py-8 text-red-500"><p class="text-sm">Generation failed.</p></div>`;
+    } finally {
+      activeGenerations--;
+      updateGenerationStatus();
+      previewGenerateBtn.disabled = false;
+      previewGenerateBtn.textContent = '🧪 Generate Preview';
+    }
+  });
+
+  previewRefreshBtn.addEventListener('click', loadPreviewAgents);
+
+  // Load preview agents when tab opens
+  document.querySelector('[data-tab="preview"]')?.addEventListener('click', () => {
+    if (previewAgents.length === 0) loadPreviewAgents();
+  });
 
   // Stored feedback adjustments
   const FEEDBACK_KEY = 'legacy_recruitment_feedback';
@@ -1403,33 +1590,10 @@ if (!session) {
     localStorage.setItem(FEEDBACK_KEY, JSON.stringify(items));
   }
 
-  // Random test prospects
-  const TEST_PROSPECTS = [
-    { name: 'Marcus Johnson', state: 'GA', city: 'Atlanta', experience: '1-3yr', email: 'marcus.j@test.legacy', phone: '(404) 555-0199', agency: 'Family First Insurance Group', notes: 'Recently got licensed, looking for better training.' },
-    { name: 'Sarah Mitchell', state: 'TX', city: 'Dallas', experience: '3-5yr', email: 'sarah.m@test.legacy', phone: '(214) 555-0342', agency: 'Shield Life Agency', notes: 'Experienced but unhappy with current upline support. Focus on final expense.' },
-    { name: 'David Chen', state: 'OH', city: 'Columbus', experience: 'new', email: 'david.c@test.legacy', phone: '(614) 555-0271', agency: '', notes: 'Career changer from finance. Has Series 6 & 63. Interested in IUL market.' },
-    { name: 'Lisa Rodriguez', state: 'AL', city: 'Birmingham', experience: '5+yr', email: 'lisa.r@test.legacy', phone: '(205) 555-0188', agency: 'Cornerstone Benefits', notes: 'Top producer but wants to build her own team. Already has 3 agents under her.' },
-    { name: 'James Walker', state: 'MS', city: 'Jackson', experience: '1-3yr', email: 'james.w@test.legacy', phone: '(601) 555-0415', agency: 'Primerica', notes: 'Looking for better products and carrier access. Tired of captive model.' },
-    { name: 'Tanisha Williams', state: 'SC', city: 'Charleston', experience: 'new', email: 'tanisha.w@test.legacy', phone: '(843) 555-0267', agency: '', notes: 'Just passed state exam. Background in nursing — strong empathy for final expense clients.' },
-    { name: 'Robert Kim', state: 'MI', city: 'Grand Rapids', experience: '3-5yr', email: 'robert.k@test.legacy', phone: '(616) 555-0394', agency: 'Globe Life', notes: 'Solid producer, wants mentorship on IUL and annuities to move upmarket.' },
-  ];
 
+  testGenerateBtn.addEventListener('click', () => generateSyntheticPreview());
 
-  testGenerateBtn.addEventListener('click', () => generatePreview());
-
-  testRandomBtn.addEventListener('click', () => {
-    const p = TEST_PROSPECTS[Math.floor(Math.random() * TEST_PROSPECTS.length)];
-    (document.getElementById('test-name') as HTMLInputElement).value = p.name;
-    (document.getElementById('test-state') as HTMLInputElement).value = p.state;
-    (document.getElementById('test-city') as HTMLInputElement).value = p.city;
-    (document.getElementById('test-experience') as HTMLSelectElement).value = p.experience;
-    (document.getElementById('test-email') as HTMLInputElement).value = p.email;
-    (document.getElementById('test-phone') as HTMLInputElement).value = p.phone;
-    (document.getElementById('test-agency') as HTMLInputElement).value = p.agency;
-    (document.getElementById('test-notes') as HTMLTextAreaElement).value = p.notes;
-  });
-
-  async function generatePreview() {
+  async function generateSyntheticPreview() {
     const prospect = {
       name: (document.getElementById('test-name') as HTMLInputElement).value.trim(),
       state: (document.getElementById('test-state') as HTMLInputElement).value.trim(),
@@ -1520,7 +1684,7 @@ if (!session) {
         <div class="border border-gray-200 rounded-lg overflow-hidden">
           <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center gap-2">
             <span class="text-xs text-gray-400">From:</span>
-            <span class="text-xs font-medium">Tim Byrd &lt;tim@legacyf-l.com&gt;</span>
+            <span class="text-xs font-medium">Legacy Financial Recruiting &lt;recruiting@legacyfinancial.app&gt;</span>
           </div>
           <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 flex items-center gap-2">
             <span class="text-xs text-gray-400">To:</span>
@@ -1602,8 +1766,12 @@ if (!session) {
     });
     testFeedbackText.value = '';
 
-    // Regenerate with new feedback
-    await generatePreview();
+    // Regenerate with new feedback — use real agent if selected, otherwise synthetic
+    if (previewAgentSelect.value) {
+      previewGenerateBtn.click();
+    } else {
+      await generateSyntheticPreview();
+    }
   });
 
   // Initial load
