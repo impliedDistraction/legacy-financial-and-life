@@ -329,22 +329,46 @@ if (!session) {
     <!-- ═══════════════ REVIEW TAB ═══════════════ -->
     <div id="tab-review" class="tab-panel hidden">
       <div class="space-y-4">
-        <!-- Filters & Controls -->
-        <div class="flex items-center gap-3 flex-wrap">
-          <select id="review-filter" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
-            <option value="pending">Pending (needs AI)</option>
-            <option value="drafted">Drafted (needs QA)</option>
-            <option value="reviewed">Reviewed (ready to approve)</option>
+        <!-- Pipeline Stage Navigation -->
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+          <div class="flex items-center gap-2 flex-wrap mb-3">
+            <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="pending">
+              ⏳ Pending <span class="review-stage-count ml-1 bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="pending">0</span>
+            </button>
+            <span class="text-gray-300">→</span>
+            <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="drafted">
+              📝 Drafted <span class="review-stage-count ml-1 bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="drafted">0</span>
+            </button>
+            <span class="text-gray-300">→</span>
+            <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="reviewed">
+              ✅ Reviewed <span class="review-stage-count ml-1 bg-green-100 text-green-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="reviewed">0</span>
+            </button>
+            <span class="text-gray-300">→</span>
+            <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="approved">
+              👍 Approved <span class="review-stage-count ml-1 bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="approved">0</span>
+            </button>
+            <span class="text-gray-300 mx-1">|</span>
+            <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="rejected">
+              ❌ Rejected <span class="review-stage-count ml-1 bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="rejected">0</span>
+            </button>
+          </div>
+          <!-- Hidden select kept for JS compat -->
+          <select id="review-filter" class="hidden">
+            <option value="pending">Pending</option>
+            <option value="drafted">Drafted</option>
+            <option value="reviewed">Reviewed</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
           </select>
-          <button id="process-batch-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors">
-            ⚡ Generate Next
-          </button>
-          <button id="approve-all-btn" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors hidden">
-            ✓ Approve All Visible
-          </button>
-          <span id="review-count" class="text-xs text-gray-400 ml-auto"></span>
+          <div class="flex items-center gap-3 flex-wrap">
+            <button id="process-batch-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors">
+              ⚡ Generate Next
+            </button>
+            <button id="approve-all-btn" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors hidden">
+              ✓ Approve All Visible
+            </button>
+            <span id="review-count" class="text-xs text-gray-400 ml-auto"></span>
+          </div>
         </div>
 
         <!-- AI Unavailable Banner -->
@@ -1222,6 +1246,44 @@ if (!session) {
 
   reviewFilter.addEventListener('change', () => { currentOffset = 0; loadReviewList(); });
 
+  // Wire stage pill buttons to the hidden select
+  const stageBtns = document.querySelectorAll('.review-stage-btn') as NodeListOf<HTMLButtonElement>;
+  function updateStageBtnStyles() {
+    const active = reviewFilter.value;
+    stageBtns.forEach(btn => {
+      const stage = btn.getAttribute('data-stage');
+      if (stage === active) {
+        btn.classList.add('border-brand-500', 'bg-brand-50', 'text-brand-700');
+        btn.classList.remove('border-gray-200', 'bg-white', 'text-gray-600', 'hover:bg-gray-50');
+      } else {
+        btn.classList.remove('border-brand-500', 'bg-brand-50', 'text-brand-700');
+        btn.classList.add('border-gray-200', 'bg-white', 'text-gray-600', 'hover:bg-gray-50');
+      }
+    });
+  }
+  stageBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const stage = btn.getAttribute('data-stage') || 'pending';
+      reviewFilter.value = stage;
+      currentOffset = 0;
+      updateStageBtnStyles();
+      loadReviewList();
+    });
+  });
+
+  // Refresh pipeline stage counts
+  async function refreshReviewStageCounts() {
+    const stages = ['pending', 'drafted', 'reviewed', 'approved', 'rejected'];
+    await Promise.all(stages.map(async (s) => {
+      try {
+        const res = await fetch(`/api/recruitment-upload?status=${s}&limit=0`);
+        const data = await res.json();
+        const el = document.querySelector(`.review-stage-count[data-count="${s}"]`);
+        if (el) el.textContent = String(data.total || 0);
+      } catch { /* silent */ }
+    }));
+  }
+
   processBatchBtn.addEventListener('click', async () => {
     processBatchBtn.disabled = true;
     processBatchBtn.textContent = '⚡ Generating...';
@@ -1276,6 +1338,7 @@ if (!session) {
     // Show/hide contextual buttons
     approveAllBtn.classList.toggle('hidden', status !== 'reviewed');
     processBatchBtn.classList.toggle('hidden', status !== 'pending');
+    updateStageBtnStyles();
     try {
       const res = await fetch(`/api/recruitment-upload?status=${status}&limit=${PAGE_SIZE}&offset=${currentOffset}`);
       const data = await res.json();
@@ -1286,6 +1349,8 @@ if (!session) {
     } catch {
       reviewList.innerHTML = '<div class="text-center text-red-500 text-sm py-4">Failed to load prospects</div>';
     }
+    // Refresh stage counts in background
+    refreshReviewStageCounts();
   }
 
   loadMoreBtn.addEventListener('click', () => { currentOffset += PAGE_SIZE; loadReviewList(); });
@@ -1311,6 +1376,7 @@ if (!session) {
                 ${stateMatch ? '<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Licensed State</span>' : ''}
                 <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">${escapeHtml(p.status)}</span>
                 ${p.research_score != null ? `<span class="text-xs ${p.research_score >= 7 ? 'bg-green-100 text-green-700' : p.research_score >= 4 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'} px-1.5 py-0.5 rounded">🔍 ${p.research_score}/10</span>` : p.research_status === 'unscored' ? '<span class="text-xs bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded">⏳ unscored</span>' : ''}
+                ${p.qa_score != null ? `<span class="text-xs ${p.qa_score >= 80 ? 'bg-green-100 text-green-700' : p.qa_score >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'} px-1.5 py-0.5 rounded">QA ${p.qa_score}</span>` : ''}
               </div>
               <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
                 ${p.state ? `<span>📍 ${escapeHtml(p.state)}${p.city ? ', ' + escapeHtml(p.city) : ''}</span>` : ''}
@@ -1369,14 +1435,14 @@ if (!session) {
               <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
               ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Approve & Send</button>` : ''}
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
-            ` : ''}}
+            ` : ''}
             ${status === 'approved' ? `
               ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Send Email</button>` : ''}
               <button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
             ` : ''}
             ${status === 'rejected' ? `
-              <span class="text-xs text-gray-400 italic">${(p.properties?.rejection_reason) ? 'Reason: ' + escapeHtml(p.properties.rejection_reason) : 'No reason given'}</span>
+              <span class="text-xs text-gray-400 italic">${p.qa_rejection_reason ? 'QA: ' + escapeHtml(p.qa_rejection_reason) : (p.properties?.rejection_reason) ? 'Reason: ' + escapeHtml(p.properties.rejection_reason) : 'No reason given'}</span>
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg ml-auto" data-id="${p.id}" title="Permanently delete">🗑️ Delete forever</button>
             ` : ''}
           </div>
