@@ -50,7 +50,7 @@ if (!session) {
 
   <!-- Stats Bar -->
   <section class="max-w-7xl mx-auto px-4 pt-6 pb-2">
-    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+    <div class="grid grid-cols-3 sm:grid-cols-7 gap-3">
       <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
         <div class="text-2xl font-bold text-gray-900" id="stat-total">0</div>
         <div class="text-xs text-gray-500">Total</div>
@@ -62,6 +62,14 @@ if (!session) {
       <div class="bg-white rounded-lg border border-gray-200 p-3 text-center cursor-pointer hover:border-blue-300 transition-colors" data-stat-tab="review" data-stat-filter="drafted">
         <div class="text-2xl font-bold text-blue-600" id="stat-drafted">0</div>
         <div class="text-xs text-gray-500">Drafted</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center cursor-pointer hover:border-indigo-300 transition-colors" data-stat-tab="review" data-stat-filter="reviewed">
+        <div class="text-2xl font-bold text-indigo-600" id="stat-reviewed">0</div>
+        <div class="text-xs text-gray-500">Reviewed</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center cursor-pointer hover:border-emerald-300 transition-colors" data-stat-tab="review" data-stat-filter="approved">
+        <div class="text-2xl font-bold text-emerald-600" id="stat-approved">0</div>
+        <div class="text-xs text-gray-500">Approved</div>
       </div>
       <div class="bg-white rounded-lg border border-gray-200 p-3 text-center cursor-pointer hover:border-green-300 transition-colors" data-stat-tab="sent" data-stat-filter="sent">
         <div class="text-2xl font-bold text-green-600" id="stat-sent">0</div>
@@ -419,6 +427,9 @@ if (!session) {
               👍 Approved <span class="review-stage-count ml-1 bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="approved">0</span>
             </button>
             <span class="text-gray-300 mx-1">|</span>
+            <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="held">
+              🏷️ Held <span class="review-stage-count ml-1 bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="held">0</span>
+            </button>
             <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="rejected">
               ❌ Rejected <span class="review-stage-count ml-1 bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="rejected">0</span>
             </button>
@@ -429,6 +440,7 @@ if (!session) {
             <option value="drafted">Drafted</option>
             <option value="reviewed">Reviewed</option>
             <option value="approved">Approved</option>
+            <option value="held">Held</option>
             <option value="rejected">Rejected</option>
           </select>
           <div class="flex items-center gap-3 flex-wrap">
@@ -979,7 +991,7 @@ if (!session) {
   // ═══════════════════════════════════════════
   async function refreshPoolStats() {
     try {
-      const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'sent', 'converted', 'rejected'];
+      const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'sent', 'converted', 'rejected'];
       const sources = ['prophog_scrape', 'csv_import', 'landing_page'];
       const fetches = [
         ...statuses.map(s => fetch(`/api/recruitment-upload?status=${s}&limit=1`).then(r => r.json()).then(d => ({ key: s, count: d.total || 0 }))),
@@ -1423,7 +1435,7 @@ if (!session) {
 
   // Refresh pipeline stage counts
   async function refreshReviewStageCounts() {
-    const stages = ['pending', 'drafted', 'reviewed', 'approved', 'rejected'];
+    const stages = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'rejected'];
     await Promise.all(stages.map(async (s) => {
       try {
         const res = await fetch(`/api/recruitment-upload?status=${s}&limit=0`);
@@ -1969,7 +1981,7 @@ if (!session) {
   // ═══════════════════════════════════════════
   async function refreshStats() {
     try {
-      const statuses = ['pending', 'drafted', 'reviewed', 'sent', 'converted'];
+      const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'sent', 'converted', 'held', 'rejected'];
       const counts: Record<string, number> = {};
       let total = 0;
 
@@ -1979,15 +1991,12 @@ if (!session) {
         counts[s] = data.total || 0;
         total += counts[s];
       }
-      // Also count approved
-      const approvedRes = await fetch('/api/recruitment-upload?status=approved&limit=1');
-      const approvedData = await approvedRes.json();
-      total += approvedData.total || 0;
-      counts['drafted'] += (counts['reviewed'] || 0) + (approvedData.total || 0); // show drafted + reviewed + approved as "Drafted"
 
       document.getElementById('stat-total')!.textContent = String(total);
       document.getElementById('stat-pending')!.textContent = String(counts['pending'] || 0);
       document.getElementById('stat-drafted')!.textContent = String(counts['drafted'] || 0);
+      document.getElementById('stat-reviewed')!.textContent = String(counts['reviewed'] || 0);
+      document.getElementById('stat-approved')!.textContent = String(counts['approved'] || 0);
       document.getElementById('stat-sent')!.textContent = String(counts['sent'] || 0);
       document.getElementById('stat-converted')!.textContent = String(counts['converted'] || 0);
     } catch { /* silent */ }
