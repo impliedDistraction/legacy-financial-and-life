@@ -238,14 +238,27 @@ export const prerender = false;
   const iconClose = document.getElementById('chat-icon-close');
 
   let chatOpen = false;
+  let chatEngaged = false; // true after first message sent
+  const sessionId = crypto.randomUUID();
   const conversationHistory: Array<{ role: string; content: string }> = [];
+
+  // Vercel analytics helper (fires only if @vercel/analytics is loaded)
+  function trackChatEvent(name: string, props?: Record<string, string | number>) {
+    try {
+      const va = (window as any).va;
+      if (typeof va === 'function') va('event', { name, ...props });
+    } catch { /* non-critical */ }
+  }
 
   chatToggle?.addEventListener('click', () => {
     chatOpen = !chatOpen;
     chatPanel.classList.toggle('hidden', !chatOpen);
     iconOpen?.classList.toggle('hidden', chatOpen);
     iconClose?.classList.toggle('hidden', !chatOpen);
-    if (chatOpen) chatInput.focus();
+    if (chatOpen) {
+      chatInput.focus();
+      trackChatEvent('join_chat_opened');
+    }
   });
 
   chatInput?.addEventListener('keydown', (e) => {
@@ -323,6 +336,12 @@ export const prerender = false;
     const msg = chatInput.value.trim();
     if (!msg) return;
 
+    // Track first engagement
+    if (!chatEngaged) {
+      chatEngaged = true;
+      trackChatEvent('join_chat_engaged', { session_id: sessionId });
+    }
+
     chatInput.value = '';
     chatInput.disabled = true;
     chatSend.disabled = true;
@@ -348,7 +367,7 @@ export const prerender = false;
       const res = await fetch('/api/join-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: conversationHistory }),
+        body: JSON.stringify({ messages: conversationHistory, sessionId }),
       });
 
       typingEl.remove();
