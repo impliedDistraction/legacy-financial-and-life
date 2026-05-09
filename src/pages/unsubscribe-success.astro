@@ -1,0 +1,36 @@
+---
+import Base from '../layouts/Base.astro';
+import '../styles/tailwind.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Base title="Unsubscribed - Legacy Financial & Life" description="You have been removed from our mailing list.">
+  <Header />
+
+  <div class="min-h-[60vh] bg-gradient-to-br from-brand-50 to-white flex items-center justify-center px-4">
+    <div class="max-w-lg text-center">
+      <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+        <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+      </div>
+
+      <h1 class="text-3xl font-bold text-slate-900 mb-4">You've Been Unsubscribed</h1>
+      <p class="text-slate-600 mb-6">
+        You've been removed from our recruitment outreach list. You won't receive any more emails from us about career opportunities.
+      </p>
+      <p class="text-sm text-slate-500 mb-8">
+        If you unsubscribed by mistake or change your mind in the future, feel free to visit
+        <a href="/join" class="text-brand-600 hover:text-brand-700 underline">our careers page</a>.
+      </p>
+
+      <a href="/"
+        class="inline-block rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold transition-colors">
+        Return to Homepage
+      </a>
+    </div>
+  </div>
+
+  <Footer />
+</Base>

@@ -1,0 +1,37 @@
+---
+import Base from '../layouts/Base.astro';
+import '../styles/tailwind.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+---
+
+<Base title="Unsubscribe Error - Legacy Financial & Life" description="There was an issue processing your unsubscribe request.">
+  <Header />
+
+  <div class="min-h-[60vh] bg-gradient-to-br from-brand-50 to-white flex items-center justify-center px-4">
+    <div class="max-w-lg text-center">
+      <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
+        <svg class="w-10 h-10 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+        </svg>
+      </div>
+
+      <h1 class="text-3xl font-bold text-slate-900 mb-4">Something Went Wrong</h1>
+      <p class="text-slate-600 mb-6">
+        We couldn't process your unsubscribe request. The link may have expired or been used already.
+      </p>
+      <p class="text-sm text-slate-500 mb-8">
+        To be removed from our mailing list, please email us at
+        <a href="mailto:recruiting@legacyfinancial.app" class="text-brand-600 hover:text-brand-700 underline">recruiting@legacyfinancial.app</a>
+        with the subject line "Unsubscribe" and we'll take care of it right away.
+      </p>
+
+      <a href="/"
+        class="inline-block rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold transition-colors">
+        Return to Homepage
+      </a>
+    </div>
+  </div>
+
+  <Footer />
+</Base>
