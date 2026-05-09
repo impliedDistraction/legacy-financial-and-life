@@ -391,7 +391,7 @@ async function processProspect(prospect: Record<string, unknown>, signOff: strin
         call_voicemail: String(callScript?.voicemail || '').slice(0, 1000),
         personal_notes: String(parsed.personalNotes || '').slice(0, 1000),
         processed_at: new Date().toISOString(),
-        status: 'processed',
+        status: 'drafted',
       }),
     }
   );

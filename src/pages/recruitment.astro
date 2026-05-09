@@ -59,9 +59,9 @@ if (!session) {
         <div class="text-2xl font-bold text-amber-600" id="stat-pending">0</div>
         <div class="text-xs text-gray-500">Pending</div>
       </div>
-      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center cursor-pointer hover:border-blue-300 transition-colors" data-stat-tab="review" data-stat-filter="processed">
-        <div class="text-2xl font-bold text-blue-600" id="stat-processed">0</div>
-        <div class="text-xs text-gray-500">Ready</div>
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center cursor-pointer hover:border-blue-300 transition-colors" data-stat-tab="review" data-stat-filter="drafted">
+        <div class="text-2xl font-bold text-blue-600" id="stat-drafted">0</div>
+        <div class="text-xs text-gray-500">Drafted</div>
       </div>
       <div class="bg-white rounded-lg border border-gray-200 p-3 text-center cursor-pointer hover:border-green-300 transition-colors" data-stat-tab="sent" data-stat-filter="sent">
         <div class="text-2xl font-bold text-green-600" id="stat-sent">0</div>
@@ -333,7 +333,8 @@ if (!session) {
         <div class="flex items-center gap-3 flex-wrap">
           <select id="review-filter" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
             <option value="pending">Pending (needs AI)</option>
-            <option value="processed">Ready for Review</option>
+            <option value="drafted">Drafted (needs QA)</option>
+            <option value="reviewed">Reviewed (ready to approve)</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
           </select>
@@ -791,7 +792,7 @@ if (!session) {
           <div class="grid grid-cols-4 gap-2 text-center mb-3">
             <div><div class="text-lg font-bold text-gray-900">${totalProspects}</div><div class="text-xs text-gray-500">Found</div></div>
             <div><div class="text-lg font-bold text-amber-600">${counts.pending || 0}</div><div class="text-xs text-gray-500">Pending</div></div>
-            <div><div class="text-lg font-bold text-blue-600">${counts.processed || 0}</div><div class="text-xs text-gray-500">Ready</div></div>
+            <div><div class="text-lg font-bold text-blue-600">${(counts.drafted || 0) + (counts.reviewed || 0)}</div><div class="text-xs text-gray-500">In Pipeline</div></div>
             <div><div class="text-lg font-bold text-green-600">${counts.sent || 0}</div><div class="text-xs text-gray-500">Sent</div></div>
           </div>
           <div class="flex items-center gap-3 text-xs text-gray-500 mb-2">
@@ -1273,7 +1274,7 @@ if (!session) {
   async function loadReviewList() {
     const status = reviewFilter.value;
     // Show/hide contextual buttons
-    approveAllBtn.classList.toggle('hidden', status !== 'processed');
+    approveAllBtn.classList.toggle('hidden', status !== 'reviewed');
     processBatchBtn.classList.toggle('hidden', status !== 'pending');
     try {
       const res = await fetch(`/api/recruitment-upload?status=${status}&limit=${PAGE_SIZE}&offset=${currentOffset}`);
@@ -1358,12 +1359,17 @@ if (!session) {
               <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
             ` : ''}
-            ${status === 'processed' ? `
+            ${status === 'drafted' ? `
+              <span class="text-xs text-gray-400 italic">⏳ Awaiting QA review (automated)</span>
+              <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
+              <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
+            ` : ''}
+            ${status === 'reviewed' ? `
               <button class="action-btn approve-btn bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✓ Approve</button>
               <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
               ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Approve & Send</button>` : ''}
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
-            ` : ''}
+            ` : ''}}
             ${status === 'approved' ? `
               ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Send Email</button>` : ''}
               <button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>
@@ -1747,7 +1753,7 @@ if (!session) {
   // ═══════════════════════════════════════════
   async function refreshStats() {
     try {
-      const statuses = ['pending', 'processed', 'sent', 'converted'];
+      const statuses = ['pending', 'drafted', 'reviewed', 'sent', 'converted'];
       const counts: Record<string, number> = {};
       let total = 0;
 
@@ -1761,11 +1767,11 @@ if (!session) {
       const approvedRes = await fetch('/api/recruitment-upload?status=approved&limit=1');
       const approvedData = await approvedRes.json();
       total += approvedData.total || 0;
-      counts['processed'] += approvedData.total || 0; // show approved + processed as "Ready"
+      counts['drafted'] += (counts['reviewed'] || 0) + (approvedData.total || 0); // show drafted + reviewed + approved as "Drafted"
 
       document.getElementById('stat-total')!.textContent = String(total);
       document.getElementById('stat-pending')!.textContent = String(counts['pending'] || 0);
-      document.getElementById('stat-processed')!.textContent = String(counts['processed'] || 0);
+      document.getElementById('stat-drafted')!.textContent = String(counts['drafted'] || 0);
       document.getElementById('stat-sent')!.textContent = String(counts['sent'] || 0);
       document.getElementById('stat-converted')!.textContent = String(counts['converted'] || 0);
     } catch { /* silent */ }
@@ -2189,7 +2195,7 @@ if (!session) {
     });
   });
 
-  // Auto-switch to Review tab if there are pending/processed prospects
+  // Auto-switch to Review tab if there are pending/drafted prospects
   (async () => {
     try {
       const res = await fetch('/api/recruitment-upload?status=pending&limit=1');
@@ -2215,7 +2221,7 @@ if (!session) {
 
     try {
       // Fetch counts for each status
-      const statuses = ['pending', 'processed', 'ready_to_send', 'approved', 'sent', 'rejected'];
+      const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'sent', 'rejected'];
       const counts: Record<string, number> = {};
 
       await Promise.all(statuses.map(async (s) => {
@@ -2226,9 +2232,9 @@ if (!session) {
 
       const stages = [
         { key: 'pending', label: '⏳ Pending (need outreach)', color: 'text-gray-600' },
-        { key: 'processed', label: '📝 Processed (outreach generated)', color: 'text-blue-600' },
-        { key: 'ready_to_send', label: '✅ Ready to Send (reviewed)', color: 'text-green-600' },
-        { key: 'approved', label: '👍 Approved', color: 'text-emerald-600' },
+        { key: 'drafted', label: '📝 Drafted (awaiting QA)', color: 'text-blue-600' },
+        { key: 'reviewed', label: '✅ Reviewed (QA passed)', color: 'text-green-600' },
+        { key: 'approved', label: '👍 Approved (ready to send)', color: 'text-emerald-600' },
         { key: 'sent', label: '📧 Sent', color: 'text-purple-600' },
         { key: 'rejected', label: '❌ Rejected', color: 'text-red-600' },
       ];
@@ -2240,8 +2246,8 @@ if (!session) {
         </div>
       `).join('') + `
         <div class="pt-2 text-xs text-gray-400">
-          Flow: Pending → Processed → Ready to Send → Sent<br>
-          Cron loop: every 90s • Outreach: 3/loop • Research: 10/loop • Review: 20/loop
+          Flow: Pending → Drafted → [QA] → Reviewed → Approved → Sent<br>
+          Cron loop: every 90s • Outreach: 3/loop • QA: 50/loop • Review: 20/loop
         </div>
       `;
     } catch (err) {
@@ -2251,7 +2257,7 @@ if (!session) {
     // Load ready-to-send prospects
     if (listEl) {
       try {
-        const res = await fetch('/api/recruitment-upload?status=ready_to_send&limit=20&sort=recent');
+        const res = await fetch('/api/recruitment-upload?status=reviewed&limit=20&sort=recent');
         const data = await res.json();
         const prospects = data.prospects || [];
 

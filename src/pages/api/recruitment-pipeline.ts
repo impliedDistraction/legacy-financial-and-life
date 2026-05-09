@@ -79,30 +79,23 @@ export const POST: APIRoute = async ({ request }) => {
       return json({ processed, failed, total: prospects.length });
 
     } else if (action === 'review') {
-      // Move processed prospects to ready_to_send (lightweight — no AI needed)
-      const fetchRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.processed&select=id,name,fit_score,research_score,state,email,email_body,email_subject&order=fit_score.desc.nullslast&limit=20`,
-        { headers }
+      // Trigger QA + review for drafted prospects (actual QA runs via sentinel cron)
+      // This endpoint reports current pipeline state
+      const draftedRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.drafted&select=id`,
+        { headers: { ...headers, Prefer: 'count=exact' } }
       );
-      if (!fetchRes.ok) return json({ error: 'Failed to fetch' }, 500);
-      const prospects = await fetchRes.json();
+      const draftedRange = draftedRes.headers.get('content-range');
+      const drafted = draftedRange ? parseInt(draftedRange.split('/')[1]) : 0;
 
-      let reviewed = 0;
-      for (const p of prospects) {
-        if (p.email && p.email_body && p.email_subject && (p.fit_score || 0) >= 4) {
-          await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${p.id}`, {
-            method: 'PATCH',
-            headers: { ...headers, Prefer: 'return=minimal' },
-            body: JSON.stringify({
-              status: 'ready_to_send',
-              approved_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            }),
-          });
-          reviewed++;
-        }
-      }
-      return json({ reviewed, total: prospects.length });
+      const reviewedRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.reviewed&select=id`,
+        { headers: { ...headers, Prefer: 'count=exact' } }
+      );
+      const reviewedRange = reviewedRes.headers.get('content-range');
+      const reviewed = reviewedRange ? parseInt(reviewedRange.split('/')[1]) : 0;
+
+      return json({ drafted, reviewed, message: `${drafted} awaiting QA, ${reviewed} awaiting approval (QA + review run on cron cycle)` });
 
     } else if (action === 'research') {
       // Count unscored and report (actual research runs on OpenClaw cron)
@@ -250,7 +243,7 @@ async function updateProspectOutreach(id: string, result: Record<string, unknown
       call_voicemail: String(callScript?.voicemail || '').slice(0, 1000),
       personal_notes: String(result.personalNotes || '').slice(0, 1000),
       processed_at: new Date().toISOString(),
-      status: 'processed',
+      status: 'drafted',
       updated_at: new Date().toISOString(),
     }),
   });
