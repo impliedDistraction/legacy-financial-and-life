@@ -84,11 +84,8 @@ if (!session) {
   <!-- Tab Navigation -->
   <div class="max-w-7xl mx-auto px-4 pt-4">
     <div class="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit" id="tab-nav">
-      <button class="tab-btn active px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="upload">
-        📤 Upload
-      </button>
-      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="campaigns">
-        🔍 Prophog
+      <button class="tab-btn active px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="campaigns">
+        🎯 Leads
       </button>
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="review">
         ✅ Review & Approve
@@ -108,132 +105,206 @@ if (!session) {
   <!-- Tab Content -->
   <div class="max-w-7xl mx-auto px-4 py-4">
 
-    <!-- ═══════════════ PROPHOG TAB ═══════════════ -->
-    <div id="tab-campaigns" class="tab-panel hidden">
-      <div class="grid lg:grid-cols-3 gap-6">
-        <!-- Search List -->
-        <div class="lg:col-span-2 space-y-4">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-gray-900">Prophog Searches</h2>
-            <button id="new-campaign-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">+ New Search</button>
+    <!-- ═══════════════ LEADS TAB ═══════════════ -->
+    <div id="tab-campaigns" class="tab-panel">
+      <div class="space-y-6">
+
+        <!-- ── Pool Overview ── -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Agent Pool</h2>
+              <p class="text-xs text-gray-500 mt-0.5">Leads from all sources flow into this pool. AI agents research, draft, review, and send outreach automatically.</p>
+            </div>
           </div>
-          <div id="campaign-list" class="space-y-3">
-            <div class="text-sm text-gray-500 text-center py-8">Loading...</div>
+          <!-- Pipeline Flow Visual -->
+          <div class="flex items-center gap-0 overflow-x-auto pb-2" id="pool-pipeline">
+            <div class="flex flex-col items-center min-w-[80px]">
+              <div class="text-2xl font-bold text-gray-900" id="pool-total">—</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wider">In Pool</div>
+            </div>
+            <div class="text-gray-300 text-lg px-1">→</div>
+            <div class="flex flex-col items-center min-w-[80px]">
+              <div class="text-2xl font-bold text-amber-600" id="pool-pending">—</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wider">Pending</div>
+            </div>
+            <div class="text-gray-300 text-lg px-1">→</div>
+            <div class="flex flex-col items-center min-w-[80px]">
+              <div class="text-2xl font-bold text-blue-600" id="pool-drafted">—</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wider">Drafted</div>
+            </div>
+            <div class="text-gray-300 text-lg px-1">→</div>
+            <div class="flex flex-col items-center min-w-[80px]">
+              <div class="text-2xl font-bold text-indigo-600" id="pool-reviewed">—</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wider">Reviewed</div>
+            </div>
+            <div class="text-gray-300 text-lg px-1">→</div>
+            <div class="flex flex-col items-center min-w-[80px]">
+              <div class="text-2xl font-bold text-emerald-600" id="pool-approved">—</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wider">Approved</div>
+            </div>
+            <div class="text-gray-300 text-lg px-1">→</div>
+            <div class="flex flex-col items-center min-w-[80px]">
+              <div class="text-2xl font-bold text-green-600" id="pool-sent">—</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wider">Sent</div>
+            </div>
+            <div class="text-gray-300 text-lg px-1">→</div>
+            <div class="flex flex-col items-center min-w-[80px]">
+              <div class="text-2xl font-bold text-purple-600" id="pool-converted">—</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wider">Converted</div>
+            </div>
+            <div class="text-gray-300 text-lg px-2">|</div>
+            <div class="flex flex-col items-center min-w-[80px]">
+              <div class="text-2xl font-bold text-red-500" id="pool-rejected">—</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wider">Rejected</div>
+            </div>
+          </div>
+          <!-- Source breakdown -->
+          <div class="flex gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500" id="pool-sources">
+            <span>🔍 Prophog: <strong id="pool-src-prophog">—</strong></span>
+            <span>📤 CSV: <strong id="pool-src-csv">—</strong></span>
+            <span>🌐 Landing Page: <strong id="pool-src-landing">—</strong></span>
           </div>
         </div>
 
-        <!-- Sidebar: Form + Live Feed -->
-        <div class="space-y-4">
-          <!-- New Search Form -->
-          <div id="campaign-form" class="bg-white rounded-xl border border-gray-200 p-5 hidden">
-            <h3 class="text-sm font-semibold text-gray-900 mb-4">Search Prophog</h3>
-            <div class="space-y-3">
-              <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Search Name</label>
-                <input type="text" id="cmp-name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g., May GA Agents" />
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">State</label>
-                <select id="cmp-state" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                  <option value="Georgia" selected>Georgia (GA)</option>
-                  <option value="Ohio">Ohio (OH)</option>
-                  <option value="Oklahoma">Oklahoma (OK)</option>
-                  <option value="South Carolina">South Carolina (SC)</option>
-                  <option value="Mississippi">Mississippi (MS)</option>
-                  <option value="Michigan">Michigan (MI)</option>
-                  <option value="Texas">Texas (TX)</option>
-                  <option value="Utah">Utah (UT)</option>
-                  <option value="Alabama">Alabama (AL)</option>
-                  <option value="Louisiana">Louisiana (LA)</option>
-                </select>
-                <p class="text-xs text-gray-400 mt-0.5">Only states Legacy Financial is licensed in</p>
-              </div>
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-xs font-medium text-gray-600 mb-1">Credit Budget</label>
-                  <input type="number" id="cmp-budget" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="100" min="1" max="10000" />
-                </div>
-                <div>
-                  <label class="block text-xs font-medium text-gray-600 mb-1">Pages per Run</label>
-                  <input type="number" id="cmp-pages" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="20" min="1" max="50" />
-                </div>
-              </div>
-              <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Run Every (minutes)</label>
-                <input type="number" id="cmp-interval" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="60" min="1" max="1440" />
-              </div>
-              <!-- Review toggle -->
-              <label class="flex items-center gap-3 py-2 cursor-pointer">
-                <input type="checkbox" id="cmp-review" checked class="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500" />
-                <div>
-                  <span class="text-sm font-medium text-gray-800">Require review before sending</span>
-                  <p class="text-xs text-gray-500">Leads go to Review & Approve. Uncheck to auto-send.</p>
-                </div>
-              </label>
-              <!-- Auto-relaunch toggle -->
-              <label class="flex items-center gap-3 py-2 cursor-pointer">
-                <input type="checkbox" id="cmp-relaunch" class="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500" />
-                <div>
-                  <span class="text-sm font-medium text-gray-800">Auto-relaunch when budget used</span>
-                  <p class="text-xs text-gray-500">Resets credits and resumes automatically. Runs indefinitely until stopped.</p>
-                </div>
-              </label>
-              <!-- Email Sign-off -->
-              <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Email Sign-off</label>
-                <select id="cmp-signoff" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                  <option value="Legacy Financial Recruiting Team" selected>Legacy Financial Recruiting Team</option>
-                  <option value="Legacy Financial & Life">Legacy Financial & Life</option>
-                  <option value="The Legacy Financial Team">The Legacy Financial Team</option>
-                  <option value="Legacy Financial AI Recruiting">Legacy Financial AI Recruiting</option>
-                </select>
-                <p class="text-xs text-gray-400 mt-0.5">Appears at bottom of every email in this campaign</p>
-              </div>
-              <!-- Reply-to Email -->
-              <div>
-                <label class="block text-xs font-medium text-gray-600 mb-1">Reply-to Email</label>
-                <input type="email" id="cmp-reply-to" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="recruiting@legacyfinancial.app" />
-                <p class="text-xs text-gray-400 mt-0.5">Where replies go. Leave blank for default (recruiting@legacyfinancial.app)</p>
-              </div>
-              <!-- Advanced (hidden by default) -->
-              <details class="border-t border-gray-100 pt-2">
-                <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600">Advanced options</summary>
-                <div class="mt-2 space-y-3">
-                  <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Schedule Jitter (min)</label>
-                    <input type="number" id="cmp-jitter" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="15" min="0" max="30" />
-                    <p class="text-xs text-gray-400 mt-0.5">Randomizes run time ± this many minutes</p>
-                  </div>
-                  <div>
-                    <label class="block text-xs font-medium text-gray-600 mb-1">Notes</label>
-                    <textarea id="cmp-notes" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Internal notes..."></textarea>
-                  </div>
-                </div>
-              </details>
-              <button id="cmp-submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors mt-2">Start Search</button>
-              <button id="cmp-preview-btn" type="button" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-lg text-sm transition-colors mt-1">
-                👁️ Preview Sample Email
-              </button>
-              <div id="cmp-preview-output" class="hidden mt-3 border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
-                <div class="px-3 py-2 bg-gray-100 border-b border-gray-200 text-xs font-medium text-gray-500">Sample Email Preview</div>
-                <div id="cmp-preview-content" class="p-3 text-xs text-gray-700 space-y-2"></div>
-              </div>
+        <div class="grid lg:grid-cols-3 gap-6">
+          <!-- ── Outreach Campaigns ── -->
+          <div class="lg:col-span-2 space-y-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-lg font-semibold text-gray-900">Outreach Campaigns</h2>
+              <button id="new-campaign-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">+ New Campaign</button>
+            </div>
+            <div id="campaign-list" class="space-y-3">
+              <div class="text-sm text-gray-500 text-center py-8">Loading...</div>
             </div>
           </div>
 
-          <!-- Live Feed -->
-          <div class="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 class="text-sm font-semibold text-gray-900 mb-3">Recent Finds</h3>
-            <div id="live-feed" class="space-y-1 max-h-96 overflow-y-auto">
-              <div class="text-xs text-gray-400 text-center py-4">Loading...</div>
+          <!-- ── Sidebar: Lead Sources + Upload + Live Feed ── -->
+          <div class="space-y-4">
+
+            <!-- New Campaign Form -->
+            <div id="campaign-form" class="bg-white rounded-xl border border-gray-200 p-5 hidden">
+              <h3 class="text-sm font-semibold text-gray-900 mb-4">Launch Outreach Campaign</h3>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Campaign Name</label>
+                  <input type="text" id="cmp-name" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g., May GA Outreach" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Lead Source</label>
+                  <select id="cmp-source" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    <option value="prophog" selected>🔍 Prophog (auto-search)</option>
+                    <option value="csv">📤 CSV Import</option>
+                    <option value="pool">🎯 Existing Pool (all sources)</option>
+                  </select>
+                  <p class="text-xs text-gray-400 mt-0.5">Prophog auto-searches for new agents. CSV uses agents you've uploaded. Pool targets all available agents.</p>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Target State</label>
+                  <select id="cmp-state" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    <option value="Georgia" selected>Georgia (GA)</option>
+                    <option value="Ohio">Ohio (OH)</option>
+                    <option value="Oklahoma">Oklahoma (OK)</option>
+                    <option value="South Carolina">South Carolina (SC)</option>
+                    <option value="Mississippi">Mississippi (MS)</option>
+                    <option value="Michigan">Michigan (MI)</option>
+                    <option value="Texas">Texas (TX)</option>
+                    <option value="Utah">Utah (UT)</option>
+                    <option value="Alabama">Alabama (AL)</option>
+                    <option value="Louisiana">Louisiana (LA)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Outreach Goal</label>
+                  <input type="number" id="cmp-budget" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="200" min="10" max="10000" />
+                  <p class="text-xs text-gray-400 mt-0.5">How many agents to find and outreach to</p>
+                </div>
+                <!-- Email Sign-off -->
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Email Sign-off</label>
+                  <select id="cmp-signoff" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    <option value="Legacy Financial Recruiting Team" selected>Legacy Financial Recruiting Team</option>
+                    <option value="Legacy Financial & Life">Legacy Financial & Life</option>
+                    <option value="The Legacy Financial Team">The Legacy Financial Team</option>
+                    <option value="Legacy Financial AI Recruiting">Legacy Financial AI Recruiting</option>
+                  </select>
+                </div>
+                <!-- Reply-to Email -->
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Reply-to Email</label>
+                  <input type="email" id="cmp-reply-to" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="recruiting@legacyfinancial.app" />
+                  <p class="text-xs text-gray-400 mt-0.5">Where replies go. Leave blank for default.</p>
+                </div>
+                <!-- Auto-relaunch toggle -->
+                <label class="flex items-center gap-3 py-2 cursor-pointer">
+                  <input type="checkbox" id="cmp-relaunch" class="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500" />
+                  <div>
+                    <span class="text-sm font-medium text-gray-800">Continuous</span>
+                    <p class="text-xs text-gray-500">Auto-relaunch when goal reached. Runs until stopped.</p>
+                  </div>
+                </label>
+                <!-- Advanced (hidden by default) -->
+                <details class="border-t border-gray-100 pt-2">
+                  <summary class="text-xs text-gray-400 cursor-pointer hover:text-gray-600">Advanced options</summary>
+                  <div class="mt-2 space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                      <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Pages per Run</label>
+                        <input type="number" id="cmp-pages" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="20" min="1" max="50" />
+                      </div>
+                      <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Run Every (min)</label>
+                        <input type="number" id="cmp-interval" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="60" min="1" max="1440" />
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-600 mb-1">Schedule Jitter (min)</label>
+                      <input type="number" id="cmp-jitter" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="15" min="0" max="30" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                      <textarea id="cmp-notes" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Internal notes..."></textarea>
+                    </div>
+                  </div>
+                </details>
+                <!-- Hidden fields for backward compat -->
+                <input type="hidden" id="cmp-review" value="true" />
+                <button id="cmp-submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 rounded-lg text-sm transition-colors mt-2">Launch Campaign</button>
+                <button id="cmp-preview-btn" type="button" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-lg text-sm transition-colors mt-1">
+                  👁️ Preview Sample Email
+                </button>
+                <div id="cmp-preview-output" class="hidden mt-3 border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                  <div class="px-3 py-2 bg-gray-100 border-b border-gray-200 text-xs font-medium text-gray-500">Sample Email Preview</div>
+                  <div id="cmp-preview-content" class="p-3 text-xs text-gray-700 space-y-2"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick CSV Upload -->
+            <div class="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 class="text-sm font-semibold text-gray-900 mb-2">Import Leads</h3>
+              <p class="text-xs text-gray-500 mb-3">Upload a CSV to add agents directly into the pool.</p>
+              <button id="leads-upload-btn" class="w-full border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-brand-400 transition-colors cursor-pointer">
+                <div class="text-sm text-gray-600">📤 <span class="text-brand-600 font-medium">Browse CSV</span> or drag & drop</div>
+                <div class="text-xs text-gray-400 mt-1">Supported: .csv up to 500 rows</div>
+              </button>
+              <input type="file" accept=".csv,.txt" id="leads-csv-input" class="hidden" />
+            </div>
+
+            <!-- Live Feed -->
+            <div class="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 class="text-sm font-semibold text-gray-900 mb-3">Recent Activity</h3>
+              <div id="live-feed" class="space-y-1 max-h-96 overflow-y-auto">
+                <div class="text-xs text-gray-400 text-center py-4">Loading...</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ═══════════════ UPLOAD TAB ═══════════════ -->
-    <div id="tab-upload" class="tab-panel">
+    <!-- ═══════════════ UPLOAD TAB (hidden, accessed via Leads) ═══════════════ -->
+    <div id="tab-upload" class="tab-panel hidden">
       <div class="grid lg:grid-cols-3 gap-4">
         <div class="lg:col-span-2 space-y-4">
           <!-- CSV Upload -->
@@ -765,6 +836,7 @@ if (!session) {
       campaignsCache = data.campaigns || [];
       renderCampaigns();
       loadLiveFeed();
+      refreshPoolStats();
     } catch (err) {
       list.innerHTML = '<div class="text-sm text-red-500 text-center py-4">Failed to load searches</div>';
     }
@@ -774,7 +846,7 @@ if (!session) {
     const list = document.getElementById('campaign-list');
     if (!list) return;
     if (campaignsCache.length === 0) {
-      list.innerHTML = '<div class="text-sm text-gray-500 text-center py-8">No searches yet. Click "+ New Search" to start finding agents on Prophog.</div>';
+      list.innerHTML = '<div class="text-sm text-gray-500 text-center py-8">No campaigns yet. Click "+ New Campaign" to start finding and reaching agents.</div>';
       return;
     }
 
@@ -783,16 +855,15 @@ if (!session) {
 
     function renderCard(c: any, isPast: boolean) {
       const statusColor = c.status === 'active' ? 'green' : c.status === 'paused' ? 'amber' : 'gray';
-      const budgetPct = c.credit_budget > 0 ? Math.round(((c.credits_used || 0) / c.credit_budget) * 100) : 0;
       const counts = c.prospect_counts || {};
-      const totalProspects = Object.values(counts).reduce((a: number, b: any) => a + (b || 0), 0);
+      const totalFound = Object.values(counts).reduce((a: number, b: any) => a + (b || 0), 0);
+      const totalSent = (counts.sent || 0) + (counts.converted || 0) + (counts.bounced || 0);
+      const goal = c.credit_budget || 100;
+      const progressPct = goal > 0 ? Math.round((totalSent / goal) * 100) : 0;
       const lastRun = c.last_run_at ? new Date(c.last_run_at).toLocaleString() : 'Never';
       const nextRun = c.next_run_at ? new Date(c.next_run_at).toLocaleString() : 'Queued';
-      const reviewBadge = c.require_review
-        ? '<span class="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Review first</span>'
-        : '<span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Auto-send</span>';
       const relaunchBadge = c.auto_relaunch
-        ? '<span class="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Auto-relaunch</span>'
+        ? '<span class="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Continuous</span>'
         : '';
 
       const actionButtons = isPast ? '' : `
@@ -801,30 +872,37 @@ if (!session) {
 
       return `
         <div class="bg-white rounded-xl border border-gray-200 p-4 ${isPast ? 'opacity-75' : 'hover:border-brand-300'} transition-colors">
-          <div class="flex items-start justify-between mb-3">
+          <div class="flex items-start justify-between mb-2">
             <div>
               <h3 class="font-semibold text-gray-900">${escapeHtml(c.name)}</h3>
-              <p class="text-xs text-gray-500 mt-0.5">${escapeHtml(c.search_state)} · every ${c.schedule_interval_minutes} min</p>
+              <p class="text-xs text-gray-500 mt-0.5">🔍 Prophog · ${escapeHtml(c.search_state)}</p>
             </div>
             <div class="flex items-center gap-2">
-              ${reviewBadge}
               ${relaunchBadge}
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-700">${c.status}</span>
               ${actionButtons}
             </div>
           </div>
-          <div class="grid grid-cols-4 gap-2 text-center mb-3">
-            <div><div class="text-lg font-bold text-gray-900">${totalProspects}</div><div class="text-xs text-gray-500">Found</div></div>
-            <div><div class="text-lg font-bold text-amber-600">${counts.pending || 0}</div><div class="text-xs text-gray-500">Pending</div></div>
-            <div><div class="text-lg font-bold text-blue-600">${(counts.drafted || 0) + (counts.reviewed || 0)}</div><div class="text-xs text-gray-500">In Pipeline</div></div>
-            <div><div class="text-lg font-bold text-green-600">${counts.sent || 0}</div><div class="text-xs text-gray-500">Sent</div></div>
+          <!-- Outreach Progress -->
+          <div class="mb-3">
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="text-gray-600 font-medium">${totalSent} / ${goal} outreaches sent</span>
+              <span class="text-gray-400">${progressPct}%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+              <div class="${progressPct >= 90 ? 'bg-green-500' : progressPct >= 50 ? 'bg-brand-600' : 'bg-blue-500'} h-2 rounded-full transition-all" style="width: ${Math.min(100, progressPct)}%"></div>
+            </div>
           </div>
-          <div class="flex items-center gap-3 text-xs text-gray-500 mb-2">
-            <span>${c.credits_used || 0}/${c.credit_budget} credits</span>
-            <div class="flex-1 bg-gray-200 rounded-full h-1.5"><div class="${budgetPct >= 90 ? 'bg-red-500' : 'bg-brand-600'} h-1.5 rounded-full" style="width: ${Math.min(100, budgetPct)}%"></div></div>
+          <!-- Pipeline mini-stats -->
+          <div class="grid grid-cols-5 gap-1 text-center mb-3">
+            <div><div class="text-sm font-bold text-gray-900">${totalFound}</div><div class="text-[10px] text-gray-400">Found</div></div>
+            <div><div class="text-sm font-bold text-amber-600">${counts.pending || 0}</div><div class="text-[10px] text-gray-400">Pending</div></div>
+            <div><div class="text-sm font-bold text-blue-600">${(counts.drafted || 0) + (counts.reviewed || 0)}</div><div class="text-[10px] text-gray-400">Pipeline</div></div>
+            <div><div class="text-sm font-bold text-emerald-600">${counts.approved || 0}</div><div class="text-[10px] text-gray-400">Ready</div></div>
+            <div><div class="text-sm font-bold text-green-600">${totalSent}</div><div class="text-[10px] text-gray-400">Sent</div></div>
           </div>
           <div class="flex items-center justify-between text-xs text-gray-400">
-            <span>Last run: ${lastRun}</span>
+            <span>Last: ${lastRun}</span>
             ${isPast ? `<span>Ended: ${c.updated_at ? new Date(c.updated_at).toLocaleString() : '—'}</span>` : `<span>Next: ${nextRun}</span>`}
           </div>
         </div>`;
@@ -834,7 +912,7 @@ if (!session) {
     if (activeCampaigns.length > 0) {
       html += activeCampaigns.map(c => renderCard(c, false)).join('');
     } else {
-      html += '<div class="text-sm text-gray-500 text-center py-4">No active searches. Click "+ New Search" to start.</div>';
+      html += '<div class="text-sm text-gray-500 text-center py-4">No active campaigns. Launch one to start finding and reaching agents.</div>';
     }
 
     if (pastCampaigns.length > 0) {
@@ -896,6 +974,77 @@ if (!session) {
     }
   }
 
+  // ═══════════════════════════════════════════
+  // POOL STATS
+  // ═══════════════════════════════════════════
+  async function refreshPoolStats() {
+    try {
+      const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'sent', 'converted', 'rejected'];
+      const sources = ['prophog_scrape', 'csv_import', 'landing_page'];
+      const fetches = [
+        ...statuses.map(s => fetch(`/api/recruitment-upload?status=${s}&limit=1`).then(r => r.json()).then(d => ({ key: s, count: d.total || 0 }))),
+        ...sources.map(s => fetch(`/api/recruitment-upload?limit=1&source=${s}`).then(r => r.json()).then(d => ({ key: `src-${s}`, count: d.total || 0 }))),
+      ];
+      const results = await Promise.all(fetches);
+      const counts: Record<string, number> = {};
+      let total = 0;
+      for (const r of results) {
+        counts[r.key] = r.count;
+        if (!r.key.startsWith('src-')) total += r.count;
+      }
+      const setEl = (id: string, val: number) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = String(val);
+      };
+      setEl('pool-total', total);
+      setEl('pool-pending', counts['pending'] || 0);
+      setEl('pool-drafted', counts['drafted'] || 0);
+      setEl('pool-reviewed', counts['reviewed'] || 0);
+      setEl('pool-approved', counts['approved'] || 0);
+      setEl('pool-sent', counts['sent'] || 0);
+      setEl('pool-converted', counts['converted'] || 0);
+      setEl('pool-rejected', counts['rejected'] || 0);
+      setEl('pool-src-prophog', counts['src-prophog_scrape'] || 0);
+      setEl('pool-src-csv', counts['src-csv_import'] || 0);
+      setEl('pool-src-landing', counts['src-landing_page'] || 0);
+    } catch { /* silent */ }
+  }
+
+  // ═══════════════════════════════════════════
+  // LEADS SIDEBAR: CSV upload shortcut
+  // ═══════════════════════════════════════════
+  const leadsCsvInput = document.getElementById('leads-csv-input') as HTMLInputElement;
+  document.getElementById('leads-upload-btn')?.addEventListener('click', () => leadsCsvInput?.click());
+  leadsCsvInput?.addEventListener('change', () => {
+    if (leadsCsvInput.files?.[0]) {
+      // Switch to Upload tab and trigger file handling there
+      const file = leadsCsvInput.files[0];
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      const uploadTabBtn = document.querySelector('[data-tab="upload"]') as HTMLElement;
+      if (uploadTabBtn) {
+        uploadTabBtn.classList.add('active');
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById('tab-upload')?.classList.remove('hidden');
+      }
+      // Feed file into the main CSV handler
+      const mainCsvInput = document.getElementById('csv-input') as HTMLInputElement;
+      if (mainCsvInput) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        mainCsvInput.files = dt.files;
+        mainCsvInput.dispatchEvent(new Event('change'));
+      }
+      leadsCsvInput.value = '';
+    }
+  });
+
+  // ═══════════════════════════════════════════
+  // AUTO-LOAD: Leads is default tab, fire on init
+  // ═══════════════════════════════════════════
+  loadCampaigns();
+  refreshPoolStats();
+  refreshStats();
+
   // New campaign form
   document.getElementById('new-campaign-btn')?.addEventListener('click', () => {
     document.getElementById('campaign-form')?.classList.toggle('hidden');
@@ -915,7 +1064,7 @@ if (!session) {
     }
 
     btn.disabled = true;
-    btn.textContent = 'Starting...';
+    btn.textContent = 'Launching...';
     try {
       const res = await fetch('/api/recruitment-campaigns', {
         method: 'POST',
@@ -923,12 +1072,13 @@ if (!session) {
         body: JSON.stringify({
           action: 'create',
           name: nameVal,
+          source: (document.getElementById('cmp-source') as HTMLSelectElement).value,
           searchState: (document.getElementById('cmp-state') as HTMLInputElement).value,
           creditBudget: (document.getElementById('cmp-budget') as HTMLInputElement).value,
           maxPagesPerRun: (document.getElementById('cmp-pages') as HTMLInputElement).value,
           intervalMinutes: (document.getElementById('cmp-interval') as HTMLInputElement).value,
           jitterMinutes: (document.getElementById('cmp-jitter') as HTMLInputElement)?.value || '15',
-          requireReview: (document.getElementById('cmp-review') as HTMLInputElement).checked,
+          requireReview: true,
           autoRelaunch: (document.getElementById('cmp-relaunch') as HTMLInputElement).checked,
           signOff: (document.getElementById('cmp-signoff') as HTMLSelectElement).value,
           replyToEmail: (document.getElementById('cmp-reply-to') as HTMLInputElement).value.trim() || null,
@@ -942,12 +1092,12 @@ if (!session) {
       document.getElementById('campaign-form')?.classList.add('hidden');
       (document.getElementById('cmp-name') as HTMLInputElement).value = '';
       loadCampaigns();
-      showToast('Search started!', 'success');
+      showToast('Campaign launched!', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Failed to start search', 'error');
+      showToast(err.message || 'Failed to launch campaign', 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Start Search';
+      btn.textContent = 'Launch Campaign';
     }
   });
 
