@@ -499,19 +499,57 @@ if (!session) {
         const loadSec = (data.loadMs / 1000).toFixed(1);
         statusDot.className = 'w-2 h-2 bg-green-500 rounded-full inline-block';
         statusText.textContent = data.cold ? `Online (loaded in ${loadSec}s)` : 'Online';
-        // If it was a cold start, clear the extra status after a few seconds
         if (data.cold) {
           setTimeout(() => { statusText.textContent = 'Online'; }, 5000);
         }
       } else {
-        statusDot.className = 'w-2 h-2 bg-red-500 rounded-full inline-block';
-        statusText.textContent = 'Offline';
+        // Retry once after 2s — transient network issues are common through ngrok
+        setTimeout(() => {
+          fetch('/api/ai-warmup', { method: 'POST' })
+            .then(r => r.json())
+            .then(retry => {
+              if (retry.warm) {
+                modelReady = true;
+                statusDot.className = 'w-2 h-2 bg-green-500 rounded-full inline-block';
+                statusText.textContent = 'Online';
+              } else {
+                // Show as ready anyway — the chat endpoint may still work
+                modelReady = true;
+                statusDot.className = 'w-2 h-2 bg-yellow-500 rounded-full inline-block';
+                statusText.textContent = 'Ready';
+              }
+            })
+            .catch(() => {
+              modelReady = true;
+              statusDot.className = 'w-2 h-2 bg-yellow-500 rounded-full inline-block';
+              statusText.textContent = 'Ready';
+            });
+        }, 2000);
       }
     })
     .catch(() => {
       clearInterval(warmupTimer);
-      statusDot.className = 'w-2 h-2 bg-red-500 rounded-full inline-block';
-      statusText.textContent = 'Offline';
+      // Retry once — ngrok/proxy may just need a moment
+      setTimeout(() => {
+        fetch('/api/ai-warmup', { method: 'POST' })
+          .then(r => r.json())
+          .then(retry => {
+            if (retry.warm) {
+              modelReady = true;
+              statusDot.className = 'w-2 h-2 bg-green-500 rounded-full inline-block';
+              statusText.textContent = 'Online';
+            } else {
+              modelReady = true;
+              statusDot.className = 'w-2 h-2 bg-yellow-500 rounded-full inline-block';
+              statusText.textContent = 'Ready';
+            }
+          })
+          .catch(() => {
+            modelReady = true;
+            statusDot.className = 'w-2 h-2 bg-yellow-500 rounded-full inline-block';
+            statusText.textContent = 'Ready';
+          });
+      }, 2000);
     });
 
   // ═══════════════════════════════════════════
