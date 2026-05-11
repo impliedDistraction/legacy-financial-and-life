@@ -210,7 +210,8 @@ if (!session) {
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Target State</label>
                   <select id="cmp-state" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                    <option value="Georgia" selected>Georgia (GA)</option>
+                    <option value="Florida" selected>Florida (FL)</option>
+                    <option value="Georgia">Georgia (GA)</option>
                     <option value="Ohio">Ohio (OH)</option>
                     <option value="Oklahoma">Oklahoma (OK)</option>
                     <option value="South Carolina">South Carolina (SC)</option>
@@ -220,8 +221,27 @@ if (!session) {
                     <option value="Utah">Utah (UT)</option>
                     <option value="Alabama">Alabama (AL)</option>
                     <option value="Louisiana">Louisiana (LA)</option>
+                    <option value="Tennessee">Tennessee (TN)</option>
                   </select>
                 </div>
+                <!-- Prophog Search Filters -->
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">License Effective From</label>
+                    <input type="date" id="cmp-lic-from" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">License Effective To</label>
+                    <input type="date" id="cmp-lic-to" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                  </div>
+                </div>
+                <label class="flex items-center gap-3 py-1 cursor-pointer">
+                  <input type="checkbox" id="cmp-new-agents" class="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500" />
+                  <div>
+                    <span class="text-sm font-medium text-gray-800">New Agents Only</span>
+                    <p class="text-xs text-gray-500">Target recently licensed agents (best response rates)</p>
+                  </div>
+                </label>
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Outreach Goal</label>
                   <input type="number" id="cmp-budget" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="200" min="10" max="10000" />
@@ -887,7 +907,7 @@ if (!session) {
           <div class="flex items-start justify-between mb-2">
             <div>
               <h3 class="font-semibold text-gray-900">${escapeHtml(c.name)}</h3>
-              <p class="text-xs text-gray-500 mt-0.5">🔍 Prophog · ${escapeHtml(c.search_state)}</p>
+              <p class="text-xs text-gray-500 mt-0.5">🔍 Prophog · ${escapeHtml(c.search_state)}${c.search_filters?.onlyNewAgents ? ' · 🆕 New Agents' : ''}${c.search_filters?.licenseEffectiveFrom ? ' · 📅 ' + escapeHtml(c.search_filters.licenseEffectiveFrom) : ''}</p>
             </div>
             <div class="flex items-center gap-2">
               ${relaunchBadge}
@@ -1086,6 +1106,11 @@ if (!session) {
           name: nameVal,
           source: (document.getElementById('cmp-source') as HTMLSelectElement).value,
           searchState: (document.getElementById('cmp-state') as HTMLInputElement).value,
+          searchFilters: {
+            licenseEffectiveFrom: (document.getElementById('cmp-lic-from') as HTMLInputElement).value || undefined,
+            licenseEffectiveTo: (document.getElementById('cmp-lic-to') as HTMLInputElement).value || undefined,
+            onlyNewAgents: (document.getElementById('cmp-new-agents') as HTMLInputElement).checked || undefined,
+          },
           creditBudget: (document.getElementById('cmp-budget') as HTMLInputElement).value,
           maxPagesPerRun: (document.getElementById('cmp-pages') as HTMLInputElement).value,
           intervalMinutes: (document.getElementById('cmp-interval') as HTMLInputElement).value,
@@ -1537,12 +1562,13 @@ if (!session) {
                 ${p.fit_score ? `<span class="text-xs font-bold text-${scoreColor}-600">${p.fit_score}/10</span>` : ''}
                 ${stateMatch ? '<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Licensed State</span>' : ''}
                 <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">${escapeHtml(p.status)}</span>
+                ${!p.email ? '<span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">📞 Phone Only</span>' : ''}
                 ${p.research_score != null ? `<span class="text-xs ${p.research_score >= 7 ? 'bg-green-100 text-green-700' : p.research_score >= 4 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'} px-1.5 py-0.5 rounded">🔍 ${p.research_score}/10</span>` : p.research_status === 'unscored' ? '<span class="text-xs bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded">⏳ unscored</span>' : ''}
                 ${p.qa_score != null ? `<span class="text-xs ${p.qa_score >= 80 ? 'bg-green-100 text-green-700' : p.qa_score >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'} px-1.5 py-0.5 rounded">QA ${p.qa_score}</span>` : ''}
               </div>
               <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
                 ${p.state ? `<span>📍 ${escapeHtml(p.state)}${p.city ? ', ' + escapeHtml(p.city) : ''}</span>` : ''}
-                ${p.email ? `<span>✉️ ${escapeHtml(p.email)}</span>` : ''}
+                ${p.email ? `<span class="text-brand-700 font-medium">✉️ ${escapeHtml(p.email)}</span>` : '<span class="text-gray-300 italic">No email on file</span>'}
                 ${p.phone ? `<span>📞 ${escapeHtml(p.phone)}</span>` : ''}
                 ${p.experience_level && p.experience_level !== 'unknown' ? `<span>⭐ ${escapeHtml(p.experience_level)}</span>` : ''}
                 ${p.current_agency ? `<span>🏢 ${escapeHtml(p.current_agency)}</span>` : ''}
@@ -1853,7 +1879,7 @@ if (!session) {
                 ${p.research_score != null ? `<span class="text-xs ${p.research_score >= 7 ? 'bg-green-50 text-green-600' : p.research_score >= 4 ? 'bg-amber-50 text-amber-600' : 'bg-gray-50 text-gray-500'} px-1.5 py-0.5 rounded">🔍 ${p.research_score}</span>` : ''}
               </div>
               <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
-                ${p.email ? `<span>✉️ ${escapeHtml(p.email)}</span>` : '<span class="text-gray-400">No email</span>'}
+                ${p.email ? `<span class="text-brand-700 font-medium">✉️ ${escapeHtml(p.email)}</span>` : '<span class="text-amber-500 font-medium">📞 Phone Only</span>'}
                 ${p.state ? `<span>📍 ${escapeHtml(p.state)}${p.city ? ', ' + escapeHtml(p.city) : ''}</span>` : ''}
                 ${p.phone ? `<span>📞 ${escapeHtml(p.phone)}</span>` : ''}
               </div>
@@ -2010,6 +2036,8 @@ if (!session) {
     el.textContent = text;
     return el.innerHTML;
   }
+
+
 
   function getAttr(el: Element, attr: string): string {
     return el.getAttribute(attr) || '';

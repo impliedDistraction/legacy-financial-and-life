@@ -23,6 +23,24 @@ function jsonRes(data: unknown, status = 200) {
   });
 }
 
+/** Sanitize search_filters JSON — only allow known keys with string/boolean values */
+function sanitizeSearchFilters(raw: unknown): Record<string, string | boolean | undefined> {
+  if (!raw || typeof raw !== 'object') return {};
+  const src = raw as Record<string, unknown>;
+  const allowed: Record<string, 'string' | 'boolean'> = {
+    licenseEffectiveFrom: 'string',
+    licenseEffectiveTo: 'string',
+    onlyNewAgents: 'boolean',
+  };
+  const result: Record<string, string | boolean | undefined> = {};
+  for (const [k, type] of Object.entries(allowed)) {
+    if (k in src && typeof src[k] === type) {
+      result[k] = src[k] as string | boolean;
+    }
+  }
+  return result;
+}
+
 /**
  * GET /api/recruitment-campaigns — list campaigns + prospect counts
  * POST /api/recruitment-campaigns — create or update a campaign
@@ -84,7 +102,7 @@ export const POST: APIRoute = async ({ request }) => {
         name,
         client: String(body.client || 'legacy').slice(0, 50),
         search_state: String(body.searchState || 'Georgia').slice(0, 50),
-        search_filters: body.searchFilters || {},
+        search_filters: sanitizeSearchFilters(body.searchFilters),
         credit_budget: Math.max(1, Math.min(10000, parseInt(body.creditBudget) || 100)),
         max_pages_per_run: Math.max(1, Math.min(50, parseInt(body.maxPagesPerRun) || 20)),
         schedule_interval_minutes: Math.max(1, Math.min(1440, parseInt(body.intervalMinutes) || 60)),
