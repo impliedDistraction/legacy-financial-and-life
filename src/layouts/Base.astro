@@ -1,6 +1,5 @@
 ---
 import '../styles/tailwind.css';
-import { site } from '../content/site';
 import Analytics from '@vercel/analytics/astro';
 import SEO from '../components/SEO.astro';
 import { safeJsonStringify } from 'flags';
@@ -22,7 +21,6 @@ const flagValuesJson = safeJsonStringify(flagValues);
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <SEO title={title} description={description} />
-    <link rel="icon" href={site.branding.favicon}>
     <script type="application/json" data-flag-values set:html={flagValuesJson}></script>
 
     <!-- Meta Pixel Code -->
