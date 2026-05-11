@@ -5,6 +5,54 @@ import Footer from '../components/Footer.astro';
 import '../styles/tailwind.css';
 
 export const prerender = false;
+
+// ─── Prospect Context (server-side) ──────────────────────────────
+// When a prospect arrives via email CTA (?pid=UUID), look up their
+// research data to personalize the page and chat experience.
+const pid = Astro.url.searchParams.get('pid') || '';
+let prospectTier: 'new' | 'established' | 'unknown' = 'unknown';
+let prospectName = '';
+let prospectState = '';
+let prospectCity = '';
+
+if (pid && pid.length > 10) {
+  const SB_URL = import.meta.env.SUPABASE_URL?.trim();
+  const SB_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (SB_URL && SB_KEY) {
+    try {
+      const res = await fetch(
+        `${SB_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(pid)}&select=name,state,city,experience_level,web_presence,properties&limit=1`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+      );
+      if (res.ok) {
+        const [p] = await res.json();
+        if (p) {
+          prospectName = p.name?.split(' ')[0] || '';
+          prospectState = p.state || '';
+          prospectCity = p.city || '';
+          const wp = p.web_presence || {};
+          const biz = wp.business?.stage || '';
+          const credTier = wp.credentials?.tier || '';
+          const expLevel = p.experience_level || '';
+          const props = p.properties || {};
+          const statesCount = props.states_count || 0;
+          const daysSinceLicense = props.licensed_date
+            ? Math.floor((Date.now() - new Date(props.licensed_date).getTime()) / 86400000)
+            : null;
+
+          // Classification logic
+          if (biz === 'agency_owner' || biz === 'team_lead' || credTier === 'highly_credentialed' || credTier === 'credentialed') {
+            prospectTier = 'established';
+          } else if (expLevel === 'new' || (daysSinceLicense !== null && daysSinceLicense < 730) || statesCount <= 2) {
+            prospectTier = 'new';
+          } else if (biz === 'captive' || biz === 'independent') {
+            prospectTier = 'established';
+          }
+        }
+      }
+    } catch { /* non-critical — fall back to generic page */ }
+  }
+}
 ---
 <Base
   title="Join Legacy Financial & Life"
@@ -15,34 +63,88 @@ export const prerender = false;
   <!-- Hero -->
   <section class="relative isolate overflow-hidden bg-gradient-to-br from-brand-50 to-white">
     <div class="mx-auto max-w-4xl px-4 py-16 sm:py-24 text-center">
-      <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
-        Your Next Step in Insurance Starts Here
-      </h1>
-      <p class="mt-6 text-lg text-slate-700 max-w-2xl mx-auto">
-        Legacy Financial & Life is expanding. We offer mentorship from experienced agents,
-        proven systems, weekly training, and the tools you need to build a sustainable book of business.
-      </p>
+      {prospectTier === 'established' ? (
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
+          {prospectName ? `${prospectName}, ` : ''}Ready to Spend More Time Doing What You Do Best?
+        </h1>
+        <p class="mt-6 text-lg text-slate-700 max-w-2xl mx-auto">
+          You've built something real. Legacy Financial & Life partners with experienced agents who want
+          back-office support, a growing referral network, and FMO-level resources — so you can focus on
+          clients instead of paperwork.
+        </p>
+      ) : prospectTier === 'new' ? (
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
+          {prospectName ? `${prospectName}, ` : ''}Your Next Step in Insurance Starts Here
+        </h1>
+        <p class="mt-6 text-lg text-slate-700 max-w-2xl mx-auto">
+          Starting out is hard enough without doing it alone. Legacy Financial & Life provides
+          mentorship from experienced agents, lead support, and proven systems to help you build
+          a sustainable book of business from day one.
+        </p>
+      ) : (
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
+          Your Next Step in Insurance Starts Here
+        </h1>
+        <p class="mt-6 text-lg text-slate-700 max-w-2xl mx-auto">
+          Legacy Financial & Life is expanding. We offer mentorship from experienced agents,
+          proven systems, weekly training, and the tools you need to build a sustainable book of business.
+        </p>
+      )}
     </div>
   </section>
 
   <!-- What We Offer -->
   <section class="mx-auto max-w-4xl px-4 py-12">
     <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <div class="text-3xl mb-3">👨‍🏫</div>
-        <h3 class="font-bold text-slate-900 mb-2">Direct Mentorship</h3>
-        <p class="text-sm text-slate-600">1-on-1 guidance from agents with 300+ policies sold.</p>
-      </div>
-      <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <div class="text-3xl mb-3">📋</div>
-        <h3 class="font-bold text-slate-900 mb-2">Proven Systems</h3>
-        <p class="text-sm text-slate-600">Established processes for prospecting, presenting, and closing.</p>
-      </div>
-      <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-        <div class="text-3xl mb-3">🤝</div>
-        <h3 class="font-bold text-slate-900 mb-2">Team Support</h3>
-        <p class="text-sm text-slate-600">Weekly training, shared leads, and a collaborative culture.</p>
-      </div>
+      {prospectTier === 'established' ? (
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div class="text-3xl mb-3">🌐</div>
+          <h3 class="font-bold text-slate-900 mb-2">FMO-Level Resources</h3>
+          <p class="text-sm text-slate-600">Access to carrier appointments, compliance support, and tools reserved for high-volume producers.</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div class="text-3xl mb-3">🤝</div>
+          <h3 class="font-bold text-slate-900 mb-2">Referral Network</h3>
+          <p class="text-sm text-slate-600">A growing network of contacts across varied services — cross-referrals that benefit your clients and your book.</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div class="text-3xl mb-3">📋</div>
+          <h3 class="font-bold text-slate-900 mb-2">Back-Office Support</h3>
+          <p class="text-sm text-slate-600">Let us handle the admin so you can spend your day with clients, not carrier portals.</p>
+        </div>
+      ) : prospectTier === 'new' ? (
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div class="text-3xl mb-3">🎯</div>
+          <h3 class="font-bold text-slate-900 mb-2">Lead Support</h3>
+          <p class="text-sm text-slate-600">Shared leads and prospecting systems so you're not starting from zero every week.</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div class="text-3xl mb-3">👨‍🏫</div>
+          <h3 class="font-bold text-slate-900 mb-2">Direct Mentorship</h3>
+          <p class="text-sm text-slate-600">1-on-1 guidance from agents with 300+ policies sold. Learn what actually works.</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div class="text-3xl mb-3">📋</div>
+          <h3 class="font-bold text-slate-900 mb-2">Proven Systems</h3>
+          <p class="text-sm text-slate-600">Established processes for prospecting, presenting, and closing — no guesswork.</p>
+        </div>
+      ) : (
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div class="text-3xl mb-3">👨‍🏫</div>
+          <h3 class="font-bold text-slate-900 mb-2">Direct Mentorship</h3>
+          <p class="text-sm text-slate-600">1-on-1 guidance from agents with 300+ policies sold.</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div class="text-3xl mb-3">📋</div>
+          <h3 class="font-bold text-slate-900 mb-2">Proven Systems</h3>
+          <p class="text-sm text-slate-600">Established processes for prospecting, presenting, and closing.</p>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div class="text-3xl mb-3">🤝</div>
+          <h3 class="font-bold text-slate-900 mb-2">Team Support</h3>
+          <p class="text-sm text-slate-600">Weekly training, shared leads, and a collaborative culture.</p>
+        </div>
+      )}
     </div>
   </section>
 
@@ -152,7 +254,13 @@ export const prerender = false;
             <span class="text-white text-[10px] font-bold">LF</span>
           </div>
           <div class="bg-white rounded-xl rounded-tl-sm px-3 py-2 max-w-[85%] shadow-sm border border-slate-100">
-            <p class="text-sm text-slate-700">Hey! 👋 Thanks for checking us out. I'd love to learn a little about you — what does your day actually look like right now? Where does most of your time go?</p>
+            {prospectTier === 'established' ? (
+              <p class="text-sm text-slate-700">Hey{prospectName ? ` ${prospectName}` : ''}! 👋 Sounds like you've been in the industry a while. I'm curious — what does your day actually look like right now? Are you spending your time where you want to be?</p>
+            ) : prospectTier === 'new' ? (
+              <p class="text-sm text-slate-700">Hey{prospectName ? ` ${prospectName}` : ''}! 👋 Thanks for checking us out. Getting started in insurance can be a lot — what's been the biggest challenge so far? Where does most of your time end up going?</p>
+            ) : (
+              <p class="text-sm text-slate-700">Hey! 👋 Thanks for checking us out. I'd love to learn a little about you — what does your day actually look like right now? Where does most of your time go?</p>
+            )}
           </div>
         </div>
       </div>
@@ -241,6 +349,7 @@ export const prerender = false;
   let chatEngaged = false; // true after first message sent
   const sessionId = crypto.randomUUID();
   const conversationHistory: Array<{ role: string; content: string }> = [];
+  const chatPid = new URLSearchParams(window.location.search).get('pid') || '';
 
   // Vercel analytics helper (fires only if @vercel/analytics is loaded)
   function trackChatEvent(name: string, props?: Record<string, string | number>) {
@@ -367,7 +476,7 @@ export const prerender = false;
       const res = await fetch('/api/join-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: conversationHistory, sessionId }),
+        body: JSON.stringify({ messages: conversationHistory, sessionId, prospectId: chatPid }),
       });
 
       typingEl.remove();

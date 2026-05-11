@@ -164,6 +164,7 @@ export const POST: APIRoute = async ({ request }) => {
     const body = await request.json();
     const messages: ChatMessage[] = body.messages;
     const sessionId = typeof body.sessionId === 'string' ? body.sessionId.slice(0, 64) : getLeadTrackingId();
+    const prospectId = typeof body.prospectId === 'string' ? body.prospectId.slice(0, 64) : '';
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return new Response(JSON.stringify({ error: 'Messages array required' }), {
@@ -220,8 +221,97 @@ export const POST: APIRoute = async ({ request }) => {
       content: String(m.content).slice(0, 1000),
     }));
 
+    // ── Prospect-Aware Context ──────────────────────────────────────
+    // When a prospect arrives via email CTA (?pid=UUID), look up their
+    // research data to give the chat context about who they are.
+    let contextAddendum = '';
+    if (prospectId && prospectId.length > 10 && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const pRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(prospectId)}&select=name,state,city,experience_level,web_presence,properties&limit=1`,
+          { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } }
+        );
+        if (pRes.ok) {
+          const [prospect] = await pRes.json();
+          if (prospect) {
+            const wp = prospect.web_presence || {};
+            const props = prospect.properties || {};
+            const firstName = prospect.name?.split(' ')[0] || '';
+            const state = prospect.state || '';
+            const city = prospect.city || '';
+            const biz = wp.business?.stage || '';
+            const credTier = wp.credentials?.tier || '';
+            const expLevel = prospect.experience_level || '';
+            const community = wp.community?.tier || '';
+            const reputation = wp.reputation?.tier || '';
+            const compliance = wp.compliance?.status || '';
+            const tone = wp.toneProfile?.primary || '';
+            const hiringSignal = wp.profileSummary?.hiringSignal || '';
+            const hiringNotes = (wp.profileSummary?.hiringNotes || []).join('; ');
+            const statesCount = props.states_count || 0;
+            const licenseLines = (props.license_lines || []).join(', ');
+            const daysSinceLicense = props.licensed_date
+              ? Math.floor((Date.now() - new Date(props.licensed_date).getTime()) / 86400000)
+              : null;
+            const desigs = (wp.credentials?.designations || []).map((d: any) => d.code).join(', ');
+            const affils = (wp.credentials?.affiliations || []).map((a: any) => a.code).join(', ');
+
+            // Determine tier
+            let tier = 'unknown';
+            if (biz === 'agency_owner' || biz === 'team_lead' || credTier === 'highly_credentialed' || credTier === 'credentialed') {
+              tier = 'established';
+            } else if (expLevel === 'new' || (daysSinceLicense !== null && daysSinceLicense < 730) || statesCount <= 2) {
+              tier = 'new';
+            } else if (biz === 'captive' || biz === 'independent') {
+              tier = 'established';
+            }
+
+            // Build context (NEVER expose raw data — only natural-language summary for the AI)
+            const parts: string[] = [];
+            parts.push(`\nCONTEXT ABOUT THIS VISITOR (use naturally, NEVER quote this data verbatim):`);
+            if (firstName) parts.push(`- Their first name is ${firstName}.`);
+            if (city && state) parts.push(`- Based in ${city}, ${state}.`);
+            else if (state) parts.push(`- Licensed in ${state}.`);
+            if (licenseLines) parts.push(`- License lines: ${licenseLines}.`);
+            if (daysSinceLicense !== null) {
+              if (daysSinceLicense < 90) parts.push(`- Very new to the industry (licensed ${daysSinceLicense} days ago).`);
+              else if (daysSinceLicense < 365) parts.push(`- Relatively new (licensed about ${Math.round(daysSinceLicense / 30)} months ago).`);
+              else if (daysSinceLicense < 730) parts.push(`- Has about ${Math.round(daysSinceLicense / 365)} year(s) of experience.`);
+              else parts.push(`- Experienced (licensed ${Math.round(daysSinceLicense / 365)}+ years).`);
+            }
+            if (statesCount > 5) parts.push(`- Licensed in ${statesCount} states — broad footprint.`);
+            if (biz === 'agency_owner') parts.push(`- Appears to own their own agency.`);
+            else if (biz === 'team_lead') parts.push(`- Appears to lead a team.`);
+            else if (biz === 'captive') parts.push(`- Currently with a captive carrier.`);
+            else if (biz === 'independent') parts.push(`- Currently independent.`);
+            if (desigs) parts.push(`- Holds designations: ${desigs}.`);
+            if (affils) parts.push(`- Member of: ${affils}.`);
+            if (community && community !== 'none_found') parts.push(`- Active in their community (${community}).`);
+            if (reputation === 'well_reviewed') parts.push(`- Has positive online reviews.`);
+            if (compliance === 'flags_found') parts.push(`- Note: some compliance flags found — be neutral, don't mention.`);
+
+            if (tier === 'established') {
+              parts.push(`\nAPPROACH: This is an ESTABLISHED agent. They likely aren't looking for basic mentorship.`);
+              parts.push(`Focus on: back-office support, FMO resources, referral network, carrier appointments, compliance help, and freeing their time from admin.`);
+              parts.push(`Ask about: what admin tasks consume their day, whether they have adequate back-office support, if they're happy with their current carrier access, and what they'd do with more time.`);
+            } else if (tier === 'new') {
+              parts.push(`\nAPPROACH: This is a NEW agent. They need mentorship, leads, and structure.`);
+              parts.push(`Focus on: mentorship from experienced agents, lead generation support, training systems, and not having to figure everything out alone.`);
+              parts.push(`Ask about: their biggest challenges getting started, where they struggle most (prospecting, presenting, closing), and whether they have support right now.`);
+            }
+
+            if (hiringNotes) parts.push(`- Hiring notes: ${hiringNotes}`);
+
+            contextAddendum = parts.join('\n');
+          }
+        }
+      } catch { /* non-critical — proceed with generic prompt */ }
+    }
+
+    const effectivePrompt = contextAddendum ? SYSTEM_PROMPT + contextAddendum : SYSTEM_PROMPT;
+
     const fullMessages: ChatMessage[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: effectivePrompt },
       ...trimmedMessages,
     ];
 
