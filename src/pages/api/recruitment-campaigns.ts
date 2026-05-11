@@ -31,6 +31,10 @@ function sanitizeSearchFilters(raw: unknown): Record<string, string | boolean | 
     licenseEffectiveFrom: 'string',
     licenseEffectiveTo: 'string',
     onlyNewAgents: 'boolean',
+    county: 'string',
+    city: 'string',
+    licenseTycl: 'string',
+    residencyType: 'string',
   };
   const result: Record<string, string | boolean | undefined> = {};
   for (const [k, type] of Object.entries(allowed)) {
@@ -101,6 +105,7 @@ export const POST: APIRoute = async ({ request }) => {
       const record = {
         name,
         client: String(body.client || 'legacy').slice(0, 50),
+        source_type: String(body.source || 'prophog').slice(0, 30),
         search_state: String(body.searchState || 'Georgia').slice(0, 50),
         search_filters: sanitizeSearchFilters(body.searchFilters),
         credit_budget: Math.max(1, Math.min(10000, parseInt(body.creditBudget) || 100)),

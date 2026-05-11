@@ -170,6 +170,7 @@ if (!session) {
           <!-- Source breakdown -->
           <div class="flex gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500" id="pool-sources">
             <span>🔍 Prophog: <strong id="pool-src-prophog">—</strong></span>
+            <span>🏛️ FL: <strong id="pool-src-fl-licensee">—</strong></span>
             <span>📤 CSV: <strong id="pool-src-csv">—</strong></span>
             <span>🌐 Landing Page: <strong id="pool-src-landing">—</strong></span>
           </div>
@@ -202,10 +203,11 @@ if (!session) {
                   <label class="block text-xs font-medium text-gray-600 mb-1">Lead Source</label>
                   <select id="cmp-source" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                     <option value="prophog" selected>🔍 Prophog (auto-search)</option>
+                    <option value="fl_licensee">🏛️ FL Licensee (bulk CSV)</option>
                     <option value="csv">📤 CSV Import</option>
                     <option value="pool">🎯 Existing Pool (all sources)</option>
                   </select>
-                  <p class="text-xs text-gray-400 mt-0.5">Prophog auto-searches for new agents. CSV uses agents you've uploaded. Pool targets all available agents.</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Prophog auto-searches for new agents. FL Licensee uses Florida DFS bulk data. CSV uses agents you've uploaded.</p>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Target State</label>
@@ -223,6 +225,25 @@ if (!session) {
                     <option value="Louisiana">Louisiana (LA)</option>
                     <option value="Tennessee">Tennessee (TN)</option>
                   </select>
+                </div>
+                <!-- FL Licensee Filters (shown when fl_licensee source selected) -->
+                <div id="fl-filters" class="hidden space-y-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+                  <p class="text-xs font-medium text-blue-700">🏛️ Florida DFS Licensee Filters</p>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs font-medium text-gray-600 mb-1">County</label>
+                      <input type="text" id="cmp-county" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Miami-Dade" />
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-600 mb-1">City</label>
+                      <input type="text" id="cmp-city" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Miami" />
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">License Type (contains)</label>
+                    <input type="text" id="cmp-lic-tycl" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="e.g., Life, Health" />
+                    <p class="text-xs text-gray-400 mt-0.5">Filter by license type description</p>
+                  </div>
                 </div>
                 <!-- Prophog Search Filters -->
                 <div class="grid grid-cols-2 gap-3">
@@ -886,10 +907,13 @@ if (!session) {
     const pastCampaigns = campaignsCache.filter(c => c.status === 'completed');
 
     function renderCard(c: any, isPast: boolean) {
-      const statusColor = c.status === 'active' ? 'green' : c.status === 'paused' ? 'amber' : 'gray';
       const counts = c.prospect_counts || {};
       const totalFound = Object.values(counts).reduce((a: number, b: any) => a + (b || 0), 0);
       const totalSent = (counts.sent || 0) + (counts.converted || 0) + (counts.bounced || 0);
+      const pipelineActive = (counts.pending || 0) + (counts.drafted || 0) + (counts.reviewed || 0) + (counts.approved || 0);
+      // Show 'serving' when paused but pipeline still has prospects being processed
+      const displayStatus = c.status === 'paused' && pipelineActive > 0 ? 'serving' : c.status;
+      const statusColor = displayStatus === 'active' ? 'green' : displayStatus === 'serving' ? 'blue' : displayStatus === 'paused' ? 'amber' : 'gray';
       const goal = c.credit_budget || 100;
       const progressPct = goal > 0 ? Math.round((totalSent / goal) * 100) : 0;
       const lastRun = c.last_run_at ? new Date(c.last_run_at).toLocaleString() : 'Never';
@@ -902,16 +926,18 @@ if (!session) {
               <button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}" title="${c.status === 'active' ? 'Pause' : 'Resume'}">${c.status === 'active' ? '⏸' : '▶'}</button>
               <button class="text-xs text-red-500 hover:text-red-700 font-medium" data-campaign-action="stop" data-campaign-id="${c.id}" title="Stop campaign">⏹</button>`;
 
+      const sourceIcon = c.source_type === 'fl_licensee' ? '🏛️ FL Licensee' : c.source_type === 'csv' ? '📤 CSV' : c.source_type === 'pool' ? '🎯 Pool' : '🔍 Prophog';
+
       return `
         <div class="bg-white rounded-xl border border-gray-200 p-4 ${isPast ? 'opacity-75' : 'hover:border-brand-300'} transition-colors">
           <div class="flex items-start justify-between mb-2">
             <div>
               <h3 class="font-semibold text-gray-900">${escapeHtml(c.name)}</h3>
-              <p class="text-xs text-gray-500 mt-0.5">🔍 Prophog · ${escapeHtml(c.search_state)}${c.search_filters?.onlyNewAgents ? ' · 🆕 New Agents' : ''}${c.search_filters?.licenseEffectiveFrom ? ' · 📅 ' + escapeHtml(c.search_filters.licenseEffectiveFrom) : ''}</p>
+              <p class="text-xs text-gray-500 mt-0.5">${sourceIcon} · ${escapeHtml(c.search_state)}${c.search_filters?.onlyNewAgents ? ' · 🆕 New Agents' : ''}${c.search_filters?.licenseEffectiveFrom ? ' · 📅 ' + escapeHtml(c.search_filters.licenseEffectiveFrom) : ''}</p>
             </div>
             <div class="flex items-center gap-2">
               ${relaunchBadge}
-              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-700">${c.status}</span>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-700">${displayStatus}</span>
               ${actionButtons}
             </div>
           </div>
@@ -1012,7 +1038,7 @@ if (!session) {
   async function refreshPoolStats() {
     try {
       const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'sent', 'converted', 'rejected'];
-      const sources = ['prophog_scrape', 'csv_import', 'landing_page'];
+      const sources = ['prophog_scrape', 'csv_import', 'landing_page', 'fl_licensee'];
       const fetches = [
         ...statuses.map(s => fetch(`/api/recruitment-upload?status=${s}&limit=1`).then(r => r.json()).then(d => ({ key: s, count: d.total || 0 }))),
         ...sources.map(s => fetch(`/api/recruitment-upload?limit=1&source=${s}`).then(r => r.json()).then(d => ({ key: `src-${s}`, count: d.total || 0 }))),
@@ -1037,6 +1063,7 @@ if (!session) {
       setEl('pool-converted', counts['converted'] || 0);
       setEl('pool-rejected', counts['rejected'] || 0);
       setEl('pool-src-prophog', counts['src-prophog_scrape'] || 0);
+      setEl('pool-src-fl-licensee', counts['src-fl_licensee'] || 0);
       setEl('pool-src-csv', counts['src-csv_import'] || 0);
       setEl('pool-src-landing', counts['src-landing_page'] || 0);
     } catch { /* silent */ }
@@ -1082,6 +1109,18 @@ if (!session) {
     document.getElementById('campaign-form')?.classList.toggle('hidden');
   });
 
+  // Source type toggle — show/hide FL Licensee filters
+  document.getElementById('cmp-source')?.addEventListener('change', (e) => {
+    const source = (e.target as HTMLSelectElement).value;
+    const flFilters = document.getElementById('fl-filters');
+    const stateSelect = document.getElementById('cmp-state')?.closest('div') as HTMLElement;
+    if (flFilters) flFilters.classList.toggle('hidden', source !== 'fl_licensee');
+    // Lock state to Florida when FL Licensee selected
+    if (source === 'fl_licensee' && stateSelect) {
+      (document.getElementById('cmp-state') as HTMLSelectElement).value = 'Florida';
+    }
+  });
+
   document.getElementById('cmp-submit')?.addEventListener('click', async () => {
     const btn = document.getElementById('cmp-submit') as HTMLButtonElement;
     const nameVal = (document.getElementById('cmp-name') as HTMLInputElement).value.trim();
@@ -1110,6 +1149,9 @@ if (!session) {
             licenseEffectiveFrom: (document.getElementById('cmp-lic-from') as HTMLInputElement).value || undefined,
             licenseEffectiveTo: (document.getElementById('cmp-lic-to') as HTMLInputElement).value || undefined,
             onlyNewAgents: (document.getElementById('cmp-new-agents') as HTMLInputElement).checked || undefined,
+            county: (document.getElementById('cmp-county') as HTMLInputElement)?.value.trim() || undefined,
+            city: (document.getElementById('cmp-city') as HTMLInputElement)?.value.trim() || undefined,
+            licenseTycl: (document.getElementById('cmp-lic-tycl') as HTMLInputElement)?.value.trim() || undefined,
           },
           creditBudget: (document.getElementById('cmp-budget') as HTMLInputElement).value,
           maxPagesPerRun: (document.getElementById('cmp-pages') as HTMLInputElement).value,
