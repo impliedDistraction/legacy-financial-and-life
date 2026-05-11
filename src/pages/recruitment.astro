@@ -1607,7 +1607,11 @@ if (!session) {
                   ${socials.length ? `<div class="flex flex-wrap gap-1.5">${socials.map((s: any) => {
                     const icon = s.platform === 'linkedin' ? '🔗' : s.platform === 'facebook' ? '📘' : s.platform === 'instagram' ? '📸' : s.platform === 'tiktok' ? '🎵' : s.platform === 'twitter' ? '🐦' : '🌐';
                     const label = s.platform.charAt(0).toUpperCase() + s.platform.slice(1);
-                    return `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-white border border-purple-200 text-purple-700 hover:bg-purple-100 px-2 py-0.5 rounded-full transition-colors">${icon} ${label}${s.confirmed ? ' ✓' : ''}</a>`;
+                    const confidence = s.confirmed ? ' ✓' : s.nameMatch ? ' ?' : '';
+                    const borderColor = s.confirmed ? 'border-green-300 bg-green-50' : s.nameMatch ? 'border-amber-300 bg-amber-50' : 'border-gray-300 bg-gray-50';
+                    const textColor = s.confirmed ? 'text-green-700' : s.nameMatch ? 'text-amber-700' : 'text-gray-500';
+                    const tooltip = s.confirmed ? 'Verified — matches location/profession' : s.nameMatch ? 'Name match only — may be wrong person' : 'Unverified';
+                    return `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener" title="${tooltip}" class="inline-flex items-center gap-1 ${borderColor} border ${textColor} hover:opacity-80 px-2 py-0.5 rounded-full transition-colors">${icon} ${label}${confidence}</a>`;
                   }).join('')}</div>` : ''}
                   ${traitBadges.length ? `<div class="flex flex-wrap gap-1">${traitBadges.map(b => `<span class="inline-block bg-white text-gray-700 px-2 py-0.5 rounded-full text-xs border border-gray-200">${b}</span>`).join('')}</div>` : ''}
                   ${interestingSignals.length ? `<div class="flex flex-wrap gap-1">${interestingSignals.map((s: string) => {
