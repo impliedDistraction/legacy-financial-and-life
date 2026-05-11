@@ -28,7 +28,7 @@ About Legacy Financial & Life:
 - Products: Term Life, Whole Life, Universal Life, Final Expense, IUL, Annuities, Estate Planning
 - Licensed in: GA, OH, OK, SC, MS, MI, TX, UT, AL, LA
 - Carriers: Mutual of Omaha, Transamerica, Aflac
-- Booking: https://app.ringy.com/book/legacy
+- Booking: https://calendly.com/legacy-financial/consultation
 - Phone: (706) 333-5641
 
 Rules:

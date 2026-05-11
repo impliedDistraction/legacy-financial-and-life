@@ -5,9 +5,9 @@ export const site = {
   email: 'Beth@legacyf-l.com',
   cityState: 'Luthersville, GA',
   tagline: 'Trusted. Personal. Protective. Strategic.',
-  // Scheduling configuration — Ringy CRM booking page
+  // Scheduling configuration — Calendly booking page
   scheduling: {
-    bookingUrl: 'https://app.ringy.com/book/legacy',
+    bookingUrl: 'https://calendly.com/legacy-financial/consultation',
     // On-domain redirect so email links match the sending domain (improves deliverability)
     bookingRedirect: '/book',
     brandColor: '#1a62db',

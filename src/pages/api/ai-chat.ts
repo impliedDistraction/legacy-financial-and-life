@@ -30,7 +30,7 @@ Products & Services:
 
 Licensed States: GA, OH, OK, SC, MS, MI, TX, UT, AL, LA
 Carriers: Mutual of Omaha, Transamerica, Aflac, and other trusted carriers
-Booking Link: https://app.ringy.com/book/legacy
+Booking Link: https://calendly.com/legacy-financial/consultation
 Phone: (706) 333-5641 | Email: Beth@legacyf-l.com
 
 CONVERSATION GOAL:
@@ -78,7 +78,7 @@ STRICT RULES:
 9. Comply with insurance advertising regulations — no guaranteed returns or misleading claims
 10. NEVER output internal reasoning, chain-of-thought, or meta-commentary. Never say "Okay, the user is asking..." or "Let me think about this". Respond DIRECTLY to the customer.
 11. EVERY substantive response MUST end with an action block OR a qualifying question. Do not end a message with only information.
-12. NEVER include raw URLs (like https://app.ringy.com/...) in your text. The action blocks render the links as buttons.
+12. NEVER include raw URLs (like https://calendly.com/...) in your text. The action blocks render the links as buttons.
 
 /no_think`;
 

@@ -32,7 +32,7 @@ export const FLAG_DEFINITIONS: FlagDefinitionsType = {
     ],
   },
   'ringy-enabled': {
-    description: 'Whether leads are pushed to the Ringy CRM.',
+    description: 'Whether leads are pushed to the Ringy CRM (legacy — scheduling now uses Calendly).',
     options: [
       { value: true, label: 'Enabled' },
       { value: false, label: 'Disabled' },

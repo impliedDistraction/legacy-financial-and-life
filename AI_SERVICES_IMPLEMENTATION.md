@@ -132,7 +132,7 @@ The AI must know:
 - Licensed states: GA, OH, OK, SC, MS, MI, TX, UT, AL, LA
 - Carriers: Mutual of Omaha, Transamerica, Aflac, etc.
 - Tim & Beth's background and experience
-- Booking link: https://app.ringy.com/book/legacy
+- Booking link: https://calendly.com/legacy-financial/consultation
 - Compliance: Cannot give specific policy quotes, must refer to consultation
 - Tone: Professional, warm, trustworthy — matching the brand
 

@@ -4,7 +4,7 @@
   "redirects": [
     {
       "source": "/book",
-      "destination": "https://app.ringy.com/book/legacy",
+      "destination": "https://calendly.com/legacy-financial/consultation",
       "statusCode": 302
     }
   ],
