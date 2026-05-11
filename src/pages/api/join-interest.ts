@@ -24,7 +24,8 @@ export const POST: APIRoute = async ({ request }) => {
     const body = await request.json();
     const { name, email, phone, state, textConsent, prospectId } = body;
 
-    if (!name || !email || !phone) {
+    // When prospectId is present, the form only collects consent (no name/email/phone required)
+    if (!prospectId && (!name || !email || !phone)) {
       return new Response(JSON.stringify({ error: 'Name, email, and phone are required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },

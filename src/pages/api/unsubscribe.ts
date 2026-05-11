@@ -54,6 +54,7 @@ function supabaseHeaders(url: string, key: string) {
 export const GET: APIRoute = async ({ url, redirect }) => {
   const pid = url.searchParams.get('pid');
   const token = url.searchParams.get('token');
+  const reason = url.searchParams.get('reason') || 'unsubscribe'; // 'not_me' = wrong person / mistake
 
   if (!pid || !token) {
     return redirect('/unsubscribe-error');
@@ -64,6 +65,7 @@ export const GET: APIRoute = async ({ url, redirect }) => {
   }
 
   const now = new Date().toISOString();
+  const isNotMe = reason === 'not_me';
 
   // 1. Mark prospect as opted_out in Legacy Financial Supabase
   if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
@@ -87,21 +89,33 @@ export const GET: APIRoute = async ({ url, redirect }) => {
         }
       }
 
-      // Update prospect status to opted_out
+      // Update prospect status — for "not me", also clear the digital profile
+      const updateBody: Record<string, unknown> = {
+        status: 'opted_out',
+        updated_at: now,
+        properties: {
+          ...existingProps,
+          opted_out_at: now,
+          opted_out_via: isNotMe ? 'not_me_link' : 'unsubscribe_link',
+          opted_out_reason: isNotMe ? 'Wrong person / sent by mistake' : 'Unsubscribed via link',
+        },
+      };
+
+      // For "not me" — signal that this prospect record should not be contacted
+      // and the profile data may be inaccurate
+      if (isNotMe) {
+        (updateBody.properties as Record<string, unknown>).profile_invalidated = true;
+        (updateBody.properties as Record<string, unknown>).do_not_contact = true;
+        updateBody.web_presence = null; // Clear research data
+        updateBody.research_score = null;
+      }
+
       await fetch(
         `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(pid)}`,
         {
           method: 'PATCH',
           headers: { ...supabaseHeaders(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY), Prefer: 'return=minimal' },
-          body: JSON.stringify({
-            status: 'opted_out',
-            updated_at: now,
-            properties: {
-              ...existingProps,
-              opted_out_at: now,
-              opted_out_via: 'unsubscribe_link',
-            },
-          }),
+          body: JSON.stringify(updateBody),
         }
       );
 
@@ -115,10 +129,12 @@ export const GET: APIRoute = async ({ url, redirect }) => {
             body: JSON.stringify({
               email: prospectEmail.toLowerCase().trim(),
               phone: prospectPhone || null,
-              source: 'unsubscribe_link',
+              source: isNotMe ? 'not_me_link' : 'unsubscribe_link',
               client_slug: 'legacy-financial',
               prospect_id: pid,
-              reason: 'Clicked unsubscribe link in recruitment email',
+              reason: isNotMe
+                ? 'Recipient reported email sent by mistake — profile invalidated'
+                : 'Clicked unsubscribe link in recruitment email',
             }),
           }
         ).catch(err => console.error('Failed to add to WO opt-out list:', err));
@@ -133,9 +149,13 @@ export const GET: APIRoute = async ({ url, redirect }) => {
               prospect_email: prospectEmail.toLowerCase().trim(),
               prospect_id: pid,
               client_slug: 'legacy-financial',
-              event_type: 'opt_out_added',
+              event_type: isNotMe ? 'not_me_opt_out' : 'opt_out_added',
               result: 'recorded',
-              details: { source: 'unsubscribe_link', timestamp: now },
+              details: {
+                source: isNotMe ? 'not_me_link' : 'unsubscribe_link',
+                profile_invalidated: isNotMe,
+                timestamp: now,
+              },
             }),
           }
         ).catch(err => console.error('Failed to log compliance event:', err));
