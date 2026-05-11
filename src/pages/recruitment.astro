@@ -1960,7 +1960,7 @@ if (!session) {
     const sort = sentSort.value;
 
     // Build query params
-    let statusFilter = `status=eq.${status}`;
+    let statusFilter = `status=${status}`;
     if (status === 'all_active') {
       statusFilter = 'status=in.(sent,approved,converted)';
     }
