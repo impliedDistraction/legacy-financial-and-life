@@ -30,7 +30,7 @@ Products & Services:
 
 Licensed States: GA, OH, OK, SC, MS, MI, TX, UT, AL, LA
 Carriers: Mutual of Omaha, Transamerica, Aflac, and other trusted carriers
-Booking Link: https://calendly.com/legacy-financial/consultation
+Booking Link: https://calendly.com/bethandtim-legacyf-l/30min
 Phone: (706) 333-5641 | Email: Beth@legacyf-l.com
 
 CONVERSATION GOAL:

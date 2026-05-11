@@ -7,7 +7,7 @@ export const site = {
   tagline: 'Trusted. Personal. Protective. Strategic.',
   // Scheduling configuration — Calendly booking page
   scheduling: {
-    bookingUrl: 'https://calendly.com/legacy-financial/consultation',
+    bookingUrl: 'https://calendly.com/bethandtim-legacyf-l/30min',
     // On-domain redirect so email links match the sending domain (improves deliverability)
     bookingRedirect: '/book',
     brandColor: '#1a62db',

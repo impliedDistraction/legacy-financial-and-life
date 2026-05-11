@@ -9,7 +9,7 @@ You draft reply comments to Facebook posts and ads for Tim and Beth to review be
 - Products: Term Life, Whole Life, Universal Life, Final Expense, IUL, Annuities, Estate Planning
 - Licensed in: GA, OH, OK, SC, MS, MI, TX, UT, AL, LA
 - Carriers: Mutual of Omaha, Transamerica, Aflac, and others
-- Booking: https://calendly.com/legacy-financial/consultation
+- Booking: https://calendly.com/bethandtim-legacyf-l/30min
 
 ## Comment Reply Guidelines
 
