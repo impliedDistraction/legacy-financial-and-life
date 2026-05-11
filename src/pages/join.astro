@@ -9,13 +9,27 @@ export const prerender = false;
 // ─── Prospect Context (server-side) ──────────────────────────────
 // When a prospect arrives via email CTA (?pid=UUID), look up their
 // research data to personalize the page and chat experience.
+// Test mode: ?test=jordan uses a synthetic persona without DB lookup.
 const pid = Astro.url.searchParams.get('pid') || '';
+const testPersona = Astro.url.searchParams.get('test') || '';
 let prospectTier: 'new' | 'established' | 'unknown' = 'unknown';
 let prospectName = '';
 let prospectState = '';
 let prospectCity = '';
 
-if (pid && pid.length > 10) {
+// ─── Test Personas (no DB required) ─────────────────────────────
+const TEST_PERSONAS: Record<string, { name: string; state: string; city: string; tier: 'new' | 'established' }> = {
+  jordan: { name: 'Jordan', state: 'TN', city: 'Nashville', tier: 'new' },
+  established: { name: 'Patricia', state: 'GA', city: 'Atlanta', tier: 'established' },
+};
+
+if (testPersona && TEST_PERSONAS[testPersona]) {
+  const persona = TEST_PERSONAS[testPersona];
+  prospectName = persona.name;
+  prospectState = persona.state;
+  prospectCity = persona.city;
+  prospectTier = persona.tier;
+} else if (pid && pid.length > 10) {
   const SB_URL = import.meta.env.SUPABASE_URL?.trim();
   const SB_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (SB_URL && SB_KEY) {
@@ -350,6 +364,7 @@ if (pid && pid.length > 10) {
   const sessionId = crypto.randomUUID();
   const conversationHistory: Array<{ role: string; content: string }> = [];
   const chatPid = new URLSearchParams(window.location.search).get('pid') || '';
+  const chatTestPersona = new URLSearchParams(window.location.search).get('test') || '';
 
   // Vercel analytics helper (fires only if @vercel/analytics is loaded)
   function trackChatEvent(name: string, props?: Record<string, string | number>) {
@@ -476,7 +491,7 @@ if (pid && pid.length > 10) {
       const res = await fetch('/api/join-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: conversationHistory, sessionId, prospectId: chatPid }),
+        body: JSON.stringify({ messages: conversationHistory, sessionId, prospectId: chatPid, testPersona: chatTestPersona }),
       });
 
       typingEl.remove();
