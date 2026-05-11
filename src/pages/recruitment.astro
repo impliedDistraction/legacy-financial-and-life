@@ -1563,12 +1563,13 @@ if (!session) {
                 ${stateMatch ? '<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Licensed State</span>' : ''}
                 <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">${escapeHtml(p.status)}</span>
                 ${!p.email ? '<span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">📞 Phone Only</span>' : ''}
+                ${p.web_presence?.carrierEmail ? `<span class="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium" title="Sending to carrier email risks the agent's position">🏢 Carrier Email</span>` : ''}
                 ${p.research_score != null ? `<span class="text-xs ${p.research_score >= 7 ? 'bg-green-100 text-green-700' : p.research_score >= 4 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'} px-1.5 py-0.5 rounded">🔍 ${p.research_score}/10</span>` : p.research_status === 'unscored' ? '<span class="text-xs bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded">⏳ unscored</span>' : ''}
                 ${p.qa_score != null ? `<span class="text-xs ${p.qa_score >= 80 ? 'bg-green-100 text-green-700' : p.qa_score >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'} px-1.5 py-0.5 rounded">QA ${p.qa_score}</span>` : ''}
               </div>
               <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
                 ${p.state ? `<span>📍 ${escapeHtml(p.state)}${p.city ? ', ' + escapeHtml(p.city) : ''}</span>` : ''}
-                ${p.email ? `<span class="text-brand-700 font-medium">✉️ ${escapeHtml(p.email)}</span>` : '<span class="text-gray-300 italic">No email on file</span>'}
+                ${p.email ? `<span class="text-brand-700 font-medium">✉️ ${escapeHtml(p.email)}</span>${p.web_presence?.carrierEmail ? ' <span class="text-red-500 text-[10px]" title="Carrier-owned domain — needs personal email">⚠️ carrier</span>' : ''}` : '<span class="text-gray-300 italic">No email on file</span>'}
                 ${p.phone ? `<span>📞 ${escapeHtml(p.phone)}</span>` : ''}
                 ${p.experience_level && p.experience_level !== 'unknown' ? `<span>⭐ ${escapeHtml(p.experience_level)}</span>` : ''}
                 ${p.current_agency ? `<span>🏢 ${escapeHtml(p.current_agency)}</span>` : ''}
@@ -2041,7 +2042,7 @@ if (!session) {
                 ${p.research_score != null ? `<span class="text-xs ${p.research_score >= 7 ? 'bg-green-50 text-green-600' : p.research_score >= 4 ? 'bg-amber-50 text-amber-600' : 'bg-gray-50 text-gray-500'} px-1.5 py-0.5 rounded">🔍 ${p.research_score}</span>` : ''}
               </div>
               <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
-                ${p.email ? `<span class="text-brand-700 font-medium">✉️ ${escapeHtml(p.email)}</span>` : '<span class="text-amber-500 font-medium">📞 Phone Only</span>'}
+                ${p.email ? `<span class="text-brand-700 font-medium">✉️ ${escapeHtml(p.email)}</span>${p.web_presence?.carrierEmail ? ' <span class="text-red-500 text-[10px]" title="Carrier-owned domain — needs personal email">⚠️ carrier</span>' : ''}` : '<span class="text-amber-500 font-medium">📞 Phone Only</span>'}
                 ${p.state ? `<span>📍 ${escapeHtml(p.state)}${p.city ? ', ' + escapeHtml(p.city) : ''}</span>` : ''}
                 ${p.phone ? `<span>📞 ${escapeHtml(p.phone)}</span>` : ''}
               </div>
