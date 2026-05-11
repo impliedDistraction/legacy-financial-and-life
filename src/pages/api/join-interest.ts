@@ -4,7 +4,38 @@ export const prerender = false;
 
 const SUPABASE_URL = import.meta.env.SUPABASE_URL?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+const WO_SUPABASE_URL = import.meta.env.WO_SUPABASE_URL?.trim();
+const WO_SUPABASE_SERVICE_ROLE_KEY = import.meta.env.WO_SUPABASE_SERVICE_ROLE_KEY?.trim();
 const TABLE = 'recruitment_prospects';
+
+/**
+ * Log a compliance event to the Working Order coordinator project.
+ * This creates an auditable record of TCPA consent, opt-outs, etc.
+ */
+async function logComplianceEvent(event: {
+  prospect_email: string;
+  prospect_id: string;
+  event_type: string;
+  result: string;
+  details: Record<string, unknown>;
+}) {
+  if (!WO_SUPABASE_URL || !WO_SUPABASE_SERVICE_ROLE_KEY) return;
+  try {
+    await fetch(`${WO_SUPABASE_URL}/rest/v1/wo_compliance_events`, {
+      method: 'POST',
+      headers: {
+        apikey: WO_SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${WO_SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        ...event,
+        client_slug: 'legacy-financial',
+      }),
+    });
+  } catch { /* non-critical — don't break the form submission */ }
+}
 
 /**
  * POST /api/join-interest
@@ -82,6 +113,24 @@ export const POST: APIRoute = async ({ request }) => {
           );
 
           if (updateRes.ok) {
+            // Log TCPA consent as a compliance event (auditable record)
+            const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+            logComplianceEvent({
+              prospect_email: existing.email || cleanEmail,
+              prospect_id: prospectId,
+              event_type: textConsent ? 'tcpa_consent_granted' : 'interest_submitted',
+              result: 'recorded',
+              details: {
+                source: 'landing_page_form',
+                text_consent: Boolean(textConsent),
+                consent_timestamp: now,
+                client_ip: clientIp,
+                user_agent: request.headers.get('user-agent')?.slice(0, 200) || '',
+                prospect_name: existing.name || cleanName,
+                state: cleanState || existing.state,
+              },
+            });
+
             return new Response(JSON.stringify({ success: true, updated: true }), {
               status: 200,
               headers: { 'Content-Type': 'application/json' },
@@ -126,6 +175,24 @@ export const POST: APIRoute = async ({ request }) => {
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    // Log TCPA consent for new warm leads too
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    logComplianceEvent({
+      prospect_email: cleanEmail,
+      prospect_id: 'new_warm_lead',
+      event_type: textConsent ? 'tcpa_consent_granted' : 'interest_submitted',
+      result: 'recorded',
+      details: {
+        source: 'landing_page_form_new',
+        text_consent: Boolean(textConsent),
+        consent_timestamp: now,
+        client_ip: clientIp,
+        user_agent: request.headers.get('user-agent')?.slice(0, 200) || '',
+        prospect_name: cleanName,
+        state: cleanState,
+      },
+    });
 
     return new Response(JSON.stringify({ success: true, created: true }), {
       status: 200,
