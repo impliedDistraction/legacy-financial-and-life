@@ -1615,6 +1615,28 @@ if (!session) {
                     return `<span class="inline-block bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded text-xs">${escapeHtml(label)}</span>`;
                   }).join('')}</div>` : ''}
                   ${wp.licenseVerified ? '<div class="text-green-600 font-medium">✅ License verified via state records</div>' : ''}
+                  ${(() => {
+                    const comm = wp.community;
+                    if (!comm || comm.tier === 'none_found') return '';
+                    const commColor = comm.tier === 'deeply_involved' ? 'bg-green-100 text-green-700' : comm.tier === 'active' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600';
+                    const cats = Object.entries(comm.categories || {}).map(([cat, kws]: [string, any]) => {
+                      const icon = cat === 'religious' ? '⛪' : cat === 'civic' ? '🏛️' : cat === 'youth' ? '👦' : cat === 'nonprofit' ? '💚' : cat === 'veteran' ? '🎖️' : '🏘️';
+                      return `<span class="inline-flex items-center gap-0.5 bg-white border border-gray-200 px-1.5 py-0.5 rounded text-xs">${icon} ${cat}</span>`;
+                    }).join('');
+                    return `<div><span class="font-medium">Community:</span> <span class="px-2 py-0.5 rounded-full text-xs font-medium ${commColor}">${comm.tier.replace(/_/g, ' ')}</span> ${cats}</div>`;
+                  })()}
+                  ${(() => {
+                    const rep = wp.reputation;
+                    if (!rep || rep.tier === 'none_found') return '';
+                    const repColor = rep.tier === 'established' ? 'bg-green-100 text-green-700' : rep.tier === 'recognized' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600';
+                    const badges = [];
+                    if (rep.signals?.awards) badges.push('🏆 Awards');
+                    if (rep.signals?.reviews) badges.push('⭐ Reviews');
+                    if (rep.signals?.testimonials) badges.push('💬 Testimonials');
+                    if (rep.signals?.newsMedia) badges.push('📰 News');
+                    if (rep.signals?.industryRecognition) badges.push('🏅 Industry');
+                    return `<div><span class="font-medium">Reputation:</span> <span class="px-2 py-0.5 rounded-full text-xs font-medium ${repColor}">${rep.tier.replace(/_/g, ' ')}</span> ${badges.map(b => `<span class="inline-block bg-white border border-gray-200 px-1.5 py-0.5 rounded text-xs">${b}</span>`).join(' ')}</div>`;
+                  })()}
                 </div>
               </details>`;
               })() : ''}
