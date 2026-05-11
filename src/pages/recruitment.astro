@@ -1998,6 +1998,13 @@ if (!session) {
     }
   }
 
+  function fmtDate(d: string) {
+    return new Date(d).toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+  function fmtDateShort(d: string) {
+    return new Date(d).toLocaleString('en-US', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
   function renderSentCards(prospects: any[]) {
     sentList.innerHTML = prospects.map((p: any) => {
       const scoreColor = (p.fit_score || 0) >= 7 ? 'green' : (p.fit_score || 0) >= 4 ? 'amber' : 'red';
@@ -2006,7 +2013,7 @@ if (!session) {
 
       // Interaction indicators
       const indicators: string[] = [];
-      if (p.sent_at) indicators.push(`<span class="text-blue-600" title="Sent ${new Date(p.sent_at).toLocaleDateString()}">📧</span>`);
+      if (p.sent_at) indicators.push(`<span class="text-blue-600" title="Sent ${fmtDate(p.sent_at)}">📧</span>`);
       if (props.email_opened_at || p.email_opened_at) indicators.push(`<span class="text-green-600" title="Opened">👁️</span>`);
       if (props.email_clicked_at || p.email_clicked_at) indicators.push(`<span class="text-purple-600" title="Clicked">🔗</span>`);
       if (p.replied_at || props.replied_at) indicators.push(`<span class="text-indigo-600" title="Replied">💬</span>`);
@@ -2050,7 +2057,7 @@ if (!session) {
             </div>
             <div class="text-right flex-shrink-0">
               <div class="flex gap-1 justify-end mb-1">${indicators.join('')}</div>
-              ${p.sent_at ? `<p class="text-xs text-gray-400">Sent ${new Date(p.sent_at).toLocaleDateString()}</p>` : ''}
+              ${p.sent_at ? `<p class="text-xs text-gray-400">Sent ${fmtDateShort(p.sent_at)}</p>` : ''}
               ${p.follow_up_count ? `<p class="text-xs text-gray-400">${p.follow_up_count} follow-up${p.follow_up_count > 1 ? 's' : ''}</p>` : ''}
             </div>
           </div>
@@ -2062,22 +2069,36 @@ if (!session) {
               <!-- Timeline -->
               <div class="bg-gray-50 rounded-lg p-3">
                 <div class="space-y-1.5 text-xs">
-                  ${p.created_at ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(p.created_at).toLocaleDateString()}</span><span class="text-gray-600">📋 Added to pipeline</span></div>` : ''}
-                  ${p.processed_at ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(p.processed_at).toLocaleDateString()}</span><span class="text-gray-600">🤖 AI outreach generated</span></div>` : ''}
-                  ${p.approved_at ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(p.approved_at).toLocaleDateString()}</span><span class="text-gray-600">✅ Approved${props.auto_approved ? ' (auto)' : ''}</span></div>` : ''}
-                  ${p.sent_at ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(p.sent_at).toLocaleDateString()}</span><span class="text-gray-600">📧 Email sent</span></div>` : ''}
-                  ${(props.email_opened_at || p.email_opened_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(props.email_opened_at || p.email_opened_at).toLocaleDateString()}</span><span class="text-green-600">👁️ Email opened</span></div>` : ''}
-                  ${(props.email_clicked_at || p.email_clicked_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(props.email_clicked_at || p.email_clicked_at).toLocaleDateString()}</span><span class="text-purple-600">🔗 Link clicked</span></div>` : ''}
-                  ${(p.replied_at || props.replied_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(p.replied_at || props.replied_at).toLocaleDateString()}</span><span class="text-indigo-600">💬 Replied</span></div>` : ''}
-                  ${props.call_made_at ? `<div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0">${new Date(props.call_made_at).toLocaleDateString()}</span><span class="text-amber-600">📞 Call: ${escapeHtml(props.call_outcome || 'unknown')}</span></div>` : ''}
+                  ${p.created_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.created_at)}</span><span class="text-gray-600">📋 Added to pipeline</span></div>` : ''}
+                  ${p.processed_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.processed_at)}</span><span class="text-gray-600">🤖 AI outreach generated</span></div>` : ''}
+                  ${p.approved_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.approved_at)}</span><span class="text-gray-600">✅ Approved${props.auto_approved ? ' (auto)' : ''}</span></div>` : ''}
+                  ${p.sent_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.sent_at)}</span><span class="text-gray-600">📧 Email sent</span></div>` : ''}
+                  ${(props.email_opened_at || p.email_opened_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.email_opened_at || p.email_opened_at)}</span><span class="text-green-600">👁️ Email opened</span></div>` : ''}
+                  ${(props.email_clicked_at || p.email_clicked_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.email_clicked_at || p.email_clicked_at)}</span><span class="text-purple-600">🔗 Link clicked</span></div>` : ''}
+                  ${(p.replied_at || props.replied_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.replied_at || props.replied_at)}</span><span class="text-indigo-600">💬 Replied</span></div>` : ''}
+                  ${props.call_made_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.call_made_at)}</span><span class="text-amber-600">📞 Call: ${escapeHtml(props.call_outcome || 'unknown')}</span></div>` : ''}
                 </div>
               </div>
 
               <!-- Email Content -->
               ${p.email_body ? `
-              <div class="bg-gray-50 rounded-lg p-3">
-                <p class="text-xs font-medium text-gray-500 mb-1">Subject: ${escapeHtml(p.email_subject || '')}</p>
-                <p class="text-xs text-gray-600 whitespace-pre-wrap max-h-32 overflow-y-auto">${escapeHtml(p.email_body)}</p>
+              <div class="rounded-lg overflow-hidden border border-gray-200">
+                <!-- Mini template header -->
+                <div style="background: linear-gradient(135deg, #1e40af, #2563eb);" class="px-3 py-2 text-center">
+                  <span class="text-white text-xs font-semibold">Legacy Financial &amp; Life</span>
+                </div>
+                <div class="bg-white p-3">
+                  <p class="text-xs font-medium text-gray-500 mb-1">Subject: ${escapeHtml(p.email_subject || '')}</p>
+                  <p class="text-xs text-gray-600 whitespace-pre-wrap max-h-32 overflow-y-auto">${escapeHtml(p.email_body)}</p>
+                  <div class="mt-2 text-center">
+                    <span class="inline-block bg-blue-600 text-white text-[10px] font-semibold px-3 py-1 rounded" style="pointer-events:none;">Explore the Opportunity →</span>
+                  </div>
+                </div>
+                <!-- Compliance footer indicator -->
+                <div class="bg-gray-50 border-t border-gray-200 px-3 py-2">
+                  <p class="text-[10px] text-gray-400 leading-relaxed">Legacy Financial &amp; Life | Luthersville, GA 30251</p>
+                  <p class="text-[10px] text-gray-400">🔗 <span class="underline">Unsubscribe</span> · <span class="underline">Not ${escapeHtml(p.name?.split(' ')[0] || 'recipient')}? Let us know</span></p>
+                </div>
               </div>` : ''}
 
               <!-- Actions -->
