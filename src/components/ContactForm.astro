@@ -6,7 +6,7 @@ import { site } from '../content/site';
     <h2 class="text-2xl sm:text-3xl font-bold">{site.cta.heading}</h2>
     <p class="mt-2 text-slate-700">{site.cta.sub}</p>
 
-  <form class="mt-6 grid gap-4 sm:grid-cols-2" action="https://formspree.io/f/mdkdrwbj" method="POST">
+  <form id="contact-form" class="mt-6 grid gap-4 sm:grid-cols-2">
       <label class="grid gap-1">
         <span class="text-sm font-medium">Full name <span class="text-red-500">*</span></span>
         <input 
@@ -84,26 +84,61 @@ import { site } from '../content/site';
         </div>
       </div>
 
+      <!-- Status message -->
+      <div id="contact-status" class="sm:col-span-2 hidden"></div>
+
       <div class="sm:col-span-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div class="text-sm text-slate-600">
           Or reach us at <a class="underline hover:text-brand-700 transition-colors" href={`mailto:${site.email}`}>{site.email}</a> · {site.phone} · <a class="underline hover:text-brand-700 transition-colors" href="/schedule">Schedule Online</a>
         </div>
-        <button type="submit" class="w-full sm:w-auto rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold btn-animate hover-lift transition-all duration-200">
+        <button type="submit" id="contact-submit" class="w-full sm:w-auto rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold btn-animate hover-lift transition-all duration-200">
           {site.cta.button}
         </button>
       </div>
-      
-      <!-- Form metadata for Formspree -->
-  <input type="hidden" name="_subject" value="Legacy F&L Website Inquiry">
-  <!-- Use relative URLs so Formspree redirects stay on legacyfinancial.app -->
-  <input type="hidden" name="_next" value="/form-success">
-  <input type="hidden" name="_error" value="/form-error">
-  <input type="hidden" name="_cc" value={site.email}>
     </form>
   </div>
 
   <p class="mt-4 text-xs text-slate-500">{site.footerNote}</p>
 </section>
 
-<!-- Enhanced Form Script -->
-<script src="../scripts/form-validation.js"></script>
+<script>
+  const form = document.getElementById('contact-form') as HTMLFormElement | null;
+  const statusEl = document.getElementById('contact-status');
+  const submitBtn = document.getElementById('contact-submit') as HTMLButtonElement | null;
+
+  if (form && statusEl && submitBtn) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = new FormData(form);
+      const body: Record<string, string> = {};
+      data.forEach((v, k) => { body[k] = String(v); });
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending...';
+      statusEl.className = 'sm:col-span-2 hidden';
+
+      try {
+        const res = await fetch('/api/contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const json = await res.json();
+
+        if (res.ok) {
+          window.location.href = '/form-success';
+        } else {
+          statusEl.textContent = json.error || 'Something went wrong. Please try again.';
+          statusEl.className = 'sm:col-span-2 text-sm text-red-600 bg-red-50 rounded-lg px-4 py-3';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Schedule a Strategy Call';
+        }
+      } catch {
+        statusEl.textContent = 'Network error. Please check your connection and try again.';
+        statusEl.className = 'sm:col-span-2 text-sm text-red-600 bg-red-50 rounded-lg px-4 py-3';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Schedule a Strategy Call';
+      }
+    });
+  }
+</script>
