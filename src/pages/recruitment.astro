@@ -1582,7 +1582,7 @@ if (!session) {
                 const traits = wp.traitScores || {};
                 const socials = (wp.socialProfiles || []).filter((s: any) => s.url);
                 const visTier = vis.tier || 'unknown';
-                const visColor = visTier === 'high' ? 'text-green-700 bg-green-50' : visTier === 'moderate' ? 'text-amber-700 bg-amber-50' : 'text-gray-500 bg-gray-50';
+                const visColor = visTier === 'high' ? 'text-green-700 bg-green-50' : visTier === 'moderate' ? 'text-amber-700 bg-amber-50' : visTier === 'unverified' ? 'text-orange-600 bg-orange-50' : 'text-gray-500 bg-gray-50';
                 // Build human-readable trait badges
                 const traitBadges: string[] = [];
                 if (traits.trustNetwork >= 1.5) traitBadges.push('🤝 Strong community ties');
@@ -1603,7 +1603,13 @@ if (!session) {
               <details class="mt-2">
                 <summary class="text-xs font-medium text-purple-600 cursor-pointer">🔬 Research Details ${wp.webPresenceScore != null ? `<span class="ml-1 ${wp.webPresenceScore >= 5 ? 'text-green-600' : wp.webPresenceScore >= 2 ? 'text-amber-600' : 'text-gray-400'}">(${wp.webPresenceScore}/10)</span>` : ''} <span class="ml-2 text-[10px] font-normal text-indigo-400">✨ Expanded Research</span></summary>
                 <div class="mt-1 text-xs text-gray-600 bg-purple-50 rounded p-2 space-y-2">
-                  ${vis.tier ? `<div class="flex items-center gap-2"><span class="font-medium">Visibility:</span> <span class="px-2 py-0.5 rounded-full text-xs font-medium ${visColor}">${visTier.charAt(0).toUpperCase() + visTier.slice(1)}</span>${vis.firstNamedPosition ? ` <span class="text-gray-400">— appears #${vis.firstNamedPosition} in search results</span>` : ''}</div>` : ''}
+                  ${vis.tier ? (() => {
+                    const pos = vis.firstVerifiedPosition || vis.firstNamedPosition;
+                    const verified = vis.positionVerified;
+                    const posLabel = pos ? `— appears #${pos} in search results` : '';
+                    const verifyBadge = pos ? (verified ? ' <span class="text-green-500" title="Verified: matched location/profession">✓</span>' : ' <span class="text-amber-500" title="Name match only — may be a different person">?</span>') : '';
+                    return `<div class="flex items-center gap-2"><span class="font-medium">Visibility:</span> <span class="px-2 py-0.5 rounded-full text-xs font-medium ${visColor}">${visTier.charAt(0).toUpperCase() + visTier.slice(1)}</span>${pos ? ` <span class="text-gray-400">${posLabel}${verifyBadge}</span>` : ''}</div>`;
+                  })() : ''}
                   ${socials.length ? `<div class="flex flex-wrap gap-1.5">${socials.map((s: any) => {
                     const icon = s.platform === 'linkedin' ? '🔗' : s.platform === 'facebook' ? '📘' : s.platform === 'instagram' ? '📸' : s.platform === 'tiktok' ? '🎵' : s.platform === 'twitter' ? '🐦' : '🌐';
                     const label = s.platform.charAt(0).toUpperCase() + s.platform.slice(1);
