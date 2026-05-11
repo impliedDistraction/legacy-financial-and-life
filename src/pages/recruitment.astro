@@ -1576,17 +1576,48 @@ if (!session) {
               ${p.notes ? `<p class="text-xs text-gray-400 mt-1">${escapeHtml(p.notes)}</p>` : ''}
               ${p.fit_reason ? `<p class="text-xs text-gray-500 mt-1 italic">${escapeHtml(p.fit_reason)}</p>` : ''}
               ${p.personal_notes ? `<p class="text-xs text-blue-600 mt-1">💡 ${escapeHtml(p.personal_notes)}</p>` : ''}
-              ${p.web_presence && Object.keys(p.web_presence).length > 0 ? `
+              ${p.web_presence && Object.keys(p.web_presence).length > 0 ? (() => {
+                const wp = p.web_presence;
+                const vis = wp.visibility || {};
+                const traits = wp.traitScores || {};
+                const socials = (wp.socialProfiles || []).filter((s: any) => s.url);
+                const visTier = vis.tier || 'unknown';
+                const visColor = visTier === 'high' ? 'text-green-700 bg-green-50' : visTier === 'moderate' ? 'text-amber-700 bg-amber-50' : 'text-gray-500 bg-gray-50';
+                // Build human-readable trait badges
+                const traitBadges: string[] = [];
+                if (traits.trustNetwork >= 1.5) traitBadges.push('🤝 Strong community ties');
+                else if (traits.trustNetwork >= 0.5) traitBadges.push('🤝 Community presence');
+                if (traits.professionalPresence >= 1.5) traitBadges.push('💼 Strong professional presence');
+                if (traits.salesAdjacent >= 1) traitBadges.push('📈 Sales background');
+                if (traits.complianceTemp < 0) traitBadges.push('⚠️ Compliance flags');
+                if (traits.reachability >= 1.5) traitBadges.push('📱 Dual contact (email + phone)');
+                if (traits.readiness >= 1) traitBadges.push('🆕 Recently licensed');
+                // Filter signals to show only the interesting ones
+                const interestingSignals = (wp.signals || []).filter((s: string) =>
+                  s.includes('trust_network') || s.includes('linkedin') || s.includes('facebook') ||
+                  s.includes('instagram') || s.includes('tiktok') || s.includes('twitter') ||
+                  s.includes('own_website') || s.includes('sales_adjacent') || s.includes('stable_identity') ||
+                  s.includes('multi_social') || s.includes('compliance')
+                );
+                return `
               <details class="mt-2">
-                <summary class="text-xs font-medium text-purple-600 cursor-pointer">🔬 Research Details</summary>
-                <div class="mt-1 text-xs text-gray-600 bg-purple-50 rounded p-2 space-y-1">
-                  ${p.web_presence.summary ? `<div>${escapeHtml(p.web_presence.summary)}</div>` : ''}
-                  ${p.web_presence.linkedin ? `<div>🔗 <a href="${escapeHtml(p.web_presence.linkedin)}" target="_blank" class="text-brand-600 hover:underline">LinkedIn Profile</a></div>` : ''}
-                  ${p.web_presence.websites?.length ? `<div>🌐 ${p.web_presence.websites.map((u: string) => `<a href="${escapeHtml(u)}" target="_blank" class="text-brand-600 hover:underline">${escapeHtml(new URL(u).hostname)}</a>`).join(', ')}</div>` : ''}
-                  ${p.web_presence.signals?.length ? `<div>📊 ${p.web_presence.signals.map((s: string) => `<span class="inline-block bg-white text-gray-600 px-1.5 py-0.5 rounded text-xs mr-1 border">${escapeHtml(s)}</span>`).join('')}</div>` : ''}
-                  ${p.web_presence.notes ? `<div class="italic">${escapeHtml(p.web_presence.notes)}</div>` : ''}
+                <summary class="text-xs font-medium text-purple-600 cursor-pointer">🔬 Research Details ${wp.webPresenceScore != null ? `<span class="ml-1 ${wp.webPresenceScore >= 5 ? 'text-green-600' : wp.webPresenceScore >= 2 ? 'text-amber-600' : 'text-gray-400'}">(${wp.webPresenceScore}/10)</span>` : ''}</summary>
+                <div class="mt-1 text-xs text-gray-600 bg-purple-50 rounded p-2 space-y-2">
+                  ${vis.tier ? `<div class="flex items-center gap-2"><span class="font-medium">Visibility:</span> <span class="px-2 py-0.5 rounded-full text-xs font-medium ${visColor}">${visTier.charAt(0).toUpperCase() + visTier.slice(1)}</span>${vis.firstNamedPosition ? ` <span class="text-gray-400">— appears #${vis.firstNamedPosition} in search results</span>` : ''}</div>` : ''}
+                  ${socials.length ? `<div class="flex flex-wrap gap-1.5">${socials.map((s: any) => {
+                    const icon = s.platform === 'linkedin' ? '🔗' : s.platform === 'facebook' ? '📘' : s.platform === 'instagram' ? '📸' : s.platform === 'tiktok' ? '🎵' : s.platform === 'twitter' ? '🐦' : '🌐';
+                    const label = s.platform.charAt(0).toUpperCase() + s.platform.slice(1);
+                    return `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 bg-white border border-purple-200 text-purple-700 hover:bg-purple-100 px-2 py-0.5 rounded-full transition-colors">${icon} ${label}${s.confirmed ? ' ✓' : ''}</a>`;
+                  }).join('')}</div>` : ''}
+                  ${traitBadges.length ? `<div class="flex flex-wrap gap-1">${traitBadges.map(b => `<span class="inline-block bg-white text-gray-700 px-2 py-0.5 rounded-full text-xs border border-gray-200">${b}</span>`).join('')}</div>` : ''}
+                  ${interestingSignals.length ? `<div class="flex flex-wrap gap-1">${interestingSignals.map((s: string) => {
+                    const label = s.replace(/_/g, ' ').replace('trust network:', '🏘️ ').replace('sales adjacent:', '📈 ');
+                    return `<span class="inline-block bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded text-xs">${escapeHtml(label)}</span>`;
+                  }).join('')}</div>` : ''}
+                  ${wp.licenseVerified ? '<div class="text-green-600 font-medium">✅ License verified via state records</div>' : ''}
                 </div>
-              </details>` : ''}
+              </details>`;
+              })() : ''}
             </div>
           </div>
 
