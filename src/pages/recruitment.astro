@@ -1601,8 +1601,66 @@ if (!session) {
                 );
                 return `
               <details class="mt-2">
-                <summary class="text-xs font-medium text-purple-600 cursor-pointer">🔬 Research Details ${wp.webPresenceScore != null ? `<span class="ml-1 ${wp.webPresenceScore >= 5 ? 'text-green-600' : wp.webPresenceScore >= 2 ? 'text-amber-600' : 'text-gray-400'}">(${wp.webPresenceScore}/10)</span>` : ''} <span class="ml-2 text-[10px] font-normal text-indigo-400">✨ Expanded Research</span></summary>
+                <summary class="text-xs font-medium text-purple-600 cursor-pointer">🔬 Research Details ${wp.webPresenceScore != null ? `<span class="ml-1 ${wp.webPresenceScore >= 5 ? 'text-green-600' : wp.webPresenceScore >= 2 ? 'text-amber-600' : 'text-gray-400'}">(${wp.webPresenceScore}/10)</span>` : ''} <span class="ml-2 text-[10px] font-normal text-indigo-400">✨ Expanded Research${wp.searchesPerformed ? ` (${wp.searchesPerformed} searches)` : ''}</span></summary>
                 <div class="mt-1 text-xs text-gray-600 bg-purple-50 rounded p-2 space-y-2">
+                  ${(() => {
+                    const ps = wp.profileSummary;
+                    if (!ps) return '';
+                    const signalColors: Record<string, string> = { strong: 'bg-green-100 text-green-700 border-green-300', promising: 'bg-blue-100 text-blue-700 border-blue-300', neutral: 'bg-gray-100 text-gray-600 border-gray-300', caution: 'bg-red-100 text-red-700 border-red-300', high_value: 'bg-purple-100 text-purple-700 border-purple-300' };
+                    const signalIcons: Record<string, string> = { strong: '💎', promising: '⭐', neutral: '—', caution: '⚠️', high_value: '👑' };
+                    const sc = signalColors[ps.hiringSignal] || signalColors.neutral;
+                    const si = signalIcons[ps.hiringSignal] || '';
+                    const notes = (ps.hiringNotes || []).map((n: string) => `<li>${escapeHtml(n)}</li>`).join('');
+                    return `<div class="bg-white border ${sc.split(' ')[2] || 'border-gray-200'} rounded-lg p-2 space-y-1">
+                      <div class="flex items-center gap-2"><span class="font-semibold text-sm">Hiring Brief</span> <span class="px-2 py-0.5 rounded-full text-xs font-medium ${sc}">${si} ${ps.hiringSignal.replace(/_/g, ' ')}</span></div>
+                      ${notes ? `<ul class="text-xs text-gray-600 ml-4 list-disc space-y-0.5">${notes}</ul>` : ''}
+                    </div>`;
+                  })()}
+                  ${(() => {
+                    const comp = wp.compliance;
+                    if (!comp) return '';
+                    const compColors: Record<string, string> = { clean: 'bg-green-100 text-green-700', minor_flags: 'bg-amber-100 text-amber-700', flags_found: 'bg-red-100 text-red-700' };
+                    const compIcons: Record<string, string> = { clean: '✅', minor_flags: '⚠️', flags_found: '🚨' };
+                    const cc = compColors[comp.status] || 'bg-gray-100 text-gray-600';
+                    const ci = compIcons[comp.status] || '❓';
+                    const ev = (comp.evidence || []).map((e: any) =>
+                      `<div class="pl-3 border-l-2 border-red-200 text-gray-500 italic">"${escapeHtml(e.snippet)}" <span class="text-gray-400 not-italic">— <a href="${escapeHtml(e.url || '#')}" target="_blank" rel="noopener" class="underline">${escapeHtml(e.source)}</a></span></div>`
+                    ).join('');
+                    return `<div><span class="font-medium">Compliance:</span> <span class="px-2 py-0.5 rounded-full text-xs font-medium ${cc}">${ci} ${comp.status.replace(/_/g, ' ')}</span>${comp.flagCount > 0 ? ` <span class="text-red-500 text-[10px]">${comp.flagCount} flag${comp.flagCount > 1 ? 's' : ''}</span>` : ''}</div>${ev}`;
+                  })()}
+                  ${(() => {
+                    const cred = wp.credentials;
+                    if (!cred || cred.tier === 'none_found') return '';
+                    const credColor = cred.tier === 'highly_credentialed' ? 'bg-green-100 text-green-700' : cred.tier === 'credentialed' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600';
+                    const desigs = (cred.designations || []).map((d: any) => `<span class="inline-block bg-white border border-blue-200 text-blue-700 px-1.5 py-0.5 rounded text-xs font-medium" title="${escapeHtml(d.label)}">${escapeHtml(d.code)}</span>`).join(' ');
+                    const affils = (cred.affiliations || []).map((a: any) => `<span class="inline-block bg-white border border-purple-200 text-purple-700 px-1.5 py-0.5 rounded text-xs font-medium" title="${escapeHtml(a.label)}">${escapeHtml(a.code)}</span>`).join(' ');
+                    return `<div><span class="font-medium">Credentials:</span> <span class="px-2 py-0.5 rounded-full text-xs font-medium ${credColor}">🎓 ${cred.tier.replace(/_/g, ' ')}</span> ${desigs} ${affils}</div>`;
+                  })()}
+                  ${(() => {
+                    const biz = wp.business;
+                    if (!biz || biz.stage === 'unknown') return '';
+                    const stageLabels: Record<string, string> = { agency_owner: '🏢 Agency Owner', team_lead: '👥 Team Lead', captive: '🔒 Captive Agent', independent: '🆓 Independent' };
+                    const stageColors: Record<string, string> = { agency_owner: 'bg-purple-100 text-purple-700', team_lead: 'bg-blue-100 text-blue-700', captive: 'bg-amber-100 text-amber-700', independent: 'bg-green-100 text-green-700' };
+                    const label = stageLabels[biz.stage] || biz.stage;
+                    const color = stageColors[biz.stage] || 'bg-gray-100 text-gray-600';
+                    const ev = (biz.evidence || []).slice(0, 2).map((e: any) =>
+                      `<div class="pl-3 border-l-2 border-purple-200 text-gray-500 italic">"${escapeHtml(e.snippet)}" <span class="text-gray-400 not-italic">— ${escapeHtml(e.source)}</span></div>`
+                    ).join('');
+                    return `<div><span class="font-medium">Career Stage:</span> <span class="px-2 py-0.5 rounded-full text-xs font-medium ${color}">${label}</span>${biz.indicators?.hasWebsite ? ' <span class="text-[10px] text-gray-400">has business website</span>' : ''}</div>${ev}`;
+                  })()}
+                  ${(() => {
+                    const inf = wp.influence;
+                    if (!inf || inf.tier === 'none_found') return '';
+                    const infColor = inf.tier === 'public_figure' ? 'bg-green-100 text-green-700' : inf.tier === 'locally_known' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600';
+                    const cats = Object.entries(inf.categories || {}).filter(([_, v]) => v).map(([cat]: [string, any]) => {
+                      const icons: Record<string, string> = { news: '📰', speaking: '🎤', events: '🎪', interviews: '🎙️', localLeader: '🏛️' };
+                      return `<span class="inline-block bg-white border border-gray-200 px-1.5 py-0.5 rounded text-xs">${icons[cat] || '📌'} ${cat}</span>`;
+                    }).join(' ');
+                    const ev = (inf.evidence || []).slice(0, 2).map((e: any) =>
+                      `<div class="pl-3 border-l-2 border-purple-200 text-gray-500 italic">"${escapeHtml(e.snippet)}" <span class="text-gray-400 not-italic">— ${escapeHtml(e.source)}</span></div>`
+                    ).join('');
+                    return `<div><span class="font-medium">Local Influence:</span> <span class="px-2 py-0.5 rounded-full text-xs font-medium ${infColor}">📡 ${inf.tier.replace(/_/g, ' ')}</span> ${cats}</div>${ev}`;
+                  })()}
                   ${vis.tier ? (() => {
                     const pos = vis.firstVerifiedPosition || vis.firstNamedPosition;
                     const verified = vis.positionVerified;
@@ -1686,7 +1744,7 @@ if (!session) {
                 </div>
                 <div class="mt-1.5 flex items-center gap-1.5 text-[10px] text-indigo-400">
                   <span>✨</span>
-                  <span>Expanded Research preview — 4 searches per prospect included free.</span>
+                  <span>Expanded Research — 8-search agent profile included free.</span>
                   <span class="text-indigo-300">Add research credits at workingorder.app</span>
                 </div>
               </details>`;
