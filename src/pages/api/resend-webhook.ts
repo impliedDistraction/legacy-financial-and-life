@@ -25,22 +25,41 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
 
   const eventType = String(event.type || '');
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  let propsPatch: Record<string, unknown> = {};
 
   if (eventType === 'email.opened') {
-    update.properties = { email_opened_at: new Date().toISOString() };
+    propsPatch = { email_opened_at: new Date().toISOString() };
   } else if (eventType === 'email.clicked') {
-    update.properties = { email_clicked_at: new Date().toISOString() };
+    propsPatch = { email_clicked_at: new Date().toISOString() };
   } else if (eventType === 'email.bounced') {
     update.status = 'bounced';
-    update.properties = { bounced_at: new Date().toISOString(), bounce_type: (data as Record<string, unknown>).bounce_type };
+    propsPatch = { bounced_at: new Date().toISOString(), bounce_type: (data as Record<string, unknown>).bounce_type };
   } else if (eventType === 'email.complained') {
     update.status = 'opted_out';
-    update.properties = { complained_at: new Date().toISOString(), rejection_reason: 'spam_complaint', opted_out_at: new Date().toISOString(), opted_out_via: 'spam_complaint' };
+    propsPatch = { complained_at: new Date().toISOString(), rejection_reason: 'spam_complaint', opted_out_at: new Date().toISOString(), opted_out_via: 'spam_complaint' };
   } else {
     return; // Don't update for other event types
   }
 
   try {
+    // Fetch existing properties to merge (avoid overwriting)
+    const existingRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(prospectId)}&select=properties`,
+      {
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+    if (existingRes.ok) {
+      const [row] = await existingRes.json();
+      update.properties = { ...(row?.properties || {}), ...propsPatch };
+    } else {
+      update.properties = propsPatch;
+    }
+
     await fetch(`${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(prospectId)}`, {
       method: 'PATCH',
       headers: {

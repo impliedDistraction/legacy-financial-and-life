@@ -70,18 +70,20 @@ export const GET: APIRoute = async ({ url, redirect }) => {
     try {
       // Fetch the prospect to get their email for the opt-out list
       const fetchRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(pid)}&select=email,phone,name&limit=1`,
+        `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(pid)}&select=email,phone,name,properties&limit=1`,
         { headers: supabaseHeaders(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) }
       );
 
       let prospectEmail = '';
       let prospectPhone = '';
+      let existingProps: Record<string, unknown> = {};
 
       if (fetchRes.ok) {
         const [prospect] = await fetchRes.json();
         if (prospect) {
           prospectEmail = prospect.email || '';
           prospectPhone = prospect.phone || '';
+          existingProps = prospect.properties || {};
         }
       }
 
@@ -95,6 +97,7 @@ export const GET: APIRoute = async ({ url, redirect }) => {
             status: 'opted_out',
             updated_at: now,
             properties: {
+              ...existingProps,
               opted_out_at: now,
               opted_out_via: 'unsubscribe_link',
             },
