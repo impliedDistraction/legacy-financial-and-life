@@ -2082,13 +2082,13 @@ if (!session) {
 
               <!-- Email Content -->
               ${p.email_body ? `
+              <p class="text-xs font-medium text-gray-500 mb-1.5">Subject: ${escapeHtml(p.email_subject || '')}</p>
               <div class="rounded-lg overflow-hidden border border-gray-200">
                 <!-- Mini template header -->
                 <div style="background: linear-gradient(135deg, #1e40af, #2563eb);" class="px-3 py-2 text-center">
                   <span class="text-white text-xs font-semibold">Legacy Financial &amp; Life</span>
                 </div>
                 <div class="bg-white p-3">
-                  <p class="text-xs font-medium text-gray-500 mb-1">Subject: ${escapeHtml(p.email_subject || '')}</p>
                   <p class="text-xs text-gray-600 whitespace-pre-wrap max-h-32 overflow-y-auto">${escapeHtml(p.email_body)}</p>
                   <div class="mt-2 text-center">
                     <span class="inline-block bg-blue-600 text-white text-[10px] font-semibold px-3 py-1 rounded" style="pointer-events:none;">Explore the Opportunity →</span>
