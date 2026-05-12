@@ -167,3 +167,26 @@ export const GET: APIRoute = async ({ url, redirect }) => {
 
   return redirect('/unsubscribe-success');
 };
+
+/**
+ * POST /api/unsubscribe
+ * RFC 8058 one-click unsubscribe — email clients (Gmail, Apple Mail, Yahoo)
+ * send a POST with body "List-Unsubscribe=One-Click".
+ * The pid and token are in the URL query params (same URL as the GET).
+ */
+export const POST: APIRoute = async (context) => {
+  const { url } = context;
+  const pid = url.searchParams.get('pid');
+  const token = url.searchParams.get('token');
+
+  if (!pid || !token) {
+    return new Response('Missing parameters', { status: 400 });
+  }
+
+  if (!(await verifyToken(pid, token))) {
+    return new Response('Invalid token', { status: 403 });
+  }
+
+  // Delegate to GET handler which does the actual unsubscribe work
+  return GET(context);
+};

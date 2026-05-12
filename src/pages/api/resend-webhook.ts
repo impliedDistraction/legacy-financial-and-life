@@ -42,6 +42,8 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
 
   if (eventType === 'email.opened') {
     propsPatch = { email_opened_at: new Date().toISOString() };
+    // Preserve first open timestamp for time-to-open analytics
+    propsPatch._preserve_first_open = true;
   } else if (eventType === 'email.clicked') {
     const click = (data.click || data) as Record<string, unknown>;
     const clickedUrl = typeof click.link === 'string' ? click.link : (typeof data.link === 'string' ? data.link : null);
@@ -63,7 +65,7 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
     if (clickedUrl) {
       if (/\/join\b/.test(clickedUrl)) {
         if (!isBot) {
-          update.interaction_stage = 'clicked_cta';
+          update._promote_stage = 'clicked_cta';
         } else {
           propsPatch.email_click_bot_cta = true;
         }
@@ -74,8 +76,9 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
       }
     }
   } else if (eventType === 'email.bounced') {
+    const bounceType = String((data as Record<string, unknown>).bounce_type || '');
     update.status = 'bounced';
-    propsPatch = { bounced_at: new Date().toISOString(), bounce_type: (data as Record<string, unknown>).bounce_type };
+    propsPatch = { bounced_at: new Date().toISOString(), bounce_type: bounceType };
   } else if (eventType === 'email.complained') {
     update.status = 'opted_out';
     propsPatch = { complained_at: new Date().toISOString(), rejection_reason: 'spam_complaint', opted_out_at: new Date().toISOString(), opted_out_via: 'spam_complaint' };
@@ -84,9 +87,9 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
   }
 
   try {
-    // Fetch existing properties to merge (avoid overwriting)
+    // Fetch existing properties + interaction_stage to merge (avoid overwriting)
     const existingRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(prospectId)}&select=properties`,
+      `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(prospectId)}&select=properties,interaction_stage`,
       {
         headers: {
           apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -98,6 +101,25 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
     if (existingRes.ok) {
       const [row] = await existingRes.json();
       const existing = row?.properties || {};
+      const currentStage = row?.interaction_stage || 'new';
+
+      // Preserve first open timestamp (don't overwrite with later opens)
+      if (propsPatch._preserve_first_open && existing.email_opened_at) {
+        delete propsPatch.email_opened_at;
+      }
+      delete propsPatch._preserve_first_open;
+
+      // Only promote interaction_stage forward, never regress
+      const STAGE_ORDER = ['new', 'clicked_cta', 'visited_page', 'interested', 'contacted'];
+      if (update._promote_stage) {
+        const targetStage = update._promote_stage as string;
+        const currentIdx = STAGE_ORDER.indexOf(currentStage);
+        const targetIdx = STAGE_ORDER.indexOf(targetStage);
+        if (targetIdx > currentIdx) {
+          update.interaction_stage = targetStage;
+        }
+        delete update._promote_stage;
+      }
 
       // Build click history array for click events
       if (propsPatch._click_event) {
@@ -111,6 +133,8 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
 
       update.properties = { ...existing, ...propsPatch };
     } else {
+      delete propsPatch._preserve_first_open;
+      delete update._promote_stage;
       if (propsPatch._click_event) {
         const clickEvent = propsPatch._click_event;
         delete propsPatch._click_event;
@@ -131,9 +155,11 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
       body: JSON.stringify(update),
     });
 
-    // Auto-add to Working Order opt-out list on complaints and hard bounces
+    // Auto-add to Working Order opt-out list on complaints and hard bounces only
+    // Soft bounces (mailbox full, temp server issue) are transient and shouldn't opt-out
+    const isHardBounce = eventType === 'email.bounced' && (update.properties as Record<string, unknown>)?.bounce_type !== 'soft';
     if (WO_SUPABASE_URL && WO_SUPABASE_SERVICE_ROLE_KEY &&
-        (eventType === 'email.complained' || eventType === 'email.bounced')) {
+        (eventType === 'email.complained' || isHardBounce)) {
       // Fetch prospect email for opt-out list
       const prospectRes = await fetch(
         `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(prospectId)}&select=email,phone&limit=1`,
