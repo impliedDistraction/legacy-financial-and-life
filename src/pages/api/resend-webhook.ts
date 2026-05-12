@@ -27,12 +27,27 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   let propsPatch: Record<string, unknown> = {};
 
+  // Known email security scanner / link-prefetch user agents
+  const BOT_UA_PATTERNS = [
+    /amazon\s*cloudfront/i, /barracuda/i, /mimecast/i, /proofpoint/i,
+    /fireeye/i, /fortinet/i, /symantec/i, /mcafee/i, /microsoft\s*defender/i,
+    /google\s*web\s*preview/i, /bot\b/i, /spider\b/i, /crawler\b/i,
+    /prefetch/i, /link\s*scanner/i, /security\s*scanner/i,
+  ];
+
+  function isBotClick(ua: string | undefined): boolean {
+    if (!ua) return false;
+    return BOT_UA_PATTERNS.some(p => p.test(ua));
+  }
+
   if (eventType === 'email.opened') {
     propsPatch = { email_opened_at: new Date().toISOString() };
   } else if (eventType === 'email.clicked') {
     const click = (data.click || data) as Record<string, unknown>;
     const clickedUrl = typeof click.link === 'string' ? click.link : (typeof data.link === 'string' ? data.link : null);
-    const clickEvent = { url: clickedUrl, at: new Date().toISOString() };
+    const clickUserAgent = typeof click.userAgent === 'string' ? click.userAgent : undefined;
+    const isBot = isBotClick(clickUserAgent);
+    const clickEvent = { url: clickedUrl, at: new Date().toISOString(), userAgent: clickUserAgent || null, bot: isBot };
     propsPatch = {
       email_clicked_at: new Date().toISOString(),
       email_clicked_url: clickedUrl,
@@ -40,12 +55,19 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
       _click_event: clickEvent,
     };
 
-    // Classify click intent
+    if (isBot) {
+      propsPatch.email_click_bot_detected = true;
+    }
+
+    // Classify click intent (only promote interaction_stage for non-bot clicks)
     if (clickedUrl) {
       if (/\/join\b/.test(clickedUrl)) {
-        update.interaction_stage = 'clicked_cta';
+        if (!isBot) {
+          update.interaction_stage = 'clicked_cta';
+        } else {
+          propsPatch.email_click_bot_cta = true;
+        }
       } else if (/\/api\/unsubscribe\b/.test(clickedUrl)) {
-        // Don't override — unsubscribe handler manages status
         propsPatch.unsubscribe_clicked_at = new Date().toISOString();
       } else if (/not.me|not_me/i.test(clickedUrl)) {
         propsPatch.not_me_clicked_at = new Date().toISOString();

@@ -74,6 +74,9 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
 >
   <Header />
 
+  <!-- Server-rendered prospect context for client-side tracking -->
+  <div id="prospect-context" data-tier={prospectTier} data-pid={pid} class="hidden"></div>
+
   <!-- Hero -->
   <section class="relative isolate overflow-hidden bg-gradient-to-br from-brand-50 to-white">
     <div class="mx-auto max-w-4xl px-4 py-16 sm:py-24 text-center">
@@ -393,6 +396,34 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
       submitBtn.textContent = prospectId ? "Yes, I'm Interested — Reach Out" : 'Schedule My Conversation';
     }
   });
+</script>
+
+<script>
+  // ─── Visit Tracking Beacon ──────────────────────────────────────
+  // Fires once on page load for prospects arriving from email CTA.
+  // This confirms a real browser rendered the page (vs bot link prefetch).
+  (function() {
+    const ctx = document.getElementById('prospect-context');
+    const pid = ctx?.dataset.pid || '';
+    const tier = ctx?.dataset.tier || 'unknown';
+    if (!pid || pid.length < 10) return;
+
+    // Deduplicate: only fire once per session per prospect
+    const visitKey = `join_visited_${pid}`;
+    if (sessionStorage.getItem(visitKey)) return;
+    sessionStorage.setItem(visitKey, '1');
+
+    fetch('/api/join-visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prospectId: pid,
+        tier,
+        referrer: document.referrer || null,
+      }),
+      keepalive: true,
+    }).catch(() => {}); // non-critical
+  })();
 </script>
 
 <script>
