@@ -53,7 +53,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   try {
     const body = await request.json();
-    const { name, email, phone, state, textConsent, prospectId } = body;
+    const { name, email, phone, state, textConsent, referralConsent, prospectId } = body;
 
     // When prospectId is present, the form only collects consent (no name/email/phone required)
     if (!prospectId && (!name || !email || !phone)) {
@@ -97,6 +97,9 @@ export const POST: APIRoute = async ({ request }) => {
               text_consent: Boolean(textConsent),
               text_consent_at: textConsent ? now : null,
               text_consent_ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown',
+              referral_consent: Boolean(referralConsent),
+              referral_consent_at: referralConsent ? now : null,
+              referral_consent_ip: referralConsent ? (request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown') : null,
               landing_page_visited_at: now,
               landing_page_state: cleanState,
             },
@@ -123,6 +126,7 @@ export const POST: APIRoute = async ({ request }) => {
               details: {
                 source: 'landing_page_form',
                 text_consent: Boolean(textConsent),
+                referral_consent: Boolean(referralConsent),
                 consent_timestamp: now,
                 client_ip: clientIp,
                 user_agent: request.headers.get('user-agent')?.slice(0, 200) || '',
@@ -154,6 +158,9 @@ export const POST: APIRoute = async ({ request }) => {
         text_consent: Boolean(textConsent),
         text_consent_at: textConsent ? now : null,
         text_consent_ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown',
+        referral_consent: Boolean(referralConsent),
+        referral_consent_at: referralConsent ? now : null,
+        referral_consent_ip: referralConsent ? (request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown') : null,
         landing_page_submitted_at: now,
         warm_lead: true,
       },
@@ -186,6 +193,7 @@ export const POST: APIRoute = async ({ request }) => {
       details: {
         source: 'landing_page_form_new',
         text_consent: Boolean(textConsent),
+        referral_consent: Boolean(referralConsent),
         consent_timestamp: now,
         client_ip: clientIp,
         user_agent: request.headers.get('user-agent')?.slice(0, 200) || '',

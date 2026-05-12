@@ -246,6 +246,19 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
           </label>
         </div>
 
+        <!-- Referral network consent (optional) -->
+        <div class="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" id="referralConsent" name="referralConsent"
+              class="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+            <span class="text-xs text-slate-600 leading-relaxed">
+              <span class="font-medium text-slate-700">Optional:</span> I'm open to hearing about opportunities from
+              Legacy Financial's trusted partner network. Your information will only be shared with vetted partners
+              offering complementary professional services, and you can revoke this consent at any time.
+            </span>
+          </label>
+        </div>
+
         <button type="submit" id="submitBtn"
           class="w-full rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           {(pid || testPersona) ? "Yes, I'm Interested — Reach Out" : "Schedule My Conversation"}
@@ -366,6 +379,7 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
       phone: phoneEl?.value.trim() || '',
       state: stateEl?.value || '',
       textConsent: (form.elements.namedItem('textConsent') as HTMLInputElement).checked,
+      referralConsent: (form.elements.namedItem('referralConsent') as HTMLInputElement).checked,
       prospectId,
     };
 
