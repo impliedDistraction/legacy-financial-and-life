@@ -18,6 +18,81 @@ const WO_SUPABASE_SERVICE_ROLE_KEY = import.meta.env.WO_SUPABASE_SERVICE_ROLE_KE
 async function trackRecruitmentEvent(event: Record<string, unknown>) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return;
   const data = (event.data || {}) as Record<string, unknown>;
+  const eventType = String(event.type || '');
+
+  // ── Inbound reply tracking (email.received) ──────────────────────
+  // These don't carry X-Legacy-Prospect-Id since they originate from
+  // the prospect, so we match by sender email instead.
+  if (eventType === 'email.received') {
+    const fromRaw = typeof data.from === 'string' ? data.from : '';
+    // Extract bare email from "Name <email>" or plain "email" formats
+    const emailMatch = fromRaw.match(/<([^>]+)>/) || fromRaw.match(/^([^\s<]+@[^\s>]+)$/);
+    const senderEmail = emailMatch?.[1]?.toLowerCase().trim();
+    if (!senderEmail) return;
+
+    try {
+      // Look up prospect by email
+      const lookupRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/recruitment_prospects?email=ilike.${encodeURIComponent(senderEmail)}&select=id,properties,interaction_stage&limit=1`,
+        {
+          headers: {
+            apikey: SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      if (!lookupRes.ok) return;
+      const [prospect] = await lookupRes.json();
+      if (!prospect) return;
+
+      const existing = prospect.properties || {};
+      const currentStage = prospect.interaction_stage || 'new';
+
+      // Build reply preview (truncate to 500 chars)
+      const rawText = typeof data.text === 'string' ? data.text : '';
+      const subject = typeof data.subject === 'string' ? data.subject : '';
+      const replyPreview = rawText.replace(/\s+/g, ' ').trim().slice(0, 500);
+      const now = new Date().toISOString();
+
+      // Append to reply history
+      const replies = Array.isArray(existing.email_replies) ? existing.email_replies : [];
+      replies.push({ at: now, subject, preview: replyPreview });
+
+      const propsPatch: Record<string, unknown> = {
+        ...existing,
+        email_replied_at: existing.email_replied_at || now, // preserve first reply time
+        email_reply_count: (existing.email_reply_count || 0) + 1,
+        email_replies: replies,
+      };
+
+      // Promote interaction_stage forward only
+      const STAGE_ORDER = ['new', 'clicked_cta', 'visited_page', 'interested', 'replied', 'contacted'];
+      const currentIdx = STAGE_ORDER.indexOf(currentStage);
+      const targetIdx = STAGE_ORDER.indexOf('replied');
+      const stageUpdate = targetIdx > currentIdx ? { interaction_stage: 'replied' } : {};
+
+      await fetch(`${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(prospect.id)}`, {
+        method: 'PATCH',
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({
+          updated_at: now,
+          properties: propsPatch,
+          ...stageUpdate,
+        }),
+      });
+    } catch (err) {
+      console.error('Failed to track inbound reply to recruitment prospect:', err);
+    }
+    return;
+  }
+
+  // ── Outbound event tracking (opened/clicked/bounced/complained) ──
   const headers = (data.headers || []) as Array<{ name: string; value: string }>;
   const prospectId = headers.find(h => h.name.toLowerCase() === 'x-legacy-prospect-id')?.value;
   const template = headers.find(h => h.name.toLowerCase() === 'x-legacy-template')?.value;
@@ -258,7 +333,10 @@ export const POST: APIRoute = async ({ request }) => {
       console.error('Recruitment tracking error (non-fatal):', err);
     });
 
-    const alerted = await processResendWebhookEvent(event as { type: string; created_at?: string; data?: Record<string, unknown> });
+    const alerted = await processResendWebhookEvent(event as { type: string; created_at?: string; data?: Record<string, unknown> }).catch(err => {
+      console.error('Resend monitoring error (non-fatal):', err);
+      return false;
+    });
     return Response.json({ ok: true, type: event.type, alerted });
   } catch (error) {
     console.error('Failed to process Resend webhook event', error);

@@ -149,6 +149,7 @@ function hasOutputLeak(text: string): boolean {
 async function logChatExchange(opts: {
   sessionId: string;
   clientIp: string;
+  prospectId?: string;
   userMessage: string;
   assistantMessage: string;
   flagged: boolean;
@@ -169,6 +170,7 @@ async function logChatExchange(opts: {
       body: JSON.stringify({
         session_id: opts.sessionId,
         client_ip: opts.clientIp,
+        prospect_id: opts.prospectId || null,
         user_message: opts.userMessage.slice(0, 2000),
         assistant_message: opts.assistantMessage.slice(0, 4000),
         flagged: opts.flagged,
@@ -229,6 +231,7 @@ export const POST: APIRoute = async ({ request }) => {
       logChatExchange({
         sessionId,
         clientIp,
+        prospectId: prospectId || undefined,
         userMessage: userText,
         assistantMessage: safeResponse,
         flagged: true,
@@ -484,6 +487,7 @@ export const POST: APIRoute = async ({ request }) => {
       logChatExchange({
         sessionId,
         clientIp,
+        prospectId: prospectId || undefined,
         userMessage: userText,
         assistantMessage: responseText,
         flagged,
