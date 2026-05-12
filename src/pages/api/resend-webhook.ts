@@ -19,8 +19,8 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return;
   const data = (event.data || {}) as Record<string, unknown>;
   const headers = (data.headers || []) as Array<{ name: string; value: string }>;
-  const prospectId = headers.find(h => h.name === 'X-Legacy-Prospect-Id')?.value;
-  const template = headers.find(h => h.name === 'X-Legacy-Template')?.value;
+  const prospectId = headers.find(h => h.name.toLowerCase() === 'x-legacy-prospect-id')?.value;
+  const template = headers.find(h => h.name.toLowerCase() === 'x-legacy-template')?.value;
   if (!prospectId || template !== 'recruitment') return;
 
   const eventType = String(event.type || '');
@@ -30,7 +30,27 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
   if (eventType === 'email.opened') {
     propsPatch = { email_opened_at: new Date().toISOString() };
   } else if (eventType === 'email.clicked') {
-    propsPatch = { email_clicked_at: new Date().toISOString() };
+    const click = (data.click || data) as Record<string, unknown>;
+    const clickedUrl = typeof click.link === 'string' ? click.link : (typeof data.link === 'string' ? data.link : null);
+    const clickEvent = { url: clickedUrl, at: new Date().toISOString() };
+    propsPatch = {
+      email_clicked_at: new Date().toISOString(),
+      email_clicked_url: clickedUrl,
+      email_clicks: '__APPEND_CLICK__', // placeholder — merged below
+      _click_event: clickEvent,
+    };
+
+    // Classify click intent
+    if (clickedUrl) {
+      if (/\/join\b/.test(clickedUrl)) {
+        update.interaction_stage = 'clicked_cta';
+      } else if (/\/api\/unsubscribe\b/.test(clickedUrl)) {
+        // Don't override — unsubscribe handler manages status
+        propsPatch.unsubscribe_clicked_at = new Date().toISOString();
+      } else if (/not.me|not_me/i.test(clickedUrl)) {
+        propsPatch.not_me_clicked_at = new Date().toISOString();
+      }
+    }
   } else if (eventType === 'email.bounced') {
     update.status = 'bounced';
     propsPatch = { bounced_at: new Date().toISOString(), bounce_type: (data as Record<string, unknown>).bounce_type };
@@ -55,8 +75,26 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
     );
     if (existingRes.ok) {
       const [row] = await existingRes.json();
-      update.properties = { ...(row?.properties || {}), ...propsPatch };
+      const existing = row?.properties || {};
+
+      // Build click history array for click events
+      if (propsPatch._click_event) {
+        const clickEvent = propsPatch._click_event;
+        delete propsPatch._click_event;
+        delete propsPatch.email_clicks;
+        const clicks = Array.isArray(existing.email_clicks) ? existing.email_clicks : [];
+        clicks.push(clickEvent);
+        propsPatch.email_clicks = clicks;
+      }
+
+      update.properties = { ...existing, ...propsPatch };
     } else {
+      if (propsPatch._click_event) {
+        const clickEvent = propsPatch._click_event;
+        delete propsPatch._click_event;
+        delete propsPatch.email_clicks;
+        propsPatch.email_clicks = [clickEvent];
+      }
       update.properties = propsPatch;
     }
 
