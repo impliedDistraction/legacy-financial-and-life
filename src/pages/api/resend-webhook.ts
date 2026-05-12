@@ -98,7 +98,6 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
   const template = headers.find(h => h.name.toLowerCase() === 'x-legacy-template')?.value;
   if (!prospectId || template !== 'recruitment') return;
 
-  const eventType = String(event.type || '');
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   let propsPatch: Record<string, unknown> = {};
 
