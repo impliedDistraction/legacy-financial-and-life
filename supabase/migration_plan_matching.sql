@@ -92,10 +92,12 @@ CREATE INDEX IF NOT EXISTS idx_carrier_products_states
 
 CREATE TABLE IF NOT EXISTS plan_recommendations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  -- link to a recruitment prospect (nullable for direct sales leads)
+  -- link to a recruitment prospect (legacy, nullable)
   prospect_id UUID REFERENCES recruitment_prospects(id),
-  -- for non-recruitment leads (e.g. /free-quote submissions)
-  lead_source TEXT NOT NULL DEFAULT 'recruitment',  -- recruitment, free_quote, referral, walk_in
+  -- link to a sales lead (primary use case)
+  sales_lead_id UUID,  -- FK added after sales_leads table exists
+  -- source classification
+  lead_source TEXT NOT NULL DEFAULT 'free_quote',   -- free_quote, facebook, referral, walk_in
   lead_data JSONB DEFAULT '{}'::jsonb,              -- name, age, state, coverage needs, health info
   -- which agent should work this
   assigned_agent_id UUID REFERENCES carrier_agents(id),

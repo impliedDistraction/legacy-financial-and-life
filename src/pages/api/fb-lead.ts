@@ -575,6 +575,26 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       ringyStatus,
     });
 
+    // ── Insert into sales_leads pool for agent plan matching ────────
+    // Fire-and-forget — failure logged but doesn't block the user redirect
+    void insertSalesLead({
+      name,
+      email,
+      phone: phoneDigits || phone,
+      state,
+      dob,
+      height,
+      weight,
+      tobaccoUse,
+      interest,
+      beneficiary,
+      trackingId,
+      leadScore,
+      attribution: attributionProps,
+    }).catch((err) => {
+      console.error('Sales lead insert failed (non-blocking):', err);
+    });
+
     await trackQuoteEvent('quote_pipeline_completed', 'handoff', confirmationResult.error ? 'warning' : 'success', 'handoff', {
       ...attributionProps,
       internalEmailId: internalResult.data?.id ?? null,
@@ -781,4 +801,81 @@ function toVercelAttributionProps(attribution: Record<string, string | undefined
       .map((key) => [key, attribution[key]])
       .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0),
   );
+}
+
+// ── Sales lead pool insert ──────────────────────────────────────────
+// Persists the lead into the sales_leads table for agent plan matching.
+// Non-blocking — called via void/catch so form redirect is never delayed.
+
+async function insertSalesLead(params: {
+  name: string;
+  email: string;
+  phone: string;
+  state: string;
+  dob: string;
+  height: string;
+  weight: string;
+  tobaccoUse: string;
+  interest: string;
+  beneficiary: string;
+  trackingId: string;
+  leadScore: LeadScoreResult;
+  attribution: Record<string, unknown>;
+}): Promise<void> {
+  const supabaseUrl = import.meta.env.SUPABASE_URL;
+  const supabaseKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseKey) return;
+
+  // Parse DOB (MM/DD/YYYY) → ISO date
+  let dateOfBirth: string | null = null;
+  const dobMatch = params.dob.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (dobMatch) {
+    dateOfBirth = `${dobMatch[3]}-${dobMatch[1]}-${dobMatch[2]}`;
+  }
+
+  // Parse height ("X ft Y in") → total inches
+  let heightInches: number | null = null;
+  const htMatch = params.height.match(/(\d+)\s*ft\s*(\d+)\s*in/);
+  if (htMatch) {
+    heightInches = Number(htMatch[1]) * 12 + Number(htMatch[2]);
+  }
+
+  // Parse weight
+  const weightLbs = /^\d{2,3}$/.test(params.weight) ? Number(params.weight) : null;
+
+  const row = {
+    name: params.name,
+    email: params.email || null,
+    phone: params.phone || null,
+    state: params.state || null,
+    date_of_birth: dateOfBirth,
+    height_inches: heightInches,
+    weight_lbs: weightLbs,
+    tobacco_use: params.tobaccoUse === 'yes',
+    interest: params.interest || null,
+    beneficiary_name: params.beneficiary || null,
+    source: 'free_quote',
+    tracking_id: params.trackingId || null,
+    attribution: params.attribution || {},
+    lead_score: params.leadScore.score,
+    lead_tier: params.leadScore.tier,
+    score_signals: params.leadScore.signals,
+    status: 'new',
+  };
+
+  const res = await fetch(`${supabaseUrl}/rest/v1/sales_leads`, {
+    method: 'POST',
+    headers: {
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(row),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`sales_leads insert ${res.status}: ${body}`);
+  }
 }

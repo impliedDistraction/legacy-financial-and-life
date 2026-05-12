@@ -483,3 +483,75 @@ CREATE OR REPLACE FUNCTION match_products_for_lead(
     AND (p_agent_id IS NULL OR cp.agent_id = p_agent_id)
   ORDER BY cp.plan_type, cp.carrier_name;
 $$;
+
+
+-- ┌─────────────────────────────────────────────────────────────────┐
+-- │ PHASE 6: Sales leads pool — consumer leads for plan matching   │
+-- └─────────────────────────────────────────────────────────────────┘
+
+-- 6a. sales_leads — the consumer lead pool
+CREATE TABLE IF NOT EXISTS sales_leads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT,
+  phone TEXT,
+  state TEXT,
+  date_of_birth DATE,
+  age INTEGER,
+  height_inches INTEGER,
+  weight_lbs INTEGER,
+  tobacco_use BOOLEAN DEFAULT false,
+  interest TEXT,
+  beneficiary_name TEXT,
+  coverage_amount NUMERIC,
+  source TEXT NOT NULL DEFAULT 'free_quote',
+  tracking_id TEXT,
+  campaign_id UUID,
+  attribution JSONB DEFAULT '{}'::jsonb,
+  lead_score INTEGER,
+  lead_tier TEXT,
+  score_signals JSONB DEFAULT '[]'::jsonb,
+  status TEXT NOT NULL DEFAULT 'new',
+  assigned_agent_id UUID REFERENCES carrier_agents(id),
+  agent_notes TEXT,
+  contacted_at TIMESTAMPTZ,
+  quoted_at TIMESTAMPTZ,
+  bound_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_leads_status ON sales_leads (status);
+CREATE INDEX IF NOT EXISTS idx_sales_leads_new ON sales_leads (created_at DESC) WHERE status = 'new';
+CREATE INDEX IF NOT EXISTS idx_sales_leads_state ON sales_leads (state);
+CREATE INDEX IF NOT EXISTS idx_sales_leads_source ON sales_leads (source);
+CREATE INDEX IF NOT EXISTS idx_sales_leads_tracking ON sales_leads (tracking_id) WHERE tracking_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sales_leads_email ON sales_leads (email) WHERE email IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sales_leads_agent ON sales_leads (assigned_agent_id) WHERE assigned_agent_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_sales_leads_score ON sales_leads (lead_score DESC NULLS LAST);
+
+-- 6b. Link plan_recommendations to sales_leads
+ALTER TABLE plan_recommendations
+  ADD COLUMN IF NOT EXISTS sales_lead_id UUID REFERENCES sales_leads(id);
+CREATE INDEX IF NOT EXISTS idx_plan_recs_sales_lead
+  ON plan_recommendations (sales_lead_id) WHERE sales_lead_id IS NOT NULL;
+
+-- 6c. Auto-compute age from DOB
+CREATE OR REPLACE FUNCTION compute_age_from_dob()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.date_of_birth IS NOT NULL THEN
+    NEW.age := EXTRACT(YEAR FROM age(NEW.date_of_birth));
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_sales_leads_compute_age') THEN
+    CREATE TRIGGER trg_sales_leads_compute_age
+      BEFORE INSERT OR UPDATE OF date_of_birth ON sales_leads
+      FOR EACH ROW EXECUTE FUNCTION compute_age_from_dob();
+  END IF;
+END $$;
