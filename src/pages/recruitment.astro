@@ -2804,6 +2804,47 @@ if (!session) {
         </div>
       `;
 
+      // ── Helper: render research log for a state ──
+      function renderResearchLog(entry: any) {
+        const rlog = entry.researchLog || [];
+        if (rlog.length === 0) return '';
+        const phaseIcons: Record<string, string> = {
+          init: '🏁', search: '🔎', fetch: '🌐', extract: '📋',
+          ai: '🤖', verify: '✓', assess: '📊', prophog_xref: '🔗',
+        };
+        const steps = rlog.map((step: any) => {
+          const icon = phaseIcons[step.phase] || '•';
+          const ts = step.ts ? new Date(step.ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+          const urlLink = step.url ? ` <a href="${step.url}" target="_blank" rel="noopener" class="text-brand-600 hover:underline">[link]</a>` : '';
+          return `<div class="flex items-start gap-1.5 py-0.5 text-xs">
+            <span class="text-gray-400 w-12 shrink-0 text-right">${ts}</span>
+            <span class="shrink-0">${icon}</span>
+            <span class="text-gray-400 w-12 shrink-0">${step.phase}</span>
+            <span class="text-gray-700">${step.detail || step.action}${urlLink}</span>
+          </div>`;
+        }).join('');
+        return `<details class="mt-2 ml-4">
+          <summary class="text-[10px] text-gray-400 cursor-pointer hover:text-gray-600">📜 Research Log (${rlog.length} steps)</summary>
+          <div class="mt-1 pl-2 border-l border-gray-200 max-h-40 overflow-y-auto">${steps}</div>
+        </details>`;
+      }
+
+      function renderListViews(entry: any) {
+        const views = entry.listViews || [];
+        if (views.length === 0) return '';
+        const items = views.map((lv: any) =>
+          `<div class="flex items-center gap-2 py-0.5 text-xs">
+            <span class="text-gray-400">📂</span>
+            <a href="${lv.url}" target="_blank" rel="noopener" class="text-brand-600 hover:underline truncate max-w-[300px]">${lv.description || lv.url}</a>
+            <span class="text-gray-400 shrink-0">${lv.updateFrequency || ''}</span>
+          </div>`
+        ).join('');
+        return `<div class="mt-1 ml-4">
+          <span class="text-[10px] text-gray-500 font-medium">List Views:</span>
+          <div class="pl-2">${items}</div>
+        </div>`;
+      }
+
       // Confirmed sources detail
       const confirmed = Object.entries(findings)
         .filter(([, e]: [string, any]) => (e as any).status === 'confirmed')
@@ -2821,6 +2862,8 @@ if (!session) {
             .sort()
             .pop() as string | undefined;
           const checkStr = lastCheck ? new Date(lastCheck).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+          const resLogHtml = renderResearchLog(entry);
+          const lvHtml = renderListViews(entry);
 
           return `<tr class="border-b border-gray-100 last:border-0">
             <td class="py-2 px-3 text-sm font-medium text-gray-900">${entry.stateName} (${code})</td>
@@ -2831,7 +2874,8 @@ if (!session) {
             }</td>
             <td class="py-2 px-3 text-xs text-gray-500">${checkStr}</td>
             <td class="py-2 px-3 text-xs text-gray-500 max-w-[200px] truncate" title="${entry.notes || ''}">${entry.notes || '—'}</td>
-          </tr>`;
+          </tr>
+          ${(resLogHtml || lvHtml) ? `<tr class="border-b border-gray-100 last:border-0"><td colspan="5" class="py-0 px-3">${lvHtml}${resLogHtml}</td></tr>` : ''}`;
         }).join('');
 
         confirmedHtml = `
@@ -2853,13 +2897,30 @@ if (!session) {
 
       let promisingHtml = '';
       if (promising.length > 0) {
-        const items = promising.map(([code, entry]: [string, any]) =>
-          `<div class="flex items-start gap-2 py-1.5 border-b border-gray-100 last:border-0">
-            <span class="text-sm font-medium text-amber-700 w-16 shrink-0">${code}</span>
-            <span class="text-sm text-gray-700">${entry.stateName}</span>
-            <span class="text-xs text-gray-500 ml-auto max-w-[300px] truncate" title="${entry.notes || ''}">${entry.notes || 'Needs deeper investigation'}</span>
-          </div>`
-        ).join('');
+        const items = promising.map(([code, entry]: [string, any]) => {
+          const resLogHtml = renderResearchLog(entry);
+          const lvHtml = renderListViews(entry);
+          const pagesCount = (entry.pagesVisited || []).length;
+          const searchesCount = entry.searchesUsed || 0;
+          const lastDate = entry.lastResearched ? new Date(entry.lastResearched).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+
+          return `<div class="py-2 border-b border-gray-100 last:border-0">
+            <div class="flex items-start gap-2">
+              <span class="text-sm font-medium text-amber-700 w-16 shrink-0">${code}</span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm text-gray-700">${entry.stateName}</span>
+                  <span class="text-[10px] text-gray-400">${searchesCount} searches · ${pagesCount} pages${lastDate ? ` · ${lastDate}` : ''}</span>
+                </div>
+                <div class="text-xs text-gray-500 mt-0.5">${entry.notes || 'Needs deeper investigation'}</div>
+                ${entry.bulkDownloadUrl ? `<a href="${entry.bulkDownloadUrl}" target="_blank" rel="noopener" class="text-[10px] text-brand-600 hover:underline">🔗 Bulk page</a>` : ''}
+                ${entry.doiUrl && entry.doiUrl !== entry.bulkDownloadUrl ? `<a href="${entry.doiUrl}" target="_blank" rel="noopener" class="text-[10px] text-brand-600 hover:underline ml-2">🏛️ DOI</a>` : ''}
+              </div>
+            </div>
+            ${lvHtml}
+            ${resLogHtml}
+          </div>`;
+        }).join('');
 
         promisingHtml = `
           <details class="mb-3">
@@ -2872,12 +2933,42 @@ if (!session) {
       // Footer info
       const footerHtml = `
         <div class="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-100">
-          Discovery runs automatically via cron (daily, 3 states/batch, geographic spread from GA).<br>
-          Confirmed sources are auto-monitored for changes every 12h. Files stored locally on Sentinel.
+          Discovery runs automatically via cron (daily, 3 states/batch, geographic spread from GA). AI page analysis enabled.<br>
+          Confirmed sources are auto-monitored for changes every 12h. Prophog cross-reference checks for agent listings in unsourced states.
         </div>
       `;
 
-      panel.innerHTML = statsHtml + stateMapHtml + confirmedHtml + promisingHtml + footerHtml;
+      // Explored states (collapsed)
+      const exploredStates = Object.entries(findings)
+        .filter(([, e]: [string, any]) => (e as any).status === 'explored');
+
+      let exploredHtml = '';
+      if (exploredStates.length > 0) {
+        const items = exploredStates.map(([code, entry]: [string, any]) => {
+          const resLogHtml = renderResearchLog(entry);
+          const pagesCount = (entry.pagesVisited || []).length;
+          return `<div class="py-1.5 border-b border-gray-100 last:border-0">
+            <div class="flex items-start gap-2">
+              <span class="text-xs font-medium text-gray-500 w-16 shrink-0">${code}</span>
+              <div class="flex-1 min-w-0">
+                <span class="text-xs text-gray-600">${entry.stateName}</span>
+                <span class="text-[10px] text-gray-400 ml-2">${pagesCount} pages visited</span>
+                ${entry.doiUrl ? `<a href="${entry.doiUrl}" target="_blank" rel="noopener" class="text-[10px] text-brand-600 hover:underline ml-2">🏛️ DOI</a>` : ''}
+              </div>
+            </div>
+            ${resLogHtml}
+          </div>`;
+        }).join('');
+
+        exploredHtml = `
+          <details class="mb-3">
+            <summary class="text-sm font-medium text-gray-500 cursor-pointer mb-2">⬜ Explored — No Bulk Data (${exploredStates.length})</summary>
+            <div>${items}</div>
+          </details>
+        `;
+      }
+
+      panel.innerHTML = statsHtml + stateMapHtml + confirmedHtml + promisingHtml + exploredHtml + footerHtml;
     } catch (err: any) {
       panel.innerHTML = `<div class="text-sm text-red-500">Failed to load: ${err?.message || err}</div>`;
     }
