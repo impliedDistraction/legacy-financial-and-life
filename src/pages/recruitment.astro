@@ -717,6 +717,22 @@ if (!session) {
 
     <!-- ═══════════════ PIPELINE TAB ═══════════════ -->
     <div id="tab-pipeline" class="tab-panel hidden">
+
+      <!-- ── State Source Discovery Panel ── -->
+      <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">🗺️ State Data Source Discovery</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Automated discovery of insurance licensee bulk data feeds. Spreads organically from GA.</p>
+          </div>
+          <button id="discovery-refresh-btn" class="text-xs text-brand-600 hover:text-brand-700 font-medium">↻ Refresh</button>
+        </div>
+
+        <div id="discovery-panel-content">
+          <div class="text-sm text-gray-400">Loading discovery data...</div>
+        </div>
+      </div>
+
       <div class="grid lg:grid-cols-2 gap-6">
         <!-- Pipeline Status -->
         <div class="space-y-4">
@@ -871,7 +887,7 @@ if (!session) {
       if (tab === 'review') loadReviewList();
       if (tab === 'sent') loadSentList();
       if (tab === 'campaigns') loadCampaigns();
-      if (tab === 'pipeline') loadPipelineStatus();
+      if (tab === 'pipeline') { loadPipelineStatus(); loadDiscoveryPanel(); }
     });
   });
 
@@ -1038,7 +1054,7 @@ if (!session) {
   async function refreshPoolStats() {
     try {
       const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'sent', 'converted', 'rejected'];
-      const sources = ['prophog_scrape', 'csv_import', 'landing_page', 'fl_licensee'];
+      const sources = ['prophog_scan', 'csv_import', 'landing_page', 'fl_licensee'];
       const fetches = [
         ...statuses.map(s => fetch(`/api/recruitment-upload?status=${s}&limit=1`).then(r => r.json()).then(d => ({ key: s, count: d.total || 0 }))),
         ...sources.map(s => fetch(`/api/recruitment-upload?limit=1&source=${s}`).then(r => r.json()).then(d => ({ key: `src-${s}`, count: d.total || 0 }))),
@@ -1062,7 +1078,7 @@ if (!session) {
       setEl('pool-sent', counts['sent'] || 0);
       setEl('pool-converted', counts['converted'] || 0);
       setEl('pool-rejected', counts['rejected'] || 0);
-      setEl('pool-src-prophog', counts['src-prophog_scrape'] || 0);
+      setEl('pool-src-prophog', counts['src-prophog_scan'] || 0);
       setEl('pool-src-fl-licensee', counts['src-fl_licensee'] || 0);
       setEl('pool-src-csv', counts['src-csv_import'] || 0);
       setEl('pool-src-landing', counts['src-landing_page'] || 0);
@@ -2688,6 +2704,186 @@ if (!session) {
       }
     } catch { /* ignore — stays on upload tab */ }
   })();
+
+  // ═══════════════════════════════════════════
+  // STATE SOURCE DISCOVERY
+  // ═══════════════════════════════════════════
+
+  async function loadDiscoveryPanel() {
+    const panel = document.getElementById('discovery-panel-content');
+    if (!panel) return;
+
+    try {
+      const res = await fetch('/api/state-discovery');
+      if (!res.ok) {
+        const offline = res.status === 503;
+        panel.innerHTML = `<div class="text-sm ${offline ? 'text-amber-600' : 'text-red-500'}">
+          ${offline ? '⏸️ Sentinel offline — discovery data unavailable while server is down.' : `Failed to load: HTTP ${res.status}`}
+        </div>`;
+        return;
+      }
+
+      const data = await res.json();
+      const findings = data.findings || {};
+      const monitor = data.monitor || {};
+      const manifests = data.manifests || {};
+
+      // Count by status
+      const counts = { confirmed: 0, promising: 0, explored: 0, not_started: 0, monitored: Object.keys(monitor).length };
+      const stateNames: Record<string, string> = {};
+      for (const [code, entry] of Object.entries(findings) as [string, any][]) {
+        counts[entry.status as keyof typeof counts] = (counts[entry.status as keyof typeof counts] || 0) + 1;
+        stateNames[code] = entry.stateName;
+      }
+      // Count truly not-started (not in findings at all)
+      const totalStates = 51;
+      const researchedCount = Object.keys(findings).length;
+      counts.not_started = totalStates - researchedCount;
+
+      // Summary stats
+      const statsHtml = `
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+          <div class="bg-green-50 rounded-lg p-3 text-center">
+            <div class="text-2xl font-bold text-green-700">${counts.confirmed}</div>
+            <div class="text-xs text-green-600">Confirmed</div>
+          </div>
+          <div class="bg-amber-50 rounded-lg p-3 text-center">
+            <div class="text-2xl font-bold text-amber-700">${counts.promising}</div>
+            <div class="text-xs text-amber-600">Promising</div>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-3 text-center">
+            <div class="text-2xl font-bold text-gray-600">${counts.explored}</div>
+            <div class="text-xs text-gray-500">Explored</div>
+          </div>
+          <div class="bg-blue-50 rounded-lg p-3 text-center">
+            <div class="text-2xl font-bold text-blue-700">${counts.not_started}</div>
+            <div class="text-xs text-blue-600">Remaining</div>
+          </div>
+          <div class="bg-purple-50 rounded-lg p-3 text-center">
+            <div class="text-2xl font-bold text-purple-700">${counts.monitored}</div>
+            <div class="text-xs text-purple-600">Monitored</div>
+          </div>
+        </div>
+      `;
+
+      // State map — visual grid
+      const allStates = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"];
+
+      const stateGrid = allStates.map(code => {
+        const entry = findings[code] as any;
+        const status = entry?.status || 'not_started';
+        const isMonitored = !!monitor[code];
+
+        let bg = 'bg-gray-100 text-gray-400';
+        let title = `${stateNames[code] || code}: Not researched yet`;
+        if (status === 'confirmed') {
+          bg = isMonitored ? 'bg-green-500 text-white' : 'bg-green-200 text-green-800';
+          title = `${entry.stateName}: Confirmed${isMonitored ? ' (monitored)' : ''} — ${(entry.downloads || []).length} file(s)`;
+        } else if (status === 'promising') {
+          bg = 'bg-amber-200 text-amber-800';
+          title = `${entry.stateName}: Promising — needs deeper investigation`;
+        } else if (status === 'explored') {
+          bg = 'bg-gray-200 text-gray-600';
+          title = `${entry.stateName}: Explored — no bulk download found`;
+        }
+
+        return `<div class="w-9 h-9 rounded flex items-center justify-center text-[10px] font-bold cursor-default ${bg}" title="${title}">${code}</div>`;
+      }).join('');
+
+      const stateMapHtml = `
+        <div class="mb-4">
+          <div class="flex items-center gap-4 mb-2">
+            <span class="text-xs font-medium text-gray-700">Coverage Map</span>
+            <span class="flex items-center gap-1 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded bg-green-500 inline-block"></span> Confirmed + Monitored</span>
+            <span class="flex items-center gap-1 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded bg-green-200 inline-block"></span> Confirmed</span>
+            <span class="flex items-center gap-1 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded bg-amber-200 inline-block"></span> Promising</span>
+            <span class="flex items-center gap-1 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded bg-gray-200 inline-block"></span> Explored</span>
+            <span class="flex items-center gap-1 text-[10px] text-gray-500"><span class="w-2.5 h-2.5 rounded bg-gray-100 inline-block"></span> Not Started</span>
+          </div>
+          <div class="flex flex-wrap gap-1">${stateGrid}</div>
+        </div>
+      `;
+
+      // Confirmed sources detail
+      const confirmed = Object.entries(findings)
+        .filter(([, e]: [string, any]) => (e as any).status === 'confirmed')
+        .sort(([a], [b]) => a.localeCompare(b));
+
+      let confirmedHtml = '';
+      if (confirmed.length > 0) {
+        const rows = confirmed.map(([code, entry]: [string, any]) => {
+          const isMonitored = !!monitor[code];
+          const manifest = manifests[code] || {};
+          const fileCount = (entry.downloads || []).length;
+          const lastCheck = Object.values(manifest as Record<string, any>)
+            .map((m: any) => m.lastChecked)
+            .filter(Boolean)
+            .sort()
+            .pop() as string | undefined;
+          const checkStr = lastCheck ? new Date(lastCheck).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+          return `<tr class="border-b border-gray-100 last:border-0">
+            <td class="py-2 px-3 text-sm font-medium text-gray-900">${entry.stateName} (${code})</td>
+            <td class="py-2 px-3 text-sm text-gray-600">${fileCount} file${fileCount !== 1 ? 's' : ''}</td>
+            <td class="py-2 px-3 text-sm">${isMonitored
+              ? '<span class="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">Active</span>'
+              : '<span class="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">Pending</span>'
+            }</td>
+            <td class="py-2 px-3 text-xs text-gray-500">${checkStr}</td>
+            <td class="py-2 px-3 text-xs text-gray-500 max-w-[200px] truncate" title="${entry.notes || ''}">${entry.notes || '—'}</td>
+          </tr>`;
+        }).join('');
+
+        confirmedHtml = `
+          <details class="mb-3" open>
+            <summary class="text-sm font-medium text-green-700 cursor-pointer mb-2">✅ Confirmed Sources (${confirmed.length})</summary>
+            <table class="w-full text-left">
+              <thead><tr class="text-xs text-gray-500 border-b border-gray-200">
+                <th class="py-1 px-3">State</th><th class="py-1 px-3">Files</th><th class="py-1 px-3">Monitor</th><th class="py-1 px-3">Last Check</th><th class="py-1 px-3">Notes</th>
+              </tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </details>
+        `;
+      }
+
+      // Promising leads
+      const promising = Object.entries(findings)
+        .filter(([, e]: [string, any]) => (e as any).status === 'promising');
+
+      let promisingHtml = '';
+      if (promising.length > 0) {
+        const items = promising.map(([code, entry]: [string, any]) =>
+          `<div class="flex items-start gap-2 py-1.5 border-b border-gray-100 last:border-0">
+            <span class="text-sm font-medium text-amber-700 w-16 shrink-0">${code}</span>
+            <span class="text-sm text-gray-700">${entry.stateName}</span>
+            <span class="text-xs text-gray-500 ml-auto max-w-[300px] truncate" title="${entry.notes || ''}">${entry.notes || 'Needs deeper investigation'}</span>
+          </div>`
+        ).join('');
+
+        promisingHtml = `
+          <details class="mb-3">
+            <summary class="text-sm font-medium text-amber-700 cursor-pointer mb-2">🔶 Promising Leads (${promising.length})</summary>
+            <div>${items}</div>
+          </details>
+        `;
+      }
+
+      // Footer info
+      const footerHtml = `
+        <div class="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-100">
+          Discovery runs automatically via cron (daily, 3 states/batch, geographic spread from GA).<br>
+          Confirmed sources are auto-monitored for changes every 12h. Files stored locally on Sentinel.
+        </div>
+      `;
+
+      panel.innerHTML = statsHtml + stateMapHtml + confirmedHtml + promisingHtml + footerHtml;
+    } catch (err: any) {
+      panel.innerHTML = `<div class="text-sm text-red-500">Failed to load: ${err?.message || err}</div>`;
+    }
+  }
+
+  document.getElementById('discovery-refresh-btn')?.addEventListener('click', loadDiscoveryPanel);
 
   // ═══════════════════════════════════════════
   // PIPELINE TAB
