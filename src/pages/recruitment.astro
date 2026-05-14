@@ -208,7 +208,7 @@ if (!session) {
                     <option value="prophog" selected>🔍 Prophog (auto-search)</option>
                     <option value="fl_licensee">🏛️ FL Licensee (bulk CSV)</option>
                     <option value="csv">📤 CSV Import</option>
-                    <option value="pool">🎯 Existing Pool (all sources)</option>
+
                   </select>
                   <p class="text-xs text-gray-400 mt-0.5">Prophog auto-searches for new agents. FL Licensee uses Florida DFS bulk data. CSV uses agents you've uploaded.</p>
                 </div>
@@ -269,7 +269,7 @@ if (!session) {
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Outreach Goal</label>
                   <input type="number" id="cmp-budget" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" value="200" min="10" max="10000" />
-                  <p class="text-xs text-gray-400 mt-0.5">How many agents to find and outreach to</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Target number of emails to send. Campaign completes when reached.</p>
                 </div>
                 <!-- Email Sign-off -->
                 <div>
@@ -1032,18 +1032,29 @@ if (!session) {
       return;
     }
 
-    const activeCampaigns = campaignsCache.filter(c => c.status === 'active' || c.status === 'paused');
-    const pastCampaigns = campaignsCache.filter(c => c.status === 'completed');
+    // Detect goal-met campaigns: paused + sent >= goal = effectively completed
+    function isGoalMet(c: any) {
+      const counts = c.prospect_counts || {};
+      const totalSent = (counts.sent || 0) + (counts.converted || 0) + (counts.bounced || 0);
+      const goal = c.send_limit || c.credit_budget || 100;
+      return c.status === 'paused' && totalSent >= goal;
+    }
+    const activeCampaigns = campaignsCache.filter(c => (c.status === 'active' || c.status === 'paused') && !isGoalMet(c));
+    const pastCampaigns = campaignsCache.filter(c => c.status === 'completed' || isGoalMet(c));
 
     function renderCard(c: any, isPast: boolean) {
       const counts = c.prospect_counts || {};
       const totalFound = Object.values(counts).reduce((a: number, b: any) => a + (b || 0), 0);
       const totalSent = (counts.sent || 0) + (counts.converted || 0) + (counts.bounced || 0);
       const pipelineActive = (counts.pending || 0) + (counts.drafted || 0) + (counts.reviewed || 0) + (counts.approved || 0);
-      // Show 'serving' when paused but pipeline still has prospects being processed
-      const displayStatus = c.status === 'paused' && pipelineActive > 0 ? 'serving' : c.status;
-      const statusColor = displayStatus === 'active' ? 'green' : displayStatus === 'serving' ? 'blue' : displayStatus === 'paused' ? 'amber' : 'gray';
-      const goal = c.credit_budget || 100;
+      const goal = c.send_limit || c.credit_budget || 100;
+      const goalMet = totalSent >= goal;
+      // Status logic: completed > goal-met > serving (pipeline active) > raw status
+      const displayStatus = c.status === 'completed' ? 'completed'
+        : (c.status === 'paused' && goalMet) ? 'completed'
+        : (c.status === 'paused' && pipelineActive > 0) ? 'serving'
+        : c.status;
+      const statusColor = displayStatus === 'active' ? 'green' : displayStatus === 'serving' ? 'blue' : displayStatus === 'completed' ? 'gray' : displayStatus === 'paused' ? 'amber' : 'gray';
       const progressPct = goal > 0 ? Math.round((totalSent / goal) * 100) : 0;
       const lastRun = c.last_run_at ? new Date(c.last_run_at).toLocaleString() : 'Never';
       const nextRun = c.next_run_at ? new Date(c.next_run_at).toLocaleString() : 'Queued';
@@ -1283,6 +1294,7 @@ if (!session) {
             licenseTycl: (document.getElementById('cmp-lic-tycl') as HTMLInputElement)?.value.trim() || undefined,
           },
           creditBudget: (document.getElementById('cmp-budget') as HTMLInputElement).value,
+          sendLimit: (document.getElementById('cmp-budget') as HTMLInputElement).value,
           maxPagesPerRun: (document.getElementById('cmp-pages') as HTMLInputElement).value,
           intervalMinutes: (document.getElementById('cmp-interval') as HTMLInputElement).value,
           jitterMinutes: (document.getElementById('cmp-jitter') as HTMLInputElement)?.value || '15',

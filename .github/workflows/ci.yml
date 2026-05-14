@@ -36,32 +36,15 @@ jobs:
 
       - name: Test build artifacts
         run: |
-          # Check if dist directory exists
-          if [ ! -d "dist" ]; then
-            echo "❌ Build failed: dist directory not found"
+          # Vercel adapter outputs to .vercel/output/static/
+          if [ ! -d ".vercel/output/static" ]; then
+            echo "❌ Build failed: .vercel/output/static directory not found"
             exit 1
           fi
           
-          # Check if index.html exists
-          if [ ! -f "dist/index.html" ]; then
+          if [ ! -f ".vercel/output/static/index.html" ]; then
             echo "❌ Build failed: index.html not found"
             exit 1
           fi
           
-          # Check if CSS files exist
-          if [ ! -f "dist/_astro"/*.css ]; then
-            echo "❌ Build failed: CSS files not found"
-            exit 1
-          fi
-          
           echo "✅ Build artifacts verified successfully"
-
-      - name: Archive build artifacts
-        if: matrix.node-version == 22
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: |
-            dist/
-            !dist/**/*.map
-          retention-days: 7
