@@ -564,9 +564,23 @@ if (!session) {
             <div class="text-center"><span class="text-lg font-bold text-green-600" id="stat-track-opened">-</span><p class="text-xs text-gray-400">Opened</p></div>
             <div class="text-center"><span class="text-lg font-bold text-violet-600" id="stat-track-clicked">-</span><p class="text-xs text-gray-400">Clicked</p></div>
             <div class="text-center"><span class="text-lg font-bold text-cyan-600" id="stat-track-visited">-</span><p class="text-xs text-gray-400">Visited</p></div>
+            <div class="text-center"><span class="text-lg font-bold text-teal-600" id="stat-track-chatted">-</span><p class="text-xs text-gray-400">Chatted</p></div>
             <div class="text-center"><span class="text-lg font-bold text-purple-600" id="stat-track-replied">-</span><p class="text-xs text-gray-400">Replied</p></div>
             <div class="text-center"><span class="text-lg font-bold text-emerald-600" id="stat-track-converted">-</span><p class="text-xs text-gray-400">Converted</p></div>
             <div class="text-center"><span class="text-lg font-bold text-red-500" id="stat-track-bounced">-</span><p class="text-xs text-gray-400">Bounced</p></div>
+          </div>
+        </div>
+
+        <!-- 🔥 Hot Leads — Warmest Prospects for Calling -->
+        <div id="hot-leads-section" class="hidden">
+          <div class="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200 p-4">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-lg">🔥</span>
+              <h3 class="font-semibold text-gray-900 text-sm">Hot Leads — Ready to Call</h3>
+              <span class="text-xs text-gray-500 ml-auto" id="hot-leads-count"></span>
+            </div>
+            <p class="text-xs text-gray-500 mb-3">These prospects engaged beyond just receiving an email. Sorted by engagement depth — the top one is your best bet for a call right now.</p>
+            <div id="hot-leads-list" class="space-y-2"></div>
           </div>
         </div>
 
@@ -2234,7 +2248,7 @@ if (!session) {
       const stageInfo = stageLabels[stage] || { label: stage, color: 'gray' };
 
       return `
-        <div class="bg-white rounded-xl border border-gray-200 p-4 hover:border-brand-200 transition-colors">
+        <div class="bg-white rounded-xl border border-gray-200 p-4 hover:border-brand-200 transition-colors" data-prospect-id="${p.id}">
           <div class="flex items-start justify-between gap-3">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-1 flex-wrap">
@@ -2298,9 +2312,30 @@ if (!session) {
                 </div>
               </div>` : ''}
 
+              <!-- AI Chat Transcript (lazy loaded) -->
+              <div class="chat-log-container" data-prospect-id="${p.id}" data-loaded="false">
+                <button class="load-chat-btn text-xs font-medium text-teal-600 hover:text-teal-700 cursor-pointer" data-prospect-id="${p.id}">💬 Load Chat Transcript</button>
+                <div class="chat-log-content hidden mt-1"></div>
+              </div>
+
+              <!-- Call Context (for warm leads) -->
+              ${props.join_page_visited_at || props.email_clicked_at || props.text_consent ? `
+              <div class="bg-amber-50 rounded-lg p-2 border border-amber-100">
+                <p class="text-xs font-medium text-amber-800 mb-1">📋 Call Context</p>
+                <ul class="text-xs text-amber-700 space-y-0.5">
+                  ${props.join_page_visited_at ? `<li>• Visited /join page ${(() => { const d = new Date(props.join_page_visited_at); return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); })()}${props.join_page_visit_count > 1 ? ' (' + props.join_page_visit_count + ' times)' : ''}</li>` : ''}
+                  ${props.email_clicked_at && !props.email_click_bot_detected ? '<li>• Clicked the email CTA link (real click, not bot)</li>' : ''}
+                  ${props.email_clicked_at && props.email_click_bot_detected ? '<li>• Link was scanned (likely email security scanner)</li>' : ''}
+                  ${props.text_consent ? '<li>• ✅ Gave TCPA text consent</li>' : ''}
+                  ${props.email_replied_at ? '<li>• Replied to recruitment email</li>' : ''}
+                  ${p.call_opener ? `<li>• <strong>Suggested opener:</strong> ${escapeHtml(p.call_opener.slice(0, 200))}</li>` : ''}
+                </ul>
+              </div>` : ''}
+
               <!-- Actions -->
               <div class="flex gap-2 flex-wrap">
                 ${p.status === 'approved' && p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Send Email</button>` : ''}
+                ${p.phone && p.status === 'sent' ? `<a href="tel:${escapeHtml(p.phone)}" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg inline-block text-center">📞 Call ${escapeHtml(p.phone)}</a>` : ''}
                 ${p.status === 'sent' ? `<button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>` : ''}
                 ${p.status === 'sent' || p.status === 'approved' ? `<button class="action-btn convert-btn bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">🎉 Mark Converted</button>` : ''}
               </div>
@@ -2367,19 +2402,209 @@ if (!session) {
         } catch { showToast('Failed', 'error'); }
       });
     });
+
+    // Chat log lazy loading
+    sentList.querySelectorAll('.load-chat-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pid = (btn as HTMLElement).dataset.prospectId;
+        const container = btn.closest('.chat-log-container') as HTMLElement;
+        const content = container.querySelector('.chat-log-content') as HTMLElement;
+        if (container.dataset.loaded === 'true') {
+          content.classList.toggle('hidden');
+          return;
+        }
+        (btn as HTMLElement).textContent = '💬 Loading...';
+        try {
+          const res = await fetch(`/api/recruitment-chat-logs?prospect_id=${encodeURIComponent(pid!)}`);
+          const data = await res.json();
+          const logs = data.logs || [];
+          container.dataset.loaded = 'true';
+          if (logs.length === 0) {
+            content.innerHTML = '<p class="text-xs text-gray-400 italic py-1">No chat conversations yet.</p>';
+          } else {
+            content.innerHTML = `
+              <div class="bg-white rounded-lg border border-gray-200 p-2 max-h-64 overflow-y-auto space-y-1.5">
+                ${logs.map((log: any) => `
+                  <div class="text-xs">
+                    <div class="flex gap-1.5"><span class="text-blue-600 font-medium flex-shrink-0">Prospect:</span><span class="text-gray-700">${escapeHtml(log.user_message || '')}</span></div>
+                    <div class="flex gap-1.5 mt-0.5"><span class="text-brand-600 font-medium flex-shrink-0">AI:</span><span class="text-gray-600">${escapeHtml((log.assistant_message || '').slice(0, 500))}${(log.assistant_message || '').length > 500 ? '…' : ''}</span></div>
+                    <span class="text-[10px] text-gray-300">${new Date(log.created_at).toLocaleString('en-US', { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+                  </div>
+                `).join('<hr class="border-gray-100">')}
+              </div>`;
+          }
+          (btn as HTMLElement).textContent = `💬 Chat Transcript (${logs.length})`;
+          content.classList.remove('hidden');
+        } catch {
+          content.innerHTML = '<p class="text-xs text-red-400">Failed to load chat logs</p>';
+          content.classList.remove('hidden');
+          (btn as HTMLElement).textContent = '💬 Chat Transcript';
+        }
+      });
+    });
   }
 
   async function loadTrackingStats() {
     try {
-      const res = await fetch('/api/recruitment-stats');
-      const stats = await res.json();
-      if (stats.error) return;
-      const fields = ['sent', 'opened', 'clicked', 'visited', 'replied', 'converted', 'bounced'];
-      for (const f of fields) {
-        const el = document.getElementById(`stat-track-${f}`);
-        if (el) el.textContent = String(stats[f] ?? '-');
+      const [statsRes, warmRes] = await Promise.all([
+        fetch('/api/recruitment-stats'),
+        fetch('/api/recruitment-warm-leads'),
+      ]);
+      const stats = await statsRes.json();
+      if (!stats.error) {
+        const fields = ['sent', 'opened', 'clicked', 'visited', 'chatted', 'replied', 'converted', 'bounced'];
+        for (const f of fields) {
+          const el = document.getElementById(`stat-track-${f}`);
+          if (el) el.textContent = String(stats[f] ?? '-');
+        }
       }
+
+      // Render hot leads
+      const warmData = await warmRes.json();
+      renderHotLeads(warmData.leads || [], warmData.chatLogs || {});
     } catch { /* silent */ }
+  }
+
+  function renderHotLeads(leads: any[], chatLogs: Record<string, any[]>) {
+    const section = document.getElementById('hot-leads-section')!;
+    const list = document.getElementById('hot-leads-list')!;
+    const countEl = document.getElementById('hot-leads-count')!;
+
+    if (!leads || leads.length === 0) {
+      section.classList.add('hidden');
+      return;
+    }
+
+    section.classList.remove('hidden');
+    countEl.textContent = `${leads.length} engaged prospect${leads.length !== 1 ? 's' : ''}`;
+
+    // Engagement funnel steps
+    const FUNNEL_STEPS = [
+      { key: 'sent', label: 'Sent', color: 'bg-blue-400' },
+      { key: 'opened', label: 'Opened', color: 'bg-green-400' },
+      { key: 'clicked', label: 'Clicked', color: 'bg-violet-400' },
+      { key: 'visited', label: 'Visited', color: 'bg-cyan-400' },
+      { key: 'chatted', label: 'Chatted', color: 'bg-teal-400' },
+      { key: 'interested', label: 'Interested', color: 'bg-indigo-400' },
+      { key: 'replied', label: 'Replied', color: 'bg-purple-400' },
+      { key: 'converted', label: 'Converted', color: 'bg-emerald-400' },
+    ];
+
+    function getReachedSteps(p: any): string[] {
+      const props = p.properties || {};
+      const reached: string[] = ['sent'];
+      if (props.email_opened_at) reached.push('opened');
+      if (props.email_clicked_at) reached.push('clicked');
+      if (props.join_page_visited_at) reached.push('visited');
+      if (props.chat_session_id || chatLogs[p.id]?.length > 0) reached.push('chatted');
+      if (p.interaction_stage === 'interested' || props.text_consent) reached.push('interested');
+      if (props.email_replied_at || p.interaction_stage === 'replied') reached.push('replied');
+      if (p.status === 'converted') reached.push('converted');
+      return reached;
+    }
+
+    list.innerHTML = leads.map((p: any) => {
+      const props = p.properties || {};
+      const reached = getReachedSteps(p);
+      const logs = chatLogs[p.id] || [];
+      const visitInfo = props.join_page_visits?.[0];
+      const visitUA = visitInfo?.userAgent || '';
+      const visitDevice = /mobile|android|iphone/i.test(visitUA) ? '📱 Mobile' : /windows/i.test(visitUA) ? '💻 Windows' : /mac/i.test(visitUA) ? '💻 Mac' : '💻 Desktop';
+
+      // Build a brief call context for Tim
+      const contextParts: string[] = [];
+      if (props.join_page_visited_at) {
+        const ago = timeSince(props.join_page_visited_at);
+        contextParts.push(`Visited /join ${ago} ago (${visitDevice})`);
+      }
+      if (props.email_clicked_at && !props.email_click_bot_detected) {
+        contextParts.push('Clicked email CTA (real)');
+      } else if (props.email_clicked_at && props.email_click_bot_detected) {
+        contextParts.push('Link scanned (may be bot)');
+      }
+      if (logs.length > 0) {
+        contextParts.push(`${logs.length} AI chat message${logs.length !== 1 ? 's' : ''}`);
+      }
+      if (props.text_consent) contextParts.push('✅ Gave text consent');
+      if (props.email_replied_at) contextParts.push('📨 Replied to email');
+
+      // Funnel progress bar
+      const funnelHtml = FUNNEL_STEPS.map((step) => {
+        const active = reached.includes(step.key);
+        return `<div class="flex-1 h-1.5 rounded-full ${active ? step.color : 'bg-gray-200'}" title="${step.label}${active ? ' ✓' : ''}"></div>`;
+      }).join('');
+
+      // Chat log preview
+      let chatHtml = '';
+      if (logs.length > 0) {
+        chatHtml = `
+          <details class="mt-2">
+            <summary class="text-xs font-medium text-teal-600 cursor-pointer">💬 Chat Transcript (${logs.length} messages)</summary>
+            <div class="mt-1 bg-white rounded-lg border border-gray-200 p-2 max-h-48 overflow-y-auto space-y-1.5">
+              ${logs.map((log: any) => `
+                <div class="text-xs">
+                  <div class="flex gap-1.5"><span class="text-blue-600 font-medium flex-shrink-0">Prospect:</span><span class="text-gray-700">${escapeHtml(log.user_message || '')}</span></div>
+                  <div class="flex gap-1.5 mt-0.5"><span class="text-brand-600 font-medium flex-shrink-0">AI:</span><span class="text-gray-600">${escapeHtml((log.assistant_message || '').slice(0, 300))}${(log.assistant_message || '').length > 300 ? '…' : ''}</span></div>
+                </div>
+              `).join('<hr class="border-gray-100">')}
+            </div>
+          </details>`;
+      }
+
+      return `
+        <div class="bg-white rounded-lg border border-amber-100 p-3 hover:border-amber-300 transition-colors">
+          <div class="flex items-center gap-3">
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+              <span class="text-sm">🔥</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-semibold text-sm text-gray-900">${escapeHtml(p.name)}</span>
+                ${p.fit_score ? `<span class="text-xs font-bold ${p.fit_score >= 7 ? 'text-green-600' : 'text-amber-600'}">${p.fit_score}/10</span>` : ''}
+                <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Warmth: ${Math.round(p.warmth)}</span>
+              </div>
+              <div class="text-xs text-gray-500 mt-0.5">
+                ${p.phone ? `📞 <a href="tel:${escapeHtml(p.phone)}" class="text-brand-600 hover:underline">${escapeHtml(p.phone)}</a>` : '<span class="text-amber-500">No phone</span>'}
+                · ${p.state ? `📍 ${escapeHtml(p.state)}${p.city ? ', ' + escapeHtml(p.city) : ''}` : ''}
+                · ✉️ ${escapeHtml(p.email || '')}
+              </div>
+              <p class="text-xs text-gray-500 mt-1">${contextParts.join(' · ')}</p>
+              <!-- Engagement funnel -->
+              <div class="flex gap-0.5 mt-2" title="Engagement funnel: ${reached.join(' → ')}">${funnelHtml}</div>
+            </div>
+            <div class="flex-shrink-0 flex flex-col gap-1">
+              ${p.phone ? `<a href="tel:${escapeHtml(p.phone)}" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg text-center font-medium">📞 Call</a>` : ''}
+              <button class="hot-lead-view-btn bg-brand-100 hover:bg-brand-200 text-brand-700 text-xs px-3 py-1.5 rounded-lg font-medium" data-id="${p.id}">View</button>
+            </div>
+          </div>
+          ${chatHtml}
+        </div>`;
+    }).join('');
+
+    // Bind view buttons to scroll to matching card in sent list
+    list.querySelectorAll('.hot-lead-view-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = (btn as HTMLElement).dataset.id;
+        // Look for the prospect card in the sent list
+        const card = sentList.querySelector(`[data-prospect-id="${id}"]`);
+        if (card) {
+          (card as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+          card.classList.add('ring-2', 'ring-amber-400');
+          setTimeout(() => card.classList.remove('ring-2', 'ring-amber-400'), 3000);
+        }
+      });
+    });
+  }
+
+  function timeSince(dateStr: string): string {
+    const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `${days}d`;
   }
 
   // ═══════════════════════════════════════════

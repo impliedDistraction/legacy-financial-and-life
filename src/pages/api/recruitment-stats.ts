@@ -42,6 +42,7 @@ export const GET: APIRoute = async ({ request }) => {
     opened: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(sent,converted)&properties->>email_opened_at=not.is.null&select=id&limit=0`,
     clicked: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(sent,converted)&properties->>email_clicked_at=not.is.null&select=id&limit=0`,
     visited: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(sent,converted)&properties->>join_page_visited_at=not.is.null&select=id&limit=0`,
+    chatted: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(sent,converted)&properties->>chat_session_id=not.is.null&select=id&limit=0`,
     replied: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(sent,converted)&properties->>email_replied_at=not.is.null&select=id&limit=0`,
     converted: `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.converted&select=id&limit=0`,
     bounced: `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.bounced&select=id&limit=0`,

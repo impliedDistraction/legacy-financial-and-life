@@ -166,6 +166,7 @@ export const GET: APIRoute = async ({ request }) => {
     opened: 'email_opened_at',
     clicked: 'email_clicked_at',
     visited: 'join_page_visited_at',
+    chatted: 'chat_session_id',
   };
   if (tracking && TRACKING_FIELDS[tracking]) {
     queryUrl += `&status=in.(sent,converted)&properties->>${encodeURIComponent(TRACKING_FIELDS[tracking])}=not.is.null`;

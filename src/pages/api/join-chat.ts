@@ -181,6 +181,34 @@ async function logChatExchange(opts: {
         token_count: opts.tokenCount || null,
       }),
     });
+
+    // Mark the prospect as having chatted (first message only — dedup by chat_session_id)
+    if (opts.prospectId && opts.prospectId.length > 10) {
+      try {
+        const prospectRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(opts.prospectId)}&select=properties,interaction_stage`,
+          { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' } },
+        );
+        if (prospectRes.ok) {
+          const [row] = await prospectRes.json();
+          if (row && !(row.properties || {}).chat_session_id) {
+            const now = new Date().toISOString();
+            const existing = row.properties || {};
+            const stage = row.interaction_stage || 'new';
+            const earlyStages = new Set(['new', 'clicked_cta', 'visited_page']);
+            const update: Record<string, unknown> = {
+              properties: { ...existing, chat_session_id: opts.sessionId, chat_engaged_at: now },
+              updated_at: now,
+            };
+            if (earlyStages.has(stage)) update.interaction_stage = 'interested';
+            await fetch(
+              `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(opts.prospectId)}`,
+              { method: 'PATCH', headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(update) },
+            );
+          }
+        }
+      } catch { /* non-critical */ }
+    }
   } catch { /* non-critical — don't break chat */ }
 }
 
