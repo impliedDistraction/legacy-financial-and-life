@@ -600,7 +600,7 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
 
   function processActions(text: string): { clean: string; html: string } {
     let html = '';
-    const clean = text.replace(/\{\{(book_call|fill_form)\}\}/g, (_m, action) => {
+    const clean = text.replace(/\{\{(book_call|fill_form|escalate_issue)\}\}/g, (_m, action) => {
       if (action === 'book_call') {
         html += `<div class="mt-2 pt-2 border-t border-slate-100">
           <a href="https://calendly.com/bethandtim-legacyf-l/30min" target="_blank" rel="noopener"
@@ -614,6 +614,15 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
              class="inline-block px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded-lg hover:bg-green-700 transition-colors">
             📋 Fill Out Interest Form
           </button>
+        </div>`;
+      } else if (action === 'escalate_issue') {
+        html += `<div class="mt-2 pt-2 border-t border-red-100" id="inline-escalate-form">
+          <p class="text-xs text-red-700 font-semibold mb-1">🛠️ Report a Technical Issue</p>
+          <div class="space-y-1.5">
+            <textarea placeholder="What happened?" rows="2" maxlength="2000" class="w-full px-2 py-1 text-xs border border-red-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" data-escalate="summary"></textarea>
+            <input type="email" placeholder="Your email (optional)" class="w-full px-2 py-1 text-xs border border-red-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400" data-escalate="email" />
+            <button class="w-full py-1 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors escalate-submit-btn">Submit Report</button>
+          </div>
         </div>`;
       }
       return '';
@@ -673,7 +682,7 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
       let responseEl: HTMLElement | null = null;
       let buffer = '';
 
-      const stripActions = (t: string) => t.replace(/\{\{(book_call|fill_form)\}\}/g, '').trimEnd();
+      const stripActions = (t: string) => t.replace(/\{\{(book_call|fill_form|escalate_issue)\}\}/g, '').trimEnd();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -717,6 +726,39 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
             const container = document.createElement('div');
             container.innerHTML = html;
             while (container.firstChild) bubble.appendChild(container.firstChild);
+          }
+          // Wire up escalate form if present
+          const escalateForm = bubble.querySelector('#inline-escalate-form');
+          if (escalateForm) {
+            const submitBtn = escalateForm.querySelector('.escalate-submit-btn');
+            submitBtn?.addEventListener('click', async () => {
+              const summary = (escalateForm.querySelector('[data-escalate="summary"]') as HTMLTextAreaElement)?.value.trim();
+              const email = (escalateForm.querySelector('[data-escalate="email"]') as HTMLInputElement)?.value.trim();
+              if (!summary || summary.length < 10) {
+                submitBtn.textContent = 'Please describe the issue (10+ chars)';
+                setTimeout(() => { submitBtn.textContent = 'Submit Report'; }, 2000);
+                return;
+              }
+              submitBtn.textContent = 'Submitting…';
+              (submitBtn as HTMLButtonElement).disabled = true;
+              try {
+                await fetch('/api/escalate', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    summary,
+                    category: 'technical',
+                    source: 'join-chat',
+                    pageUrl: window.location.pathname,
+                    conversation: conversationHistory.slice(-10),
+                    userContact: email ? { email } : undefined,
+                  }),
+                });
+                escalateForm.innerHTML = `<p class="text-xs text-green-600 font-medium">✓ Report submitted — our team will investigate. Thank you!</p>`;
+              } catch {
+                escalateForm.innerHTML = `<p class="text-xs text-red-600 font-medium">Failed to submit. Please call (706) 333-5641 for help.</p>`;
+              }
+            });
           }
         }
       } else if (!responseEl && fullText) {

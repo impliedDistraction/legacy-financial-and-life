@@ -632,7 +632,7 @@ if (!session) {
   // ── Action-block renderer ───────────────────────────────────────
   // Detects {{action_type}} markers in AI text and replaces them with
   // interactive UI widgets. Returns the cleaned text + rendered HTML.
-  const ACTION_REGEX = /\{\{(book_consultation|call_now|transfer_agent|collect_info)\}\}/g;
+  const ACTION_REGEX = /\{\{(book_consultation|call_now|transfer_agent|collect_info|escalate_issue)\}\}/g;
 
   function renderActionBlock(action: string): string {
     switch (action) {
@@ -686,6 +686,18 @@ if (!session) {
             </button>
           </div>
         </div>`;
+      case 'escalate_issue':
+        return `<div class="mt-3 bg-red-50 border border-red-200 rounded-xl p-3" id="inline-escalate-form">
+          <p class="text-xs text-red-700 font-semibold mb-2">🛠️ Report a Technical Issue</p>
+          <p class="text-xs text-red-600 mb-2">Please describe what went wrong so our team can investigate.</p>
+          <div class="space-y-2">
+            <textarea placeholder="What happened? (e.g., form wouldn't submit, page didn't load...)" rows="3" maxlength="2000" class="w-full px-3 py-1.5 text-xs border border-red-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400 resize-none" data-escalate="summary"></textarea>
+            <input type="email" placeholder="Your email (optional, for follow-up)" class="w-full px-3 py-1.5 text-xs border border-red-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-400" data-escalate="email" />
+            <button class="w-full py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors escalate-submit-btn">
+              Submit Report
+            </button>
+          </div>
+        </div>`;
       default:
         return '';
     }
@@ -733,6 +745,40 @@ if (!session) {
           const infoMsg = `My name is ${name}, phone: ${phone}${state ? `, state: ${state}` : ''}`;
           collectForm.innerHTML = `<p class="text-xs text-green-600 font-medium">✓ Info sent — Tim & Beth will be in touch!</p>`;
           sendMessage(infoMsg);
+        }
+      });
+    }
+
+    // Wire up escalate_issue form if present
+    const escalateForm = bubble.querySelector('#inline-escalate-form');
+    if (escalateForm) {
+      const submitBtn = escalateForm.querySelector('.escalate-submit-btn');
+      submitBtn?.addEventListener('click', async () => {
+        const summary = (escalateForm.querySelector('[data-escalate="summary"]') as HTMLTextAreaElement)?.value.trim();
+        const email = (escalateForm.querySelector('[data-escalate="email"]') as HTMLInputElement)?.value.trim();
+        if (!summary || summary.length < 10) {
+          escalateForm.querySelector('.escalate-submit-btn')!.textContent = 'Please describe the issue (10+ chars)';
+          setTimeout(() => { escalateForm.querySelector('.escalate-submit-btn')!.textContent = 'Submit Report'; }, 2000);
+          return;
+        }
+        escalateForm.querySelector('.escalate-submit-btn')!.textContent = 'Submitting…';
+        (escalateForm.querySelector('.escalate-submit-btn') as HTMLButtonElement).disabled = true;
+        try {
+          await fetch('/api/escalate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              summary,
+              category: 'technical',
+              source: 'chatbot',
+              pageUrl: window.location.pathname,
+              conversation: conversationHistory.slice(-10),
+              userContact: email ? { email } : undefined,
+            }),
+          });
+          escalateForm.innerHTML = `<p class="text-xs text-green-600 font-medium">✓ Report submitted — our team will investigate. Thank you!</p>`;
+        } catch {
+          escalateForm.innerHTML = `<p class="text-xs text-red-600 font-medium">Failed to submit. Please call (706) 333-5641 for help.</p>`;
         }
       });
     }
@@ -804,7 +850,7 @@ if (!session) {
       // Strip action markers from live-streamed text so the user never
       // sees raw {{book_consultation}} etc. Actions render on finalization.
       const stripActionMarkers = (t: string) =>
-        t.replace(/\{\{(book_consultation|call_now|transfer_agent|collect_info)\}\}/g, '').trimEnd();
+        t.replace(/\{\{(book_consultation|call_now|transfer_agent|collect_info|escalate_issue)\}\}/g, '').trimEnd();
 
       // Idle timeout: if content has been received but nothing new arrives
       // for 2s, treat the response as complete and unlock the UI.
