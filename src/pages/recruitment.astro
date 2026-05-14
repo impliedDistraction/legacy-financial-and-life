@@ -539,6 +539,9 @@ if (!session) {
           <div class="flex items-center gap-3 flex-wrap">
             <select id="sent-filter" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
               <option value="sent">📧 Sent</option>
+              <option value="opened">👁️ Opened</option>
+              <option value="clicked">🔗 Clicked</option>
+              <option value="visited">🌐 Visited /join</option>
               <option value="approved">✅ Approved (unsent)</option>
               <option value="converted">🎉 Converted</option>
               <option value="bounced">⚠️ Bounced</option>
@@ -559,6 +562,8 @@ if (!session) {
           <div class="flex gap-4 mt-3 pt-3 border-t border-gray-100" id="tracking-stats">
             <div class="text-center"><span class="text-lg font-bold text-blue-600" id="stat-track-sent">-</span><p class="text-xs text-gray-400">Sent</p></div>
             <div class="text-center"><span class="text-lg font-bold text-green-600" id="stat-track-opened">-</span><p class="text-xs text-gray-400">Opened</p></div>
+            <div class="text-center"><span class="text-lg font-bold text-violet-600" id="stat-track-clicked">-</span><p class="text-xs text-gray-400">Clicked</p></div>
+            <div class="text-center"><span class="text-lg font-bold text-cyan-600" id="stat-track-visited">-</span><p class="text-xs text-gray-400">Visited</p></div>
             <div class="text-center"><span class="text-lg font-bold text-purple-600" id="stat-track-replied">-</span><p class="text-xs text-gray-400">Replied</p></div>
             <div class="text-center"><span class="text-lg font-bold text-emerald-600" id="stat-track-converted">-</span><p class="text-xs text-gray-400">Converted</p></div>
             <div class="text-center"><span class="text-lg font-bold text-red-500" id="stat-track-bounced">-</span><p class="text-xs text-gray-400">Bounced</p></div>
@@ -2143,9 +2148,14 @@ if (!session) {
     const sort = sentSort.value;
 
     // Build query params
-    let statusFilter = `status=${status}`;
+    const trackingFilters = ['opened', 'clicked', 'visited'];
+    let statusFilter = '';
     if (status === 'all_active') {
       statusFilter = 'status=in.(sent,approved,converted)';
+    } else if (trackingFilters.includes(status)) {
+      statusFilter = `tracking=${status}`;
+    } else {
+      statusFilter = `status=${status}`;
     }
     let orderBy = 'sent_at.desc.nullslast,created_at.desc';
     if (sort === 'name') orderBy = 'name.asc';
@@ -2199,6 +2209,7 @@ if (!session) {
       if (p.sent_at) indicators.push(`<span class="text-blue-600" title="Sent ${fmtDate(p.sent_at)}">📧</span>`);
       if (props.email_opened_at || p.email_opened_at) indicators.push(`<span class="text-green-600" title="Opened">👁️</span>`);
       if (props.email_clicked_at || p.email_clicked_at) indicators.push(`<span class="text-purple-600" title="Clicked">🔗</span>`);
+      if (props.join_page_visited_at) indicators.push(`<span class="text-cyan-600" title="Visited /join">🌐</span>`);
       if (p.replied_at || props.replied_at) indicators.push(`<span class="text-indigo-600" title="Replied">💬</span>`);
       if (p.status === 'converted') indicators.push(`<span class="text-emerald-600" title="Converted">🎉</span>`);
       if (p.status === 'bounced' || props.bounced_at) indicators.push(`<span class="text-red-500" title="Bounced">⚠️</span>`);
@@ -2210,6 +2221,8 @@ if (!session) {
         new: { label: 'New', color: 'gray' },
         outreach_sent: { label: 'Outreach Sent', color: 'blue' },
         opened: { label: 'Opened', color: 'green' },
+        clicked_cta: { label: 'Clicked CTA', color: 'violet' },
+        visited_page: { label: 'Visited Page', color: 'cyan' },
         engaged: { label: 'Engaged', color: 'purple' },
         replied: { label: 'Replied', color: 'indigo' },
         scheduled: { label: 'Call Scheduled', color: 'amber' },
@@ -2257,7 +2270,8 @@ if (!session) {
                   ${p.approved_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.approved_at)}</span><span class="text-gray-600">✅ Approved${props.auto_approved ? ' (auto)' : ''}</span></div>` : ''}
                   ${p.sent_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.sent_at)}</span><span class="text-gray-600">📧 Email sent</span></div>` : ''}
                   ${(props.email_opened_at || p.email_opened_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.email_opened_at || p.email_opened_at)}</span><span class="text-green-600">👁️ Email opened</span></div>` : ''}
-                  ${(props.email_clicked_at || p.email_clicked_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.email_clicked_at || p.email_clicked_at)}</span><span class="text-purple-600">🔗 Link clicked</span></div>` : ''}
+                  ${(props.email_clicked_at || p.email_clicked_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.email_clicked_at || p.email_clicked_at)}</span><span class="text-purple-600">🔗 Link clicked${props.email_clicked_url ? ': ' + escapeHtml(props.email_clicked_url.replace(/^https?:\/\/[^/]+/, '')) : ''}</span></div>` : ''}
+                  ${props.join_page_visited_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.join_page_visited_at)}</span><span class="text-cyan-600">🌐 Visited /join page${props.join_page_visit_count > 1 ? ' (' + props.join_page_visit_count + ' visits)' : ''}</span></div>` : ''}
                   ${(p.replied_at || props.replied_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.replied_at || props.replied_at)}</span><span class="text-indigo-600">💬 Replied</span></div>` : ''}
                   ${props.call_made_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.call_made_at)}</span><span class="text-amber-600">📞 Call: ${escapeHtml(props.call_outcome || 'unknown')}</span></div>` : ''}
                 </div>
@@ -2357,15 +2371,14 @@ if (!session) {
 
   async function loadTrackingStats() {
     try {
-      const [sentRes, convertedRes] = await Promise.all([
-        fetch('/api/recruitment-upload?status=sent&limit=1'),
-        fetch('/api/recruitment-upload?status=converted&limit=1'),
-      ]);
-      const sentData = await sentRes.json();
-      const convertedData = await convertedRes.json();
-      document.getElementById('stat-track-sent')!.textContent = String(sentData.total || 0);
-      document.getElementById('stat-track-converted')!.textContent = String(convertedData.total || 0);
-      // Opened/replied/bounced would need server-side counts — show '-' until available
+      const res = await fetch('/api/recruitment-stats');
+      const stats = await res.json();
+      if (stats.error) return;
+      const fields = ['sent', 'opened', 'clicked', 'visited', 'replied', 'converted', 'bounced'];
+      for (const f of fields) {
+        const el = document.getElementById(`stat-track-${f}`);
+        if (el) el.textContent = String(stats[f] ?? '-');
+      }
     } catch { /* silent */ }
   }
 

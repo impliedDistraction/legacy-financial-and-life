@@ -143,6 +143,7 @@ export const GET: APIRoute = async ({ request }) => {
   const status = url.searchParams.get('status');
   const source = url.searchParams.get('source');
   const search = url.searchParams.get('search')?.trim();
+  const tracking = url.searchParams.get('tracking');
   const order = url.searchParams.get('order');
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 200);
   const offset = parseInt(url.searchParams.get('offset') || '0');
@@ -159,6 +160,15 @@ export const GET: APIRoute = async ({ request }) => {
     } else {
       queryUrl += `&status=eq.${encodeURIComponent(status)}`;
     }
+  }
+  // JSONB property filters for engagement tracking
+  const TRACKING_FIELDS: Record<string, string> = {
+    opened: 'email_opened_at',
+    clicked: 'email_clicked_at',
+    visited: 'join_page_visited_at',
+  };
+  if (tracking && TRACKING_FIELDS[tracking]) {
+    queryUrl += `&status=in.(sent,converted)&properties->>${encodeURIComponent(TRACKING_FIELDS[tracking])}=not.is.null`;
   }
   // Text search across name, email, state, city
   if (search) {
