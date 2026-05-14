@@ -142,9 +142,19 @@ export const POST: APIRoute = async ({ request }) => {
           }
         }
       }
+
+      // Prospect ID was provided but not found or update failed.
+      // The simplified form doesn't collect name/email/phone, so we can't
+      // fall through to the "create new" path. Return a clear error.
+      return new Response(JSON.stringify({
+        error: 'We could not locate your profile. Please try the full form or book a call directly.',
+      }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // No existing prospect matched — create a new warm lead
+    // No prospect ID — create a new warm lead from the full form
     const insertBody = {
       name: cleanName,
       email: cleanEmail,

@@ -75,7 +75,7 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
   <Header />
 
   <!-- Server-rendered prospect context for client-side tracking -->
-  <div id="prospect-context" data-tier={prospectTier} data-pid={pid} class="hidden"></div>
+  <div id="prospect-context" data-tier={prospectTier} data-pid={pid} data-name={prospectName} data-simplified={String(!!(pid || testPersona))} class="hidden"></div>
 
   <!-- Hero -->
   <section class="relative isolate overflow-hidden bg-gradient-to-br from-brand-50 to-white">
@@ -267,7 +267,23 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
         <div id="formMessage" class="hidden text-center text-sm py-2 rounded-lg"></div>
       </form>
 
-      <p class="text-center text-sm text-slate-500 mt-4">
+      <!-- Booking CTA (hidden until successful submission) -->
+      <div id="bookingCta" class="hidden bg-white rounded-xl border border-slate-200 p-8 shadow-sm text-center">
+        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-bold text-slate-900 mb-2">You're all set!</h3>
+        <p class="text-slate-600 mb-6">Let's get you on the calendar for a quick conversation with Tim &amp; Beth.</p>
+        <a id="bookingLink" href="https://calendly.com/bethandtim-legacyf-l/30min" target="_blank" rel="noopener"
+           class="inline-block w-full rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 font-semibold transition-colors text-center">
+          &#128197; Book My 30-Minute Conversation
+        </a>
+        <p class="text-sm text-slate-500 mt-4">Not ready to book yet? No worries — our team will reach out to find a time that works.</p>
+      </div>
+
+      <p id="directBookHint" class="text-center text-sm text-slate-500 mt-4">
         Prefer to book directly?
         <a href="https://calendly.com/bethandtim-legacyf-l/30min" target="_blank" rel="noopener"
            class="text-brand-600 hover:text-brand-700 font-medium underline underline-offset-2">
@@ -356,10 +372,34 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
   const form = document.getElementById('joinForm') as HTMLFormElement;
   const submitBtn = document.getElementById('submitBtn') as HTMLButtonElement;
   const msgEl = document.getElementById('formMessage') as HTMLDivElement;
+  const bookingCta = document.getElementById('bookingCta') as HTMLDivElement;
+  const bookingLink = document.getElementById('bookingLink') as HTMLAnchorElement;
+  const directBookHint = document.getElementById('directBookHint') as HTMLParagraphElement;
 
-  // Extract prospect ID from URL if present (from email CTA tracking)
+  // Extract prospect context from server-rendered data + URL params
   const params = new URLSearchParams(window.location.search);
   const prospectId = params.get('pid') || '';
+  const isTestMode = !!params.get('test');
+  const ctxEl = document.getElementById('prospect-context');
+  const isSimplified = ctxEl?.dataset.simplified === 'true';
+  const prospectName = ctxEl?.dataset.name || '';
+
+  const CALENDLY_BASE = 'https://calendly.com/bethandtim-legacyf-l/30min';
+
+  function showBookingSuccess() {
+    // Build Calendly URL with name prefill when available
+    const nameForCal = prospectName || (form.elements.namedItem('name') as HTMLInputElement | null)?.value?.trim() || '';
+    const emailForCal = (form.elements.namedItem('email') as HTMLInputElement | null)?.value?.trim() || '';
+    const calParams = new URLSearchParams();
+    if (nameForCal) calParams.set('name', nameForCal);
+    if (emailForCal) calParams.set('email', emailForCal);
+    const calUrl = calParams.toString() ? `${CALENDLY_BASE}?${calParams}` : CALENDLY_BASE;
+    bookingLink.href = calUrl;
+
+    form.classList.add('hidden');
+    bookingCta.classList.remove('hidden');
+    directBookHint?.classList.add('hidden');
+  }
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -367,39 +407,49 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
     submitBtn.textContent = 'Submitting...';
     msgEl.classList.add('hidden');
 
-    // When prospect arrived from email, they don't fill name/email/phone fields
     const nameEl = form.elements.namedItem('name') as HTMLInputElement | null;
     const emailEl = form.elements.namedItem('email') as HTMLInputElement | null;
     const phoneEl = form.elements.namedItem('phone') as HTMLInputElement | null;
     const stateEl = form.elements.namedItem('state') as HTMLSelectElement | null;
+
+    const textConsent = (form.elements.namedItem('textConsent') as HTMLInputElement).checked;
+    const referralConsent = (form.elements.namedItem('referralConsent') as HTMLInputElement).checked;
 
     const data = {
       name: nameEl?.value.trim() || '',
       email: emailEl?.value.trim() || '',
       phone: phoneEl?.value.trim() || '',
       state: stateEl?.value || '',
-      textConsent: (form.elements.namedItem('textConsent') as HTMLInputElement).checked,
-      referralConsent: (form.elements.namedItem('referralConsent') as HTMLInputElement).checked,
+      textConsent,
+      referralConsent,
       prospectId,
     };
 
     try {
-      const res = await fetch('/api/join-interest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
+      let success = false;
 
-      if (res.ok) {
-        msgEl.textContent = 'Thank you! Our hiring manager will be in touch soon.';
-        msgEl.className = 'text-center text-sm py-3 rounded-lg bg-green-50 text-green-700 border border-green-200';
-        msgEl.classList.remove('hidden');
-        form.reset();
+      if (isTestMode && !prospectId) {
+        // Test persona mode — no real DB record to update, simulate success
+        success = true;
       } else {
-        const err = await res.json().catch(() => ({ error: 'Something went wrong' }));
-        msgEl.textContent = err.error || 'Something went wrong. Please try again.';
-        msgEl.className = 'text-center text-sm py-3 rounded-lg bg-red-50 text-red-700 border border-red-200';
-        msgEl.classList.remove('hidden');
+        const res = await fetch('/api/join-interest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+
+        if (res.ok) {
+          success = true;
+        } else {
+          const err = await res.json().catch(() => ({ error: 'Something went wrong' }));
+          msgEl.textContent = err.error || 'Something went wrong. Please try again.';
+          msgEl.className = 'text-center text-sm py-3 rounded-lg bg-red-50 text-red-700 border border-red-200';
+          msgEl.classList.remove('hidden');
+        }
+      }
+
+      if (success) {
+        showBookingSuccess();
       }
     } catch {
       msgEl.textContent = 'Network error. Please check your connection and try again.';
@@ -407,7 +457,7 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
       msgEl.classList.remove('hidden');
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = prospectId ? "Yes, I'm Interested — Reach Out" : 'Schedule My Conversation';
+      submitBtn.textContent = isSimplified ? "Yes, I'm Interested — Reach Out" : 'Schedule My Conversation';
     }
   });
 </script>
