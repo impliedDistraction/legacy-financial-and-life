@@ -1,0 +1,255 @@
+---
+/**
+ * Call Form — SMS-delivered form for mid-call information collection.
+ *
+ * When the voice agent needs info that's hard to dictate (email, spelling, etc.),
+ * it sends the caller an SMS linking here. The caller fills it out on their phone
+ * while still on the call, and the data goes back to the voice bridge to resume
+ * the conversation.
+ *
+ * Query params:
+ *   fid    — Form ID (links this submission to the active call session)
+ *   fields — Comma-separated field names to collect (e.g., "email,name,phone")
+ */
+
+// No layout needed — this is a minimal mobile-first page
+const fid = Astro.url.searchParams.get("fid") || "";
+const fieldsParam = Astro.url.searchParams.get("fields") || "email";
+const fields = fieldsParam.split(",").map(f => f.trim()).filter(Boolean);
+
+// Map field names to human-readable labels and input types
+const fieldConfig: Record<string, { label: string; type: string; placeholder: string }> = {
+  email:     { label: "Email Address",        type: "email", placeholder: "you@example.com" },
+  name:      { label: "Full Name",            type: "text",  placeholder: "John Smith" },
+  phone:     { label: "Phone Number",         type: "tel",   placeholder: "(555) 123-4567" },
+  address:   { label: "Mailing Address",      type: "text",  placeholder: "123 Main St, City, ST 00000" },
+  dob:       { label: "Date of Birth",        type: "date",  placeholder: "" },
+  state:     { label: "State",                type: "text",  placeholder: "Georgia" },
+  policy_number: { label: "Policy Number",    type: "text",  placeholder: "POL-123456" },
+  notes:     { label: "Additional Notes",     type: "text",  placeholder: "Anything else?" },
+};
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Legacy Financial & Life</title>
+  <meta name="robots" content="noindex, nofollow">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+      padding: 1.5rem;
+      max-width: 400px;
+      width: 100%;
+      margin-top: 1rem;
+    }
+    .logo {
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #1e40af;
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 1.5rem;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #475569;
+      margin-bottom: 0.25rem;
+    }
+    input[type="text"], input[type="email"], input[type="tel"], input[type="date"] {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+    }
+    .btn {
+      width: 100%;
+      padding: 0.85rem;
+      background: #1e40af;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    .btn:active { background: #1e3a8a; }
+    .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+    .status {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-top: 0.75rem;
+    }
+    .success {
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+    .success .icon { font-size: 3rem; margin-bottom: 0.5rem; }
+    .success h2 { font-size: 1.2rem; color: #166534; margin-bottom: 0.5rem; }
+    .success p { font-size: 0.9rem; color: #64748b; }
+    .error { color: #dc2626; font-size: 0.8rem; margin-top: -0.5rem; margin-bottom: 0.75rem; }
+    .expired { text-align: center; padding: 2rem; }
+    .expired h2 { color: #92400e; }
+  </style>
+</head>
+<body>
+  <div class="card" id="form-card">
+    <div class="logo">Legacy Financial & Life</div>
+    <div class="subtitle">Quick info for your call — fill this out and we'll continue right where we left off.</div>
+
+    <form id="call-form" novalidate>
+      {fields.map(field => {
+        const config = fieldConfig[field] || { label: field, type: "text", placeholder: "" };
+        return (
+          <div>
+            <label for={`field-${field}`}>{config.label}</label>
+            <input
+              type={config.type}
+              id={`field-${field}`}
+              name={field}
+              placeholder={config.placeholder}
+              required
+              autocomplete={field === "email" ? "email" : field === "phone" ? "tel" : field === "name" ? "name" : "off"}
+            />
+          </div>
+        );
+      })}
+      <button type="submit" class="btn" id="submit-btn">Submit & Return to Call</button>
+      <div class="status" id="status"></div>
+    </form>
+  </div>
+
+  <div class="card success" id="success-card" style="display:none;">
+    <div class="icon">✅</div>
+    <h2>Got it!</h2>
+    <p>Your info has been sent back to the call. You can return to your phone now.</p>
+  </div>
+
+  <div class="card expired" id="expired-card" style="display:none;">
+    <div class="icon">⏰</div>
+    <h2>This form has expired</h2>
+    <p>The call has already ended or moved on. No worries — Tim or Beth will follow up with you.</p>
+  </div>
+
+  <script is:inline define:vars={{ fid }}>
+    const BRIDGE_URL = window.location.hostname === "localhost"
+      ? "http://localhost:3380"
+      : ""; // In production, the form page needs to know the bridge URL — we include it via the SMS
+
+    const form = document.getElementById("call-form");
+    const submitBtn = document.getElementById("submit-btn");
+    const statusEl = document.getElementById("status");
+    const formCard = document.getElementById("form-card");
+    const successCard = document.getElementById("success-card");
+    const expiredCard = document.getElementById("expired-card");
+
+    // Resolve bridge URL from the referrer or a global set at build time
+    // The SMS form URL goes through ngrok to the bridge, so we post back to the same origin
+    function getBridgeUrl() {
+      // If we're on the Astro site, the bridge URL is different
+      // The form page passes the bridge URL as ?bridge= param
+      const params = new URLSearchParams(window.location.search);
+      return params.get("bridge") || "";
+    }
+
+    const bridgeUrl = getBridgeUrl();
+
+    // Check if form is still active
+    async function checkStatus() {
+      if (!bridgeUrl || !fid) return;
+      try {
+        const res = await fetch(bridgeUrl + "/form/status?fid=" + encodeURIComponent(fid));
+        const json = await res.json();
+        if (!json.active) {
+          formCard.style.display = "none";
+          expiredCard.style.display = "block";
+        }
+      } catch { /* bridge unreachable, show form anyway */ }
+    }
+
+    if (fid) checkStatus();
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      statusEl.textContent = "Sending...";
+
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+
+      // Basic validation
+      for (const [key, val] of Object.entries(data)) {
+        if (!val || !val.toString().trim()) {
+          statusEl.textContent = "Please fill out all fields.";
+          submitBtn.disabled = false;
+          return;
+        }
+      }
+
+      // Email validation
+      if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+        statusEl.textContent = "Please enter a valid email address.";
+        submitBtn.disabled = false;
+        return;
+      }
+
+      try {
+        const res = await fetch(bridgeUrl + "/form/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ formId: fid, data }),
+        });
+
+        const json = await res.json();
+
+        if (res.ok) {
+          formCard.style.display = "none";
+          successCard.style.display = "block";
+        } else if (res.status === 404) {
+          formCard.style.display = "none";
+          expiredCard.style.display = "block";
+        } else {
+          statusEl.textContent = json.error || "Something went wrong. Please try again.";
+          submitBtn.disabled = false;
+        }
+      } catch (err) {
+        statusEl.textContent = "Couldn't reach the server. Please try again.";
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
