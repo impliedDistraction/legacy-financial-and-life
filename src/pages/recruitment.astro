@@ -1768,6 +1768,7 @@ if (!session) {
                 ${p.web_presence?.carrierEmail ? `<span class="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium" title="Sending to carrier email risks the agent's position">🏢 Carrier Email</span>` : ''}
                 ${p.research_score != null ? `<span class="text-xs ${p.research_score >= 7 ? 'bg-green-100 text-green-700' : p.research_score >= 4 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'} px-1.5 py-0.5 rounded">🔍 ${p.research_score}/10</span>` : p.research_status === 'unscored' ? '<span class="text-xs bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded">⏳ unscored</span>' : ''}
                 ${p.qa_score != null ? `<span class="text-xs ${p.qa_score >= 80 ? 'bg-green-100 text-green-700' : p.qa_score >= 60 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'} px-1.5 py-0.5 rounded">QA ${p.qa_score}</span>` : ''}
+                ${campaignBadge(p)}
               </div>
               <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
                 ${p.state ? `<span>📍 ${escapeHtml(p.state)}${p.city ? ', ' + escapeHtml(p.city) : ''}</span>` : ''}
@@ -2257,6 +2258,7 @@ if (!session) {
                 <span class="text-xs bg-${stageInfo.color}-100 text-${stageInfo.color}-700 px-1.5 py-0.5 rounded font-medium">${stageInfo.label}</span>
                 ${stateMatch ? '<span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Licensed</span>' : ''}
                 ${p.research_score != null ? `<span class="text-xs ${p.research_score >= 7 ? 'bg-green-50 text-green-600' : p.research_score >= 4 ? 'bg-amber-50 text-amber-600' : 'bg-gray-50 text-gray-500'} px-1.5 py-0.5 rounded">🔍 ${p.research_score}</span>` : ''}
+                ${campaignBadge(p)}
               </div>
               <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
                 ${p.email ? `<span class="text-brand-700 font-medium">✉️ ${escapeHtml(p.email)}</span>${p.web_presence?.carrierEmail ? ' <span class="text-red-500 text-[10px]" title="Carrier-owned domain — needs personal email">⚠️ carrier</span>' : ''}` : '<span class="text-amber-500 font-medium">📞 Phone Only</span>'}
@@ -2319,17 +2321,47 @@ if (!session) {
               </div>
 
               <!-- Call Context (for warm leads) -->
-              ${props.join_page_visited_at || props.email_clicked_at || props.text_consent ? `
-              <div class="bg-amber-50 rounded-lg p-2 border border-amber-100">
-                <p class="text-xs font-medium text-amber-800 mb-1">📋 Call Context</p>
-                <ul class="text-xs text-amber-700 space-y-0.5">
+              ${props.join_page_visited_at || props.email_clicked_at || props.text_consent || p.call_opener ? `
+              <div class="bg-amber-50 rounded-lg p-3 border border-amber-100">
+                <p class="text-xs font-bold text-amber-800 mb-1.5">📋 Call Context</p>
+                <ul class="text-xs text-amber-700 space-y-0.5 mb-2">
                   ${props.join_page_visited_at ? `<li>• Visited /join page ${(() => { const d = new Date(props.join_page_visited_at); return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); })()}${props.join_page_visit_count > 1 ? ' (' + props.join_page_visit_count + ' times)' : ''}</li>` : ''}
                   ${props.email_clicked_at && !props.email_click_bot_detected ? '<li>• Clicked the email CTA link (real click, not bot)</li>' : ''}
                   ${props.email_clicked_at && props.email_click_bot_detected ? '<li>• Link was scanned (likely email security scanner)</li>' : ''}
                   ${props.text_consent ? '<li>• ✅ Gave TCPA text consent</li>' : ''}
                   ${props.email_replied_at ? '<li>• Replied to recruitment email</li>' : ''}
-                  ${p.call_opener ? `<li>• <strong>Suggested opener:</strong> ${escapeHtml(p.call_opener.slice(0, 200))}</li>` : ''}
                 </ul>
+                ${p.call_opener ? `
+                <details>
+                  <summary class="text-xs font-medium text-amber-800 cursor-pointer mb-1">🤖 AI-Suggested Opener</summary>
+                  <div class="text-xs text-amber-700 bg-white rounded p-2 border border-amber-100 whitespace-pre-wrap">${escapeHtml(p.call_opener)}</div>
+                </details>` : ''}
+                <details class="mt-1.5">
+                  <summary class="text-xs font-medium text-amber-800 cursor-pointer mb-1">📞 Tim's Call Script</summary>
+                  <div class="text-xs text-amber-700 bg-white rounded p-2 border border-amber-100 space-y-2">
+                    <div>
+                      <p class="font-semibold">Opening:</p>
+                      <p>"Hi, ${escapeHtml(p.name?.split(' ')[0] || '[Name]')}? My name is <em>[Your Name]</em>, and I'm reaching out from Legacy Financial &amp; Life."</p>
+                    </div>
+                    <div>
+                      <p class="font-semibold">Purpose:</p>
+                      <p>"The reason for my call is that we're currently expanding our team, and based on your background in insurance, I think you could be a strong fit for one of our opportunities. I wanted to see if you'd be open to scheduling a quick conversation to learn more."</p>
+                    </div>
+                    <div>
+                      <p class="font-semibold">If they ask questions:</p>
+                      <p>"That is a great question for our hiring manager."</p>
+                      <p>Commission: "Most new agents start around 60% but that is a great question for the hiring manager because it is at their discretion."</p>
+                    </div>
+                    <div>
+                      <p class="font-semibold">Book the Interview:</p>
+                      <p>"I'd love to get you on the schedule for a short interview with our hiring manager. It usually takes about 20–30 minutes. Would mornings or afternoons work better for you?"</p>
+                    </div>
+                    <div>
+                      <p class="font-semibold">If not interested:</p>
+                      <p>"Totally understand. Many of the agents we speak with aren't actively looking, but they're open to hearing about opportunities that offer more flexibility, better income potential, or stronger leadership. Would you be open to a quick intro call just to compare options?"</p>
+                    </div>
+                  </div>
+                </details>
               </div>` : ''}
 
               <!-- Actions -->
@@ -2574,6 +2606,7 @@ if (!session) {
             </div>
             <div class="flex-shrink-0 flex flex-col gap-1">
               ${p.phone ? `<a href="tel:${escapeHtml(p.phone)}" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg text-center font-medium">📞 Call</a>` : ''}
+              ${p.phone ? `<button class="ai-call-btn bg-purple-600 hover:bg-purple-700 text-white text-xs px-3 py-1.5 rounded-lg font-medium" data-id="${p.id}" data-phone="${escapeHtml(p.phone)}" data-name="${escapeHtml(p.name)}" data-state="${escapeHtml(p.state || '')}" data-email="${escapeHtml(p.email || '')}">🤖 AI Call</button>` : ''}
               <button class="hot-lead-view-btn bg-brand-100 hover:bg-brand-200 text-brand-700 text-xs px-3 py-1.5 rounded-lg font-medium" data-id="${p.id}">View</button>
             </div>
           </div>
@@ -2591,6 +2624,56 @@ if (!session) {
           (card as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
           card.classList.add('ring-2', 'ring-amber-400');
           setTimeout(() => card.classList.remove('ring-2', 'ring-amber-400'), 3000);
+        }
+      });
+    });
+
+    // Bind AI Call buttons to trigger outbound recruitment call via voice bridge
+    list.querySelectorAll('.ai-call-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const el = btn as HTMLButtonElement;
+        const phone = el.dataset.phone || '';
+        const name = el.dataset.name || '';
+        const prospectId = el.dataset.id || '';
+        const state = el.dataset.state || '';
+        const email = el.dataset.email || '';
+
+        if (!confirm(`Start an AI recruitment call to ${name} at ${phone}?`)) return;
+
+        el.disabled = true;
+        el.textContent = '⏳ Dialing...';
+
+        try {
+          const res = await fetch('/api/recruitment-dial', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone,
+              prospectId,
+              prospectName: name,
+              prospectContext: `Name: ${name}. State: ${state}. Email: ${email}. Licensed insurance agent being recruited to Legacy Financial & Life.`,
+            }),
+          });
+          const data = await res.json();
+          if (data.ok) {
+            el.textContent = '✅ Call started';
+            el.classList.remove('bg-purple-600', 'hover:bg-purple-700');
+            el.classList.add('bg-green-600');
+            setTimeout(() => {
+              el.textContent = '🤖 AI Call';
+              el.disabled = false;
+              el.classList.remove('bg-green-600');
+              el.classList.add('bg-purple-600', 'hover:bg-purple-700');
+            }, 5000);
+          } else {
+            alert(`Call failed: ${data.error || 'Unknown error'}`);
+            el.textContent = '🤖 AI Call';
+            el.disabled = false;
+          }
+        } catch (err: any) {
+          alert(`Call failed: ${err.message}`);
+          el.textContent = '🤖 AI Call';
+          el.disabled = false;
         }
       });
     });
@@ -2636,6 +2719,24 @@ if (!session) {
   // ═══════════════════════════════════════════
   // UTILITIES
   // ═══════════════════════════════════════════
+  const CAMPAIGN_COLORS = ['indigo', 'teal', 'rose', 'sky', 'fuchsia', 'lime', 'orange', 'cyan'];
+  // Safelist for Tailwind JIT — ensures dynamic campaign badge classes are included:
+  // bg-indigo-50 text-indigo-700 border-indigo-200 bg-teal-50 text-teal-700 border-teal-200
+  // bg-rose-50 text-rose-700 border-rose-200 bg-sky-50 text-sky-700 border-sky-200
+  // bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 bg-lime-50 text-lime-700 border-lime-200
+  // bg-orange-50 text-orange-700 border-orange-200 bg-cyan-50 text-cyan-700 border-cyan-200
+  function campaignColor(name: string): string {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = ((h << 5) - h + name.charCodeAt(i)) | 0;
+    return CAMPAIGN_COLORS[Math.abs(h) % CAMPAIGN_COLORS.length];
+  }
+  function campaignBadge(p: any): string {
+    if (!p.campaign_name) return '';
+    const c = campaignColor(p.campaign_name);
+    const srcIcon = p.source === 'fl_licensee' ? '🏛️' : p.source === 'csv_import' ? '📤' : '🔍';
+    return `<span class="text-[10px] bg-${c}-50 text-${c}-700 border border-${c}-200 px-1.5 py-0.5 rounded font-medium" title="Campaign: ${escapeHtml(p.campaign_name)}">${srcIcon} ${escapeHtml(p.campaign_name)}</span>`;
+  }
+
   function escapeHtml(text: string): string {
     const el = document.createElement('span');
     el.textContent = text;
@@ -3126,7 +3227,10 @@ if (!session) {
             <div class="border border-gray-100 rounded-lg p-3 hover:border-brand-200 transition-colors">
               <div class="flex items-center justify-between mb-1">
                 <span class="text-sm font-medium text-gray-900">${p.name || 'Unknown'}</span>
-                <span class="text-xs px-1.5 py-0.5 rounded ${p.fit_score >= 7 ? 'bg-green-100 text-green-700' : p.fit_score >= 5 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}">${p.fit_score || '?'}/10</span>
+                <div class="flex items-center gap-1.5">
+                  ${campaignBadge(p)}
+                  <span class="text-xs px-1.5 py-0.5 rounded ${p.fit_score >= 7 ? 'bg-green-100 text-green-700' : p.fit_score >= 5 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}">${p.fit_score || '?'}/10</span>
+                </div>
               </div>
               <div class="text-xs text-gray-500">${p.state || ''} ${p.city ? '• ' + p.city : ''} ${p.email ? '• ' + p.email : ''}</div>
               ${p.email_subject ? `<div class="mt-2 text-xs text-gray-700 bg-gray-50 rounded p-2"><strong>Subject:</strong> ${p.email_subject}</div>` : ''}
