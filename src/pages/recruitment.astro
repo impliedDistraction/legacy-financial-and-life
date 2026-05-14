@@ -494,7 +494,10 @@ if (!session) {
             <button id="approve-all-btn" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors hidden">
               ✓ Approve All Visible
             </button>
-            <span id="review-count" class="text-xs text-gray-400 ml-auto"></span>
+            <select id="review-campaign-filter" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm ml-auto">
+              <option value="">All Campaigns</option>
+            </select>
+            <span id="review-count" class="text-xs text-gray-400"></span>
           </div>
         </div>
 
@@ -555,6 +558,9 @@ if (!session) {
               <option value="name">Name A-Z</option>
               <option value="score">Fit Score ↓</option>
               <option value="interaction">Last Interaction</option>
+            </select>
+            <select id="sent-campaign-filter" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+              <option value="">All Campaigns</option>
             </select>
             <span id="sent-count" class="text-xs text-gray-400 ml-auto"></span>
           </div>
@@ -1028,6 +1034,25 @@ if (!session) {
   // ═══════════════════════════════════════════
   let campaignsCache: any[] = [];
 
+  function populateCampaignFilters() {
+    const dropdowns = [
+      document.getElementById('review-campaign-filter'),
+      document.getElementById('sent-campaign-filter'),
+    ] as HTMLSelectElement[];
+    for (const dd of dropdowns) {
+      if (!dd) continue;
+      const current = dd.value;
+      dd.innerHTML = '<option value="">All Campaigns</option>';
+      for (const c of campaignsCache) {
+        const icon = c.source_type === 'fl_licensee' ? '\u{1f3db}\ufe0f' : c.source_type === 'csv_import' ? '\u{1f4e4}' : '\u{1f50d}';
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${icon} ${c.name}`;
+        dd.appendChild(opt);
+      }
+      if (current) dd.value = current;
+    }
+  }
   async function loadCampaigns() {
     const list = document.getElementById('campaign-list');
     if (!list) return;
@@ -1036,6 +1061,7 @@ if (!session) {
       const data = await res.json();
       campaignsCache = data.campaigns || [];
       renderCampaigns();
+      populateCampaignFilters();
       loadLiveFeed();
       refreshPoolStats();
     } catch (err) {
@@ -1629,11 +1655,13 @@ if (!session) {
   // ═══════════════════════════════════════════
   const reviewList = document.getElementById('review-list')!;
   const reviewFilter = document.getElementById('review-filter') as HTMLSelectElement;
+  const reviewCampaignFilter = document.getElementById('review-campaign-filter') as HTMLSelectElement;
   const processBatchBtn = document.getElementById('process-batch-btn') as HTMLButtonElement;
   const approveAllBtn = document.getElementById('approve-all-btn') as HTMLButtonElement;
   const loadMoreBtn = document.getElementById('load-more-btn') as HTMLButtonElement;
 
   reviewFilter.addEventListener('change', () => { currentOffset = 0; loadReviewList(); });
+  reviewCampaignFilter.addEventListener('change', () => { currentOffset = 0; loadReviewList(); });
 
   // Wire stage pill buttons to the hidden select
   const stageBtns = document.querySelectorAll('.review-stage-btn') as NodeListOf<HTMLButtonElement>;
@@ -1663,9 +1691,11 @@ if (!session) {
   // Refresh pipeline stage counts
   async function refreshReviewStageCounts() {
     const stages = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'rejected'];
+    const campId = reviewCampaignFilter.value;
+    const campParam = campId ? `&campaign_id=${encodeURIComponent(campId)}` : '';
     await Promise.all(stages.map(async (s) => {
       try {
-        const res = await fetch(`/api/recruitment-upload?status=${s}&limit=0`);
+        const res = await fetch(`/api/recruitment-upload?status=${s}&limit=0${campParam}`);
         const data = await res.json();
         const el = document.querySelector(`.review-stage-count[data-count="${s}"]`);
         if (el) el.textContent = String(data.total || 0);
@@ -1729,7 +1759,10 @@ if (!session) {
     processBatchBtn.classList.toggle('hidden', status !== 'pending');
     updateStageBtnStyles();
     try {
-      const res = await fetch(`/api/recruitment-upload?status=${status}&limit=${PAGE_SIZE}&offset=${currentOffset}`);
+      const campId = reviewCampaignFilter.value;
+      let url = `/api/recruitment-upload?status=${status}&limit=${PAGE_SIZE}&offset=${currentOffset}`;
+      if (campId) url += `&campaign_id=${encodeURIComponent(campId)}`;
+      const res = await fetch(url);
       const data = await res.json();
       const count = data.total || data.prospects?.length || 0;
       document.getElementById('review-count')!.textContent = count > 0 ? `${count} total` : '';
@@ -2143,6 +2176,7 @@ if (!session) {
   const sentFilter = document.getElementById('sent-filter') as HTMLSelectElement;
   const sentSearch = document.getElementById('sent-search') as HTMLInputElement;
   const sentSort = document.getElementById('sent-sort') as HTMLSelectElement;
+  const sentCampaignFilter = document.getElementById('sent-campaign-filter') as HTMLSelectElement;
   const sentLoadMore = document.getElementById('sent-load-more') as HTMLButtonElement;
   let sentOffset = 0;
   const SENT_PAGE = 30;
@@ -2150,6 +2184,7 @@ if (!session) {
 
   sentFilter.addEventListener('change', () => { sentOffset = 0; sentProspects = []; loadSentList(); });
   sentSort.addEventListener('change', () => { sentOffset = 0; sentProspects = []; loadSentList(); });
+  sentCampaignFilter.addEventListener('change', () => { sentOffset = 0; sentProspects = []; loadSentList(); });
   let sentSearchTimer: ReturnType<typeof setTimeout>;
   sentSearch.addEventListener('input', () => {
     clearTimeout(sentSearchTimer);
@@ -2180,6 +2215,8 @@ if (!session) {
     try {
       let url = `/api/recruitment-upload?${statusFilter}&limit=${SENT_PAGE}&offset=${sentOffset}&order=${orderBy}`;
       if (search) url += `&search=${encodeURIComponent(search)}`;
+      const campId = sentCampaignFilter.value;
+      if (campId) url += `&campaign_id=${encodeURIComponent(campId)}`;
       const res = await fetch(url);
       const data = await res.json();
       const prospects = data.prospects || [];
