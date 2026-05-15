@@ -169,7 +169,7 @@ export const GET: APIRoute = async ({ request }) => {
     chatted: 'chat_session_id',
   };
   if (tracking && TRACKING_FIELDS[tracking]) {
-    queryUrl += `&status=in.(sent,converted)&properties->>${encodeURIComponent(TRACKING_FIELDS[tracking])}=not.is.null`;
+    queryUrl += `&status=in.(sent,converted,follow_up_1,follow_up_2,follow_up_exhausted)&properties->>${encodeURIComponent(TRACKING_FIELDS[tracking])}=not.is.null`;
   }
   // Text search across name, email, state, city
   if (search) {

@@ -37,7 +37,7 @@ export const GET: APIRoute = async ({ request }) => {
     // Fetch all sent/converted prospects that have any engagement beyond just being sent
     // (clicked, visited, opened, replied, chatted, or expressed interest)
     const prospectsRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/recruitment_prospects?status=in.(sent,converted)&interaction_stage=neq.new&select=id,name,email,phone,state,city,fit_score,fit_reason,status,interaction_stage,sent_at,properties,research_score,web_presence&order=sent_at.desc.nullslast&limit=50`,
+      `${SUPABASE_URL}/rest/v1/recruitment_prospects?status=in.(sent,converted,follow_up_1,follow_up_2,follow_up_exhausted)&interaction_stage=neq.new&select=id,name,email,phone,state,city,fit_score,fit_reason,status,interaction_stage,sent_at,properties,research_score,web_presence&order=sent_at.desc.nullslast&limit=50`,
       { headers },
     );
 

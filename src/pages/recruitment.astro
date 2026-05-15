@@ -161,6 +161,11 @@ if (!session) {
             </div>
             <div class="text-gray-300 text-lg px-1">→</div>
             <div class="flex flex-col items-center min-w-[80px]">
+              <div class="text-2xl font-bold text-orange-500" id="pool-followup">—</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wider">Follow-up</div>
+            </div>
+            <div class="text-gray-300 text-lg px-1">→</div>
+            <div class="flex flex-col items-center min-w-[80px]">
               <div class="text-2xl font-bold text-purple-600" id="pool-converted">—</div>
               <div class="text-[10px] text-gray-400 uppercase tracking-wider">Converted</div>
             </div>
@@ -168,6 +173,11 @@ if (!session) {
             <div class="flex flex-col items-center min-w-[80px]">
               <div class="text-2xl font-bold text-red-500" id="pool-rejected">—</div>
               <div class="text-[10px] text-gray-400 uppercase tracking-wider">Rejected</div>
+            </div>
+            <div class="text-gray-300 text-lg px-2">|</div>
+            <div class="flex flex-col items-center min-w-[80px]">
+              <div class="text-2xl font-bold text-gray-400" id="pool-exhausted">—</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wider">No Response</div>
             </div>
           </div>
           <!-- Source breakdown -->
@@ -545,6 +555,9 @@ if (!session) {
               <option value="opened">👁️ Opened</option>
               <option value="clicked">🔗 Clicked</option>
               <option value="visited">🌐 Visited /join</option>
+              <option value="follow_up_1">📨 Follow-up 1 (Day 3)</option>
+              <option value="follow_up_2">📨 Follow-up 2 (Day 7)</option>
+              <option value="follow_up_exhausted">🚫 No Response</option>
               <option value="approved">✅ Approved (unsent)</option>
               <option value="converted">🎉 Converted</option>
               <option value="bounced">⚠️ Bounced</option>
@@ -574,6 +587,9 @@ if (!session) {
             <div class="text-center"><span class="text-lg font-bold text-purple-600" id="stat-track-replied">-</span><p class="text-xs text-gray-400">Replied</p></div>
             <div class="text-center"><span class="text-lg font-bold text-emerald-600" id="stat-track-converted">-</span><p class="text-xs text-gray-400">Converted</p></div>
             <div class="text-center"><span class="text-lg font-bold text-red-500" id="stat-track-bounced">-</span><p class="text-xs text-gray-400">Bounced</p></div>
+            <div class="border-l border-gray-200 pl-4 ml-2"></div>
+            <div class="text-center"><span class="text-lg font-bold text-orange-500" id="stat-track-follow_up">-</span><p class="text-xs text-gray-400">In Follow-up</p></div>
+            <div class="text-center"><span class="text-lg font-bold text-gray-500" id="stat-track-no_response">-</span><p class="text-xs text-gray-400">No Response</p></div>
           </div>
         </div>
 
@@ -867,9 +883,9 @@ if (!session) {
               <div class="flex-1">
                 <div class="flex items-center gap-2">
                   <h3 class="text-sm font-semibold text-gray-900">Multi-Touch Follow-up Sequences</h3>
-                  <span class="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded font-medium">In Progress</span>
+                  <span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-medium">Live</span>
                 </div>
-                <p class="text-xs text-gray-500 mt-0.5">Automatic follow-up emails at 3-day and 7-day intervals for prospects who haven't responded. AI personalizes each touch based on open/click behavior. The schema already supports <code class="text-xs bg-gray-100 px-1 rounded">follow_up_count</code> tracking.</p>
+                <p class="text-xs text-gray-500 mt-0.5">Automatic follow-up emails at Day 3 and Day 7 for prospects who haven't opened or clicked. Non-responsive prospects move to <code class="text-xs bg-gray-100 px-1 rounded">follow_up_exhausted</code> (No Response) after the final touch. View follow-up status and no-response lists in the Tracking tab.</p>
               </div>
             </div>
 
@@ -1080,7 +1096,7 @@ if (!session) {
     // Detect goal-met campaigns: paused + sent >= goal = effectively completed
     function isGoalMet(c: any) {
       const counts = c.prospect_counts || {};
-      const totalSent = (counts.sent || 0) + (counts.converted || 0) + (counts.bounced || 0);
+      const totalSent = (counts.sent || 0) + (counts.converted || 0) + (counts.bounced || 0) + (counts.follow_up_1 || 0) + (counts.follow_up_2 || 0) + (counts.follow_up_exhausted || 0);
       const goal = c.send_limit || c.credit_budget || 100;
       return c.status === 'paused' && totalSent >= goal;
     }
@@ -1090,7 +1106,7 @@ if (!session) {
     function renderCard(c: any, isPast: boolean) {
       const counts = c.prospect_counts || {};
       const totalFound = Object.values(counts).reduce((a: number, b: any) => a + (b || 0), 0);
-      const totalSent = (counts.sent || 0) + (counts.converted || 0) + (counts.bounced || 0);
+      const totalSent = (counts.sent || 0) + (counts.converted || 0) + (counts.bounced || 0) + (counts.follow_up_1 || 0) + (counts.follow_up_2 || 0) + (counts.follow_up_exhausted || 0);
       const pipelineActive = (counts.pending || 0) + (counts.drafted || 0) + (counts.reviewed || 0) + (counts.approved || 0);
       const goal = c.send_limit || c.credit_budget || 100;
       const goalMet = totalSent >= goal;
@@ -1222,7 +1238,7 @@ if (!session) {
   // ═══════════════════════════════════════════
   async function refreshPoolStats() {
     try {
-      const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'sent', 'converted', 'rejected'];
+      const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'sent', 'follow_up_1', 'follow_up_2', 'follow_up_exhausted', 'converted', 'rejected'];
       const sources = ['prophog_scan', 'csv_import', 'landing_page', 'fl_licensee'];
       const fetches = [
         ...statuses.map(s => fetch(`/api/recruitment-upload?status=${s}&limit=1`).then(r => r.json()).then(d => ({ key: s, count: d.total || 0 }))),
@@ -1245,8 +1261,10 @@ if (!session) {
       setEl('pool-reviewed', counts['reviewed'] || 0);
       setEl('pool-approved', counts['approved'] || 0);
       setEl('pool-sent', counts['sent'] || 0);
+      setEl('pool-followup', (counts['follow_up_1'] || 0) + (counts['follow_up_2'] || 0));
       setEl('pool-converted', counts['converted'] || 0);
       setEl('pool-rejected', counts['rejected'] || 0);
+      setEl('pool-exhausted', counts['follow_up_exhausted'] || 0);
       setEl('pool-src-prophog', counts['src-prophog_scan'] || 0);
       setEl('pool-src-fl-licensee', counts['src-fl_licensee'] || 0);
       setEl('pool-src-csv', counts['src-csv_import'] || 0);
@@ -2201,7 +2219,7 @@ if (!session) {
     const trackingFilters = ['opened', 'clicked', 'visited'];
     let statusFilter = '';
     if (status === 'all_active') {
-      statusFilter = 'status=in.(sent,approved,converted)';
+      statusFilter = 'status=in.(sent,approved,converted,follow_up_1,follow_up_2)';
     } else if (trackingFilters.includes(status)) {
       statusFilter = `tracking=${status}`;
     } else {
@@ -2265,6 +2283,8 @@ if (!session) {
       if (p.replied_at || props.replied_at) indicators.push(`<span class="text-indigo-600" title="Replied">💬</span>`);
       if (p.status === 'converted') indicators.push(`<span class="text-emerald-600" title="Converted">🎉</span>`);
       if (p.status === 'bounced' || props.bounced_at) indicators.push(`<span class="text-red-500" title="Bounced">⚠️</span>`);
+      if (props.follow_up_count >= 1) indicators.push(`<span class="text-orange-500" title="Follow-up ${props.follow_up_count}">📨</span>`);
+      if (p.status === 'follow_up_exhausted') indicators.push(`<span class="text-gray-400" title="No response — sequence complete">🚫</span>`);
       if (props.call_made_at) indicators.push(`<span class="text-amber-600" title="Called: ${escapeHtml(props.call_outcome || '')}">📞</span>`);
 
       // Stage badge
@@ -2281,6 +2301,9 @@ if (!session) {
         converted: { label: 'Converted', color: 'emerald' },
         approved: { label: 'Approved', color: 'sky' },
         sent: { label: 'Sent', color: 'blue' },
+        follow_up_1: { label: 'Follow-up 1', color: 'orange' },
+        follow_up_2: { label: 'Follow-up 2', color: 'orange' },
+        follow_up_exhausted: { label: 'No Response', color: 'gray' },
         bounced: { label: 'Bounced', color: 'red' },
       };
       const stageInfo = stageLabels[stage] || { label: stage, color: 'gray' };
@@ -2307,7 +2330,8 @@ if (!session) {
             <div class="text-right flex-shrink-0">
               <div class="flex gap-1 justify-end mb-1">${indicators.join('')}</div>
               ${p.sent_at ? `<p class="text-xs text-gray-400">Sent ${fmtDateShort(p.sent_at)}</p>` : ''}
-              ${p.follow_up_count ? `<p class="text-xs text-gray-400">${p.follow_up_count} follow-up${p.follow_up_count > 1 ? 's' : ''}</p>` : ''}
+              ${(props.follow_up_count || p.follow_up_count) ? `<p class="text-xs text-orange-500">${props.follow_up_count || p.follow_up_count} follow-up${(props.follow_up_count || p.follow_up_count) > 1 ? 's' : ''} sent</p>` : ''}
+              ${p.status === 'follow_up_exhausted' ? '<p class="text-xs text-gray-400 font-medium">No response</p>' : ''}
             </div>
           </div>
 
@@ -2322,6 +2346,9 @@ if (!session) {
                   ${p.processed_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.processed_at)}</span><span class="text-gray-600">🤖 AI outreach generated</span></div>` : ''}
                   ${p.approved_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.approved_at)}</span><span class="text-gray-600">✅ Approved${props.auto_approved ? ' (auto)' : ''}</span></div>` : ''}
                   ${p.sent_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.sent_at)}</span><span class="text-gray-600">📧 Email sent</span></div>` : ''}
+                  ${props.follow_up_1_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.follow_up_1_at)}</span><span class="text-orange-600">📨 Follow-up 1 sent (Day 3)</span></div>` : ''}
+                  ${props.follow_up_2_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.follow_up_2_at)}</span><span class="text-orange-600">📨 Follow-up 2 sent (Day 7 — final)</span></div>` : ''}
+                  ${p.status === 'follow_up_exhausted' && !props.email_opened_at && !p.email_opened_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${props.follow_up_2_at ? fmtDateShort(props.follow_up_2_at) : '—'}</span><span class="text-gray-500">🚫 No response — sequence complete</span></div>` : ''}
                   ${(props.email_opened_at || p.email_opened_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.email_opened_at || p.email_opened_at)}</span><span class="text-green-600">👁️ Email opened</span></div>` : ''}
                   ${(props.email_clicked_at || p.email_clicked_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.email_clicked_at || p.email_clicked_at)}</span><span class="text-purple-600">🔗 Link clicked${props.email_clicked_url ? ': ' + escapeHtml(props.email_clicked_url.replace(/^https?:\/\/[^/]+/, '')) : ''}</span></div>` : ''}
                   ${props.join_page_visited_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.join_page_visited_at)}</span><span class="text-cyan-600">🌐 Visited /join page${props.join_page_visit_count > 1 ? ' (' + props.join_page_visit_count + ' visits)' : ''}</span></div>` : ''}
@@ -2404,9 +2431,9 @@ if (!session) {
               <!-- Actions -->
               <div class="flex gap-2 flex-wrap">
                 ${p.status === 'approved' && p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Send Email</button>` : ''}
-                ${p.phone && p.status === 'sent' ? `<a href="tel:${escapeHtml(p.phone)}" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg inline-block text-center">📞 Call ${escapeHtml(p.phone)}</a>` : ''}
-                ${p.status === 'sent' ? `<button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>` : ''}
-                ${p.status === 'sent' || p.status === 'approved' ? `<button class="action-btn convert-btn bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">🎉 Mark Converted</button>` : ''}
+                ${p.phone && ['sent','follow_up_1','follow_up_2','follow_up_exhausted'].includes(p.status) ? `<a href="tel:${escapeHtml(p.phone)}" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg inline-block text-center">📞 Call ${escapeHtml(p.phone)}</a>` : ''}
+                ${['sent','follow_up_1','follow_up_2','follow_up_exhausted'].includes(p.status) ? `<button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>` : ''}
+                ${['sent','follow_up_1','follow_up_2','follow_up_exhausted','approved'].includes(p.status) ? `<button class="action-btn convert-btn bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">🎉 Mark Converted</button>` : ''}
               </div>
             </div>
           </details>
@@ -2521,7 +2548,7 @@ if (!session) {
       ]);
       const stats = await statsRes.json();
       if (!stats.error) {
-        const fields = ['sent', 'opened', 'clicked', 'visited', 'chatted', 'replied', 'converted', 'bounced'];
+        const fields = ['sent', 'opened', 'clicked', 'visited', 'chatted', 'replied', 'converted', 'bounced', 'follow_up', 'no_response'];
         for (const f of fields) {
           const el = document.getElementById(`stat-track-${f}`);
           if (el) el.textContent = String(stats[f] ?? '-');
@@ -3427,6 +3454,10 @@ if (!session) {
       const drafted = (counts.drafted || 0);
       const pending = (counts.pending || 0);
       const converted = (counts.converted || 0);
+      const followUp1 = (counts.follow_up_1 || 0);
+      const followUp2 = (counts.follow_up_2 || 0);
+      const followUpExhausted = (counts.follow_up_exhausted || 0);
+      const inFollowUp = followUp1 + followUp2;
       const goal = c.credit_budget || 100;
       const nextRun = c.next_run_at ? new Date(c.next_run_at) : null;
       const nextRunStr = nextRun ? nextRun.toLocaleString() : 'Queued';
@@ -3455,7 +3486,19 @@ if (!session) {
       if (sent > 0 && converted === 0) {
         timeline.push(`<div class="flex items-center gap-2 text-xs">
           <span class="w-2 h-2 bg-purple-400 rounded-full flex-shrink-0"></span>
-          <span class="text-gray-600"><strong>${sent}</strong> sent — follow-up sequence coming soon (3-day & 7-day touches)</span>
+          <span class="text-gray-600"><strong>${sent}</strong> sent — awaiting engagement or follow-up</span>
+        </div>`);
+      }
+      if (inFollowUp > 0) {
+        timeline.push(`<div class="flex items-center gap-2 text-xs">
+          <span class="w-2 h-2 bg-orange-400 rounded-full flex-shrink-0"></span>
+          <span class="text-gray-600"><strong>${inFollowUp}</strong> in follow-up sequence (${followUp1} at Day 3, ${followUp2} at Day 7)</span>
+        </div>`);
+      }
+      if (followUpExhausted > 0) {
+        timeline.push(`<div class="flex items-center gap-2 text-xs">
+          <span class="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></span>
+          <span class="text-gray-600"><strong>${followUpExhausted}</strong> no response — follow-up sequence complete</span>
         </div>`);
       }
       if (sent < goal) {
