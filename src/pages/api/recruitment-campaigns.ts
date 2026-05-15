@@ -108,8 +108,12 @@ export const POST: APIRoute = async ({ request }) => {
         source_type: String(body.source || 'prophog').slice(0, 30),
         search_state: String(body.searchState || 'Georgia').slice(0, 50),
         search_filters: sanitizeSearchFilters(body.searchFilters),
-        credit_budget: Math.max(1, Math.min(10000, parseInt(body.creditBudget) || 100)),
         send_limit: body.sendLimit ? Math.max(1, Math.min(10000, parseInt(body.sendLimit))) : null,
+        // credit_budget must be >= 5x send_limit to account for hold/reject conversion rates
+        credit_budget: Math.max(
+          Math.max(1, Math.min(10000, parseInt(body.creditBudget) || 100)),
+          body.sendLimit ? Math.min(10000, Math.max(1, parseInt(body.sendLimit)) * 5) : 0
+        ),
         max_pages_per_run: Math.max(1, Math.min(50, parseInt(body.maxPagesPerRun) || 20)),
         schedule_interval_minutes: Math.max(1, Math.min(1440, parseInt(body.intervalMinutes) || 60)),
         schedule_jitter_minutes: Math.max(0, Math.min(30, parseInt(body.jitterMinutes) || 15)),

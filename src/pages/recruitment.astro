@@ -217,10 +217,11 @@ if (!session) {
                   <select id="cmp-source" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                     <option value="prophog" selected>🔍 Prophog (auto-search)</option>
                     <option value="fl_licensee">🏛️ FL Licensee (bulk CSV)</option>
+                    <option value="state_licensee">🏛️ State Licensee (TX, etc.)</option>
                     <option value="csv">📤 CSV Import</option>
 
                   </select>
-                  <p class="text-xs text-gray-400 mt-0.5">Prophog auto-searches for new agents. FL Licensee uses Florida DFS bulk data. CSV uses agents you've uploaded.</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Prophog auto-searches for new agents. FL/State Licensee uses DOI bulk data. CSV uses agents you've uploaded.</p>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Target State</label>
@@ -1322,6 +1323,10 @@ if (!session) {
     if (source === 'fl_licensee' && stateSelect) {
       (document.getElementById('cmp-state') as HTMLSelectElement).value = 'Florida';
     }
+    // Default to Texas when State Licensee selected (primary state with data)
+    if (source === 'state_licensee' && stateSelect) {
+      (document.getElementById('cmp-state') as HTMLSelectElement).value = 'Texas';
+    }
   });
 
   document.getElementById('cmp-submit')?.addEventListener('click', async () => {
@@ -1356,8 +1361,9 @@ if (!session) {
             city: (document.getElementById('cmp-city') as HTMLInputElement)?.value.trim() || undefined,
             licenseTycl: (document.getElementById('cmp-lic-tycl') as HTMLInputElement)?.value.trim() || undefined,
           },
-          creditBudget: (document.getElementById('cmp-budget') as HTMLInputElement).value,
           sendLimit: (document.getElementById('cmp-budget') as HTMLInputElement).value,
+          // credit_budget must be higher than send_limit to account for prospect hold/reject rates
+          creditBudget: String(Math.min(10000, budget * 5)),
           maxPagesPerRun: (document.getElementById('cmp-pages') as HTMLInputElement).value,
           intervalMinutes: (document.getElementById('cmp-interval') as HTMLInputElement).value,
           jitterMinutes: (document.getElementById('cmp-jitter') as HTMLInputElement)?.value || '15',
