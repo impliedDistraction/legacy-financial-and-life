@@ -1,0 +1,299 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import '../styles/tailwind.css';
+
+export const prerender = false;
+
+// ─── Source tracking ─────────────────────────────────────────────
+const source = Astro.url.searchParams.get('src') || 'direct';
+const county = Astro.url.searchParams.get('county') || '';
+const state = Astro.url.searchParams.get('state') || '';
+
+const SUPABASE_URL = import.meta.env.SUPABASE_URL || '';
+const SUPABASE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY || '';
+---
+
+<Base title="Group Health Insurance for Growing Businesses | Legacy Financial & Life" description="Approaching 50 employees? You need a health insurance strategy before the ACA mandate kicks in. Legacy Financial helps businesses navigate group coverage options with zero hassle.">
+  <Header />
+
+  <main class="min-h-screen bg-gradient-to-b from-white to-brand-50">
+    <!-- Hero -->
+    <section class="max-w-5xl mx-auto px-4 pt-20 pb-12 text-center">
+      <div class="inline-block bg-brand-100 text-brand-800 text-sm font-semibold px-4 py-1.5 rounded-full mb-6">
+        ACA Compliance & Group Benefits
+      </div>
+      <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
+        Growing Past 50 Employees?<br/>
+        <span class="text-brand-700">You Need a Benefits Strategy.</span>
+      </h1>
+      <p class="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+        Under the Affordable Care Act, businesses with 50+ full-time equivalent employees 
+        <strong>must</strong> offer qualifying health coverage — or face penalties of 
+        <strong>$2,970 per employee</strong> per year. We help growing companies get ahead of this.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="#contact" class="bg-brand-700 text-white px-8 py-4 rounded-lg font-semibold hover:bg-brand-800 transition-colors text-lg">
+          Get a Free ACA Assessment
+        </a>
+        <a href="/schedule" class="border-2 border-brand-700 text-brand-700 px-8 py-4 rounded-lg font-semibold hover:bg-brand-50 transition-colors text-lg">
+          Schedule a Call
+        </a>
+      </div>
+    </section>
+
+    <!-- Pain Points -->
+    <section class="max-w-5xl mx-auto px-4 py-16">
+      <h2 class="text-2xl font-bold text-gray-900 text-center mb-12">
+        What Happens When You Cross the 50-Employee Threshold
+      </h2>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div class="text-3xl mb-4">⚠️</div>
+          <h3 class="font-bold text-gray-900 mb-2">IRS Penalties</h3>
+          <p class="text-gray-600">
+            Failure to offer minimum essential coverage triggers the "employer shared responsibility payment" — 
+            $2,970 per full-time employee (minus the first 30) for 2026.
+          </p>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div class="text-3xl mb-4">📋</div>
+          <h3 class="font-bold text-gray-900 mb-2">Reporting Requirements</h3>
+          <p class="text-gray-600">
+            ALEs must file Forms 1094-C and 1095-C annually. Errors or late filings 
+            trigger additional penalties. We handle compliance.
+          </p>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div class="text-3xl mb-4">🏆</div>
+          <h3 class="font-bold text-gray-900 mb-2">Talent Retention</h3>
+          <p class="text-gray-600">
+            Companies with strong benefits packages see 40% less turnover. 
+            Group health isn't just compliance — it's competitive advantage.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- What We Do -->
+    <section class="bg-brand-50 py-16">
+      <div class="max-w-5xl mx-auto px-4">
+        <h2 class="text-2xl font-bold text-gray-900 text-center mb-12">
+          How Legacy Financial Helps
+        </h2>
+        <div class="grid md:grid-cols-2 gap-8">
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-10 h-10 bg-brand-700 text-white rounded-lg flex items-center justify-center font-bold">1</div>
+            <div>
+              <h3 class="font-bold text-gray-900 mb-1">ACA Status Assessment</h3>
+              <p class="text-gray-600">We calculate your FTE count (including variable-hour employees) and determine if/when you'll trigger ALE status.</p>
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-10 h-10 bg-brand-700 text-white rounded-lg flex items-center justify-center font-bold">2</div>
+            <div>
+              <h3 class="font-bold text-gray-900 mb-1">Plan Shopping & Comparison</h3>
+              <p class="text-gray-600">We quote multiple carriers and plan designs so you get the right coverage at the right price. No carrier loyalties — just what fits.</p>
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-10 h-10 bg-brand-700 text-white rounded-lg flex items-center justify-center font-bold">3</div>
+            <div>
+              <h3 class="font-bold text-gray-900 mb-1">Enrollment & Admin</h3>
+              <p class="text-gray-600">We handle open enrollment, employee communications, and ongoing admin. Your HR team stays focused on what they do best.</p>
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <div class="flex-shrink-0 w-10 h-10 bg-brand-700 text-white rounded-lg flex items-center justify-center font-bold">4</div>
+            <div>
+              <h3 class="font-bold text-gray-900 mb-1">Ongoing Compliance</h3>
+              <p class="text-gray-600">Annual 1094-C/1095-C filings, affordability calculations, measurement periods — we manage it so you don't get surprised.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Form -->
+    <section id="contact" class="max-w-2xl mx-auto px-4 py-16">
+      <h2 class="text-2xl font-bold text-gray-900 text-center mb-4">
+        Get Your Free ACA Assessment
+      </h2>
+      <p class="text-gray-600 text-center mb-8">
+        Tell us about your business and we'll let you know where you stand — no obligation.
+      </p>
+
+      <form id="group-form" class="bg-white p-8 rounded-xl shadow-sm border border-gray-100 space-y-6">
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label for="contact_name" class="block text-sm font-medium text-gray-700 mb-1">Your Name *</label>
+            <input type="text" id="contact_name" name="contact_name" required
+              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500" />
+          </div>
+          <div>
+            <label for="company_name" class="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+            <input type="text" id="company_name" name="company_name" required
+              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500" />
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+            <input type="email" id="email" name="email" required
+              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500" />
+          </div>
+          <div>
+            <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <input type="tel" id="phone" name="phone"
+              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500" />
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label for="employee_count" class="block text-sm font-medium text-gray-700 mb-1">Current Full-Time Employees *</label>
+            <select id="employee_count" name="employee_count" required
+              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+              <option value="">Select range</option>
+              <option value="10-19">10-19 employees</option>
+              <option value="20-34">20-34 employees</option>
+              <option value="35-49">35-49 employees (approaching ALE)</option>
+              <option value="50-99">50-99 employees (ALE status)</option>
+              <option value="100+">100+ employees</option>
+            </select>
+          </div>
+          <div>
+            <label for="business_state" class="block text-sm font-medium text-gray-700 mb-1">State *</label>
+            <select id="business_state" name="business_state" required
+              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+              <option value="">Select state</option>
+              <option value="GA">Georgia</option>
+              <option value="TX">Texas</option>
+              <option value="FL">Florida</option>
+              <option value="OH">Ohio</option>
+              <option value="MI">Michigan</option>
+              <option value="TN">Tennessee</option>
+              <option value="SC">South Carolina</option>
+              <option value="AL">Alabama</option>
+              <option value="LA">Louisiana</option>
+              <option value="OK">Oklahoma</option>
+              <option value="MS">Mississippi</option>
+              <option value="UT">Utah</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label for="current_coverage" class="block text-sm font-medium text-gray-700 mb-1">Current Health Coverage Status</label>
+          <select id="current_coverage" name="current_coverage"
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500">
+            <option value="">Select one</option>
+            <option value="none">No group coverage yet</option>
+            <option value="shopping">Shopping for first plan</option>
+            <option value="renewing">Renewing — want to compare options</option>
+            <option value="switching">Unhappy with current broker/plan</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="notes" class="block text-sm font-medium text-gray-700 mb-1">Anything else we should know?</label>
+          <textarea id="notes" name="notes" rows="3"
+            class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+            placeholder="e.g., hiring timeline, current broker frustrations, specific needs..."></textarea>
+        </div>
+
+        <!-- Honeypot -->
+        <div class="hidden" aria-hidden="true">
+          <input type="text" name="website" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <input type="hidden" name="source" value={source} />
+        <input type="hidden" name="county" value={county} />
+        <input type="hidden" name="state_hint" value={state} />
+
+        <button type="submit" id="submit-btn"
+          class="w-full bg-brand-700 text-white py-3 rounded-lg font-semibold hover:bg-brand-800 transition-colors text-lg">
+          Get My Free Assessment
+        </button>
+
+        <p class="text-xs text-gray-500 text-center">
+          No obligation. We'll review your situation and reach out within 1 business day.
+        </p>
+      </form>
+
+      <!-- Success message (hidden by default) -->
+      <div id="success-msg" class="hidden bg-green-50 border border-green-200 rounded-xl p-8 text-center">
+        <div class="text-4xl mb-4">✅</div>
+        <h3 class="text-xl font-bold text-green-800 mb-2">Assessment Request Received!</h3>
+        <p class="text-green-700 mb-4">We'll review your business details and get back to you within 1 business day with your ACA status and coverage options.</p>
+        <a href="/schedule" class="inline-block bg-brand-700 text-white px-6 py-3 rounded-lg font-semibold hover:bg-brand-800 transition-colors">
+          Or Schedule a Call Now →
+        </a>
+      </div>
+    </section>
+
+    <!-- Trust / Stats -->
+    <section class="bg-gray-50 py-12">
+      <div class="max-w-5xl mx-auto px-4 text-center">
+        <p class="text-sm text-gray-500 uppercase tracking-wide mb-6">Trusted by growing businesses across the Southeast</p>
+        <div class="grid grid-cols-3 gap-8">
+          <div>
+            <div class="text-3xl font-bold text-brand-700">12</div>
+            <div class="text-sm text-gray-600">States Licensed</div>
+          </div>
+          <div>
+            <div class="text-3xl font-bold text-brand-700">$0</div>
+            <div class="text-sm text-gray-600">Cost for ACA Assessment</div>
+          </div>
+          <div>
+            <div class="text-3xl font-bold text-brand-700">1 Day</div>
+            <div class="text-sm text-gray-600">Response Time</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+
+  <script>
+    const form = document.getElementById('group-form');
+    const successMsg = document.getElementById('success-msg');
+    const submitBtn = document.getElementById('submit-btn');
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!form) return;
+
+      const formData = new FormData(form);
+      // Honeypot check
+      if (formData.get('website')) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      try {
+        const res = await fetch('/api/group-interest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(formData)),
+        });
+
+        if (res.ok) {
+          form.classList.add('hidden');
+          successMsg?.classList.remove('hidden');
+        } else {
+          alert('Something went wrong. Please try again or call us directly.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Get My Free Assessment';
+        }
+      } catch (err) {
+        alert('Network error. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Get My Free Assessment';
+      }
+    });
+  </script>
+</Base>

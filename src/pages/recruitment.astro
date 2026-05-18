@@ -227,18 +227,8 @@ if (!session) {
                   <label class="block text-xs font-medium text-gray-600 mb-1">Target State</label>
                   <select id="cmp-state" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                     <option value="Florida" selected>Florida (FL)</option>
-                    <option value="Georgia">Georgia (GA)</option>
-                    <option value="Ohio">Ohio (OH)</option>
-                    <option value="Oklahoma">Oklahoma (OK)</option>
-                    <option value="South Carolina">South Carolina (SC)</option>
-                    <option value="Mississippi">Mississippi (MS)</option>
-                    <option value="Michigan">Michigan (MI)</option>
-                    <option value="Texas">Texas (TX)</option>
-                    <option value="Utah">Utah (UT)</option>
-                    <option value="Alabama">Alabama (AL)</option>
-                    <option value="Louisiana">Louisiana (LA)</option>
-                    <option value="Tennessee">Tennessee (TN)</option>
                   </select>
+                  <p id="cmp-state-hint" class="text-xs text-gray-400 mt-0.5">Loading available states...</p>
                 </div>
                 <!-- State Licensee Filters (shown when fl_licensee or state_licensee source selected) -->
                 <div id="fl-filters" class="hidden space-y-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
@@ -920,9 +910,9 @@ if (!session) {
               <div class="flex-1">
                 <div class="flex items-center gap-2">
                   <h3 class="text-sm font-semibold text-gray-900">Cross-Campaign Deduplication</h3>
-                  <span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-medium">Ready</span>
+                  <span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-medium">Live</span>
                 </div>
-                <p class="text-xs text-gray-500 mt-0.5">Prevents the same agent from receiving outreach from multiple campaigns. Database constraint ready to deploy — ensures clean prospect pipelines.</p>
+                <p class="text-xs text-gray-500 mt-0.5">Prevents the same agent from receiving outreach from multiple campaigns. Database constraint deployed — ensures clean prospect pipelines.</p>
               </div>
             </div>
 
@@ -944,9 +934,21 @@ if (!session) {
               <div class="flex-1">
                 <div class="flex items-center gap-2">
                   <h3 class="text-sm font-semibold text-gray-900">Agent Landing Page with Inbound Capture</h3>
-                  <span class="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded font-medium">Planned</span>
+                  <span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-medium">Live</span>
                 </div>
-                <p class="text-xs text-gray-500 mt-0.5">Public "Join Our Team" page where interested agents can submit their info directly into the recruitment pipeline as warm leads.</p>
+                <p class="text-xs text-gray-500 mt-0.5">Public <a href="/join" class="text-brand-600 hover:underline">/join</a> page where interested agents can submit their info directly into the recruitment pipeline. Personalized by prospect tier with TCPA-compliant consent and Calendly booking.</p>
+              </div>
+            </div>
+
+            <!-- Warm Visitor Follow-up -->
+            <div class="flex gap-3 items-start">
+              <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-600 text-sm">🔥</div>
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-semibold text-gray-900">Warm Visitor Follow-up (No-Submit)</h3>
+                  <span class="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-medium">In Progress</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-0.5">Detect prospects who visited /join but didn't submit the form (e.g. didn't accept TCPA consent). Trigger a softer follow-up email acknowledging their interest without requiring consent — "We saw you checked us out. Here's more info, no strings attached."</p>
               </div>
             </div>
           </div>
@@ -1327,7 +1329,118 @@ if (!session) {
     if (source === 'state_licensee' && stateSelect) {
       (document.getElementById('cmp-state') as HTMLSelectElement).value = 'Florida';
     }
+    // Rebuild state options based on source
+    populateStateDropdown(source);
   });
+
+  // ═══════════════════════════════════════════
+  // DYNAMIC STATE DROPDOWN (based on discovery)
+  // ═══════════════════════════════════════════
+  const STATE_NAMES: Record<string, string> = {
+    AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',
+    CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',
+    IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',
+    ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',
+    MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',
+    NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',
+    OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',
+    TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',
+    WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'
+  };
+
+  // Prophog target states (all states Tim is interested in for Prophog searches)
+  const PROPHOG_STATES = ['FL','GA','OH','OK','SC','MS','MI','TX','UT','AL','LA','TN'];
+
+  // Cache discovery findings
+  let discoveryFindings: Record<string, { status: string; stateName?: string }> = {};
+
+  async function loadDiscoveryForForm() {
+    try {
+      const res = await fetch('/api/state-discovery');
+      if (res.ok) {
+        const data = await res.json();
+        const findings = data.findings || data;
+        for (const [code, info] of Object.entries(findings)) {
+          const f = info as any;
+          if (f.status || f.confidence) {
+            discoveryFindings[code] = { status: f.status || f.confidence, stateName: f.stateName };
+          }
+        }
+      }
+    } catch {}
+    // Fallback if Sentinel offline
+    if (Object.keys(discoveryFindings).length === 0) {
+      discoveryFindings = {
+        FL: { status: 'confirmed', stateName: 'Florida' },
+        TX: { status: 'confirmed', stateName: 'Texas' },
+        CA: { status: 'promising', stateName: 'California' },
+        AL: { status: 'promising', stateName: 'Alabama' },
+        TN: { status: 'promising', stateName: 'Tennessee' },
+        LA: { status: 'promising', stateName: 'Louisiana' },
+        OH: { status: 'promising', stateName: 'Ohio' },
+        UT: { status: 'promising', stateName: 'Utah' },
+        GA: { status: 'explored', stateName: 'Georgia' },
+        SC: { status: 'explored', stateName: 'South Carolina' },
+        MS: { status: 'explored', stateName: 'Mississippi' },
+        OK: { status: 'explored', stateName: 'Oklahoma' },
+        MI: { status: 'explored', stateName: 'Michigan' },
+      };
+    }
+    // Initial population for default source
+    const source = (document.getElementById('cmp-source') as HTMLSelectElement)?.value || 'prophog';
+    populateStateDropdown(source);
+  }
+
+  function populateStateDropdown(source: string) {
+    const select = document.getElementById('cmp-state') as HTMLSelectElement;
+    const hint = document.getElementById('cmp-state-hint');
+    if (!select) return;
+
+    let options: { value: string; label: string; disabled?: boolean }[] = [];
+
+    if (source === 'fl_licensee') {
+      // FL only
+      options = [{ value: 'Florida', label: 'Florida (FL)' }];
+      if (hint) hint.textContent = 'FL Licensee source is locked to Florida.';
+    } else if (source === 'state_licensee') {
+      // Only confirmed sources are launchable; promising shown as disabled
+      const confirmed = Object.entries(discoveryFindings)
+        .filter(([_, f]) => f.status === 'confirmed')
+        .map(([code]) => code)
+        .sort();
+      const promising = Object.entries(discoveryFindings)
+        .filter(([_, f]) => f.status === 'promising')
+        .map(([code]) => code)
+        .sort();
+
+      for (const code of confirmed) {
+        options.push({ value: STATE_NAMES[code] || code, label: `${STATE_NAMES[code]} (${code}) ✓` });
+      }
+      for (const code of promising) {
+        options.push({ value: STATE_NAMES[code] || code, label: `${STATE_NAMES[code]} (${code}) — verifying`, disabled: true });
+      }
+      if (hint) hint.textContent = `${confirmed.length} state source${confirmed.length !== 1 ? 's' : ''} confirmed. ${promising.length} being verified.`;
+    } else if (source === 'prophog') {
+      // All Prophog target states
+      for (const code of PROPHOG_STATES) {
+        options.push({ value: STATE_NAMES[code] || code, label: `${STATE_NAMES[code]} (${code})` });
+      }
+      if (hint) hint.textContent = 'Prophog auto-searches for new agents in these states.';
+    } else {
+      // CSV — all states available
+      for (const [code, name] of Object.entries(STATE_NAMES).sort((a, b) => a[1].localeCompare(b[1]))) {
+        options.push({ value: name, label: `${name} (${code})` });
+      }
+      if (hint) hint.textContent = 'CSV import can target any state.';
+    }
+
+    select.innerHTML = options.map(o =>
+      `<option value="${o.value}"${o.disabled ? ' disabled' : ''}>${o.label}</option>`
+    ).join('');
+  }
+
+  // Load on page init
+  loadDiscoveryForForm();
 
   document.getElementById('cmp-submit')?.addEventListener('click', async () => {
     const btn = document.getElementById('cmp-submit') as HTMLButtonElement;
@@ -3538,21 +3651,50 @@ if (!session) {
     container.innerHTML = items.join('');
   }
 
-  function renderStateDiscoveryGrid() {
+  async function renderStateDiscoveryGrid() {
     const grid = document.getElementById('state-discovery-grid');
     const label = document.getElementById('state-discovery-label');
     const pct = document.getElementById('state-discovery-pct');
     const bar = document.getElementById('state-discovery-bar');
     if (!grid) return;
 
-    // Known state discovery status (synced from Sentinel findings)
-    const stateStatus: Record<string, { status: string; note: string }> = {
-      FL: { status: 'confirmed', note: 'Florida — bulk CSV downloads active. Already importing licensee data.' },
-      TX: { status: 'confirmed', note: 'Texas — data.texas.gov Open Data Portal. Daily-updated CSV with NPN, license data, city/state. Verified and ready for import.' },
-      CA: { status: 'promising', note: 'California — CDI bulk download page found. Files need manual verification.' },
-      AL: { status: 'promising', note: 'Alabama — DOI search portal found, no bulk download yet.' },
-      GA: { status: 'explored', note: 'Georgia — DOI site found, individual search only. May need FOIA request.' },
-    };
+    // Known state discovery status (synced from Sentinel findings.json)
+    // Try fetching live data from Sentinel, fall back to last-known snapshot
+    let stateStatus: Record<string, { status: string; note: string }> = {};
+    try {
+      const res = await fetch('/api/state-discovery');
+      if (res.ok) {
+        const data = await res.json();
+        const findings = data.findings || data;
+        for (const [code, info] of Object.entries(findings)) {
+          const f = info as any;
+          if (f.status || f.confidence) {
+            stateStatus[code] = {
+              status: f.status || f.confidence,
+              note: f.notes || f.stateName || code,
+            };
+          }
+        }
+      }
+    } catch {}
+    // Fallback if Sentinel is offline
+    if (Object.keys(stateStatus).length === 0) {
+      stateStatus = {
+        FL: { status: 'confirmed', note: 'Florida — bulk CSV downloads active. Already importing licensee data.' },
+        TX: { status: 'confirmed', note: 'Texas — data.texas.gov Open Data Portal. Daily-updated CSV with NPN, license data, city/state. Verified and ready for import.' },
+        CA: { status: 'promising', note: 'California — CDI bulk download page found. Files need manual verification.' },
+        AL: { status: 'promising', note: 'Alabama — DOI search portal found, no bulk download yet.' },
+        TN: { status: 'promising', note: 'Tennessee — DOI search portal only. No bulk download. May need FOIA.' },
+        LA: { status: 'promising', note: 'Louisiana — DOI search portal found. No bulk CSV available.' },
+        OH: { status: 'promising', note: 'Ohio — DOI search portal found. No bulk download detected.' },
+        UT: { status: 'promising', note: 'Utah — GRAMA-restricted. Paid requests only, no free bulk data.' },
+        GA: { status: 'explored', note: 'Georgia — DOI site found, individual search only. May need FOIA request.' },
+        SC: { status: 'explored', note: 'South Carolina — DOI site found, individual lookup only.' },
+        MS: { status: 'explored', note: 'Mississippi — DOI site found, no bulk data download detected.' },
+        OK: { status: 'explored', note: 'Oklahoma — DOI site found, individual search only.' },
+        MI: { status: 'explored', note: 'Michigan — Socrata data was budget data, not insurance licensees.' },
+      };
+    }
 
     const researched = Object.keys(stateStatus).length;
     const total = ALL_STATES.length;

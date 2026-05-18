@@ -600,12 +600,23 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
 
   function processActions(text: string): { clean: string; html: string } {
     let html = '';
-    const clean = text.replace(/\{\{(book_call|fill_form|escalate_issue)\}\}/g, (_m, action) => {
+    const clean = text.replace(/\{\{(book_call|schedule_call|fill_form|escalate_issue)\}\}/g, (_m, action) => {
       if (action === 'book_call') {
         html += `<div class="mt-2 pt-2 border-t border-slate-100">
           <a href="https://calendly.com/bethandtim-legacyf-l/30min" target="_blank" rel="noopener"
              class="inline-block px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors">
             📅 Schedule a Call
+          </a>
+        </div>`;
+      } else if (action === 'schedule_call') {
+        html += `<div class="mt-2 pt-2 border-t border-slate-100 schedule-widget" data-loaded="false">
+          <p class="text-xs text-brand-700 font-semibold mb-2">📅 Pick a time for your 30-min conversation:</p>
+          <div class="schedule-slots-container">
+            <p class="text-xs text-slate-400 animate-pulse">Loading available times…</p>
+          </div>
+          <a href="https://calendly.com/bethandtim-legacyf-l/30min" target="_blank" rel="noopener"
+             class="schedule-fallback hidden text-xs text-brand-600 hover:text-brand-700 underline underline-offset-2 mt-2 inline-block">
+            Or book directly on Calendly →
           </a>
         </div>`;
       } else if (action === 'fill_form') {
@@ -682,7 +693,7 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
       let responseEl: HTMLElement | null = null;
       let buffer = '';
 
-      const stripActions = (t: string) => t.replace(/\{\{(book_call|fill_form|escalate_issue)\}\}/g, '').trimEnd();
+      const stripActions = (t: string) => t.replace(/\{\{(book_call|schedule_call|fill_form|escalate_issue)\}\}/g, '').trimEnd();
 
       while (true) {
         const { done, value } = await reader.read();
@@ -760,6 +771,13 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
               }
             });
           }
+
+          // Wire up inline scheduling widget if present
+          const scheduleWidget = bubble.querySelector('.schedule-widget');
+          if (scheduleWidget && scheduleWidget.getAttribute('data-loaded') === 'false') {
+            scheduleWidget.setAttribute('data-loaded', 'true');
+            loadScheduleSlots(scheduleWidget as HTMLElement);
+          }
         }
       } else if (!responseEl && fullText) {
         addChatBubble('assistant', fullText);
@@ -774,5 +792,124 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
       chatSend.disabled = false;
       chatInput.focus();
     }
+  }
+
+  // ─── Inline Scheduling Widget ────────────────────────────────────
+  async function loadScheduleSlots(widget: HTMLElement) {
+    const container = widget.querySelector('.schedule-slots-container') as HTMLElement;
+    const fallbackLink = widget.querySelector('.schedule-fallback') as HTMLElement;
+
+    try {
+      const res = await fetch('/api/schedule-slots?max=6&days=7');
+      if (!res.ok) throw new Error('API error');
+      const data = await res.json();
+
+      if (!data.available || !data.slots || data.slots.length === 0) {
+        // Show fallback link to Calendly
+        container.innerHTML = `<p class="text-xs text-slate-500">No times loaded — book directly below.</p>`;
+        fallbackLink?.classList.remove('hidden');
+        return;
+      }
+
+      // Render slot buttons grouped by day
+      const tz = 'America/New_York';
+      const slotsByDay = new Map<string, Array<{ start: string; label: string }>>();
+      for (const slot of data.slots) {
+        const dt = new Date(slot.start);
+        const dayKey = dt.toLocaleDateString('en-US', { timeZone: tz, weekday: 'short', month: 'short', day: 'numeric' });
+        const timeLabel = dt.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true });
+        if (!slotsByDay.has(dayKey)) slotsByDay.set(dayKey, []);
+        slotsByDay.get(dayKey)!.push({ start: slot.start, label: timeLabel });
+      }
+
+      let slotsHtml = '';
+      for (const [day, times] of slotsByDay) {
+        slotsHtml += `<div class="mb-1.5"><p class="text-[10px] text-slate-500 font-medium mb-0.5">${escapeHtml(day)}</p><div class="flex flex-wrap gap-1">`;
+        for (const t of times) {
+          slotsHtml += `<button class="slot-btn px-2 py-1 text-[11px] bg-brand-50 text-brand-700 border border-brand-200 rounded-md hover:bg-brand-100 hover:border-brand-400 transition-colors" data-start="${escapeHtml(t.start)}">${escapeHtml(t.label)}</button>`;
+        }
+        slotsHtml += `</div></div>`;
+      }
+      container.innerHTML = slotsHtml;
+      fallbackLink?.classList.remove('hidden');
+
+      // Wire up slot buttons
+      container.querySelectorAll('.slot-btn').forEach(btn => {
+        btn.addEventListener('click', () => handleSlotSelect(btn as HTMLButtonElement, widget));
+      });
+    } catch {
+      container.innerHTML = `<p class="text-xs text-slate-500">Couldn't load times.</p>`;
+      fallbackLink?.classList.remove('hidden');
+    }
+  }
+
+  async function handleSlotSelect(btn: HTMLButtonElement, widget: HTMLElement) {
+    const startTime = btn.getAttribute('data-start');
+    if (!startTime) return;
+
+    const container = widget.querySelector('.schedule-slots-container') as HTMLElement;
+
+    // Confirm selection — show mini form for name/email
+    const dt = new Date(startTime);
+    const formatted = dt.toLocaleString('en-US', {
+      timeZone: 'America/New_York',
+      weekday: 'short', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true,
+    });
+
+    container.innerHTML = `
+      <div class="space-y-1.5">
+        <p class="text-xs text-slate-700 font-medium">📅 ${escapeHtml(formatted)} ET</p>
+        <input type="text" placeholder="Your name" maxlength="100" class="w-full px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-400" data-schedule="name" />
+        <input type="email" placeholder="Your email" maxlength="200" class="w-full px-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-400" data-schedule="email" />
+        <div class="flex gap-2">
+          <button class="flex-1 py-1 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition-colors schedule-confirm-btn">Confirm</button>
+          <button class="px-2 py-1 text-xs text-slate-500 hover:text-slate-700 schedule-back-btn">← Back</button>
+        </div>
+      </div>`;
+
+    // Back button reloads slots
+    container.querySelector('.schedule-back-btn')?.addEventListener('click', () => {
+      widget.setAttribute('data-loaded', 'false');
+      loadScheduleSlots(widget);
+    });
+
+    // Confirm button books the slot
+    container.querySelector('.schedule-confirm-btn')?.addEventListener('click', async () => {
+      const nameInput = container.querySelector('[data-schedule="name"]') as HTMLInputElement;
+      const emailInput = container.querySelector('[data-schedule="email"]') as HTMLInputElement;
+      const name = nameInput?.value.trim();
+      const email = emailInput?.value.trim();
+
+      if (!name || name.length < 2) { nameInput?.focus(); return; }
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { emailInput?.focus(); return; }
+
+      const confirmBtn = container.querySelector('.schedule-confirm-btn') as HTMLButtonElement;
+      confirmBtn.textContent = 'Booking…';
+      confirmBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/schedule-slots', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ startTime, name, email, prospectId: chatPid }),
+        });
+        const result = await res.json();
+
+        if (result.success) {
+          container.innerHTML = `<p class="text-xs text-green-600 font-medium">✅ You're booked for ${escapeHtml(formatted)} ET! Check ${escapeHtml(email)} for confirmation.</p>`;
+          trackChatEvent('join_schedule_booked', { session_id: sessionId });
+        } else if (result.fallbackUrl) {
+          container.innerHTML = `<p class="text-xs text-amber-600">${escapeHtml(result.error || 'Booking unavailable')}</p><a href="${result.fallbackUrl}" target="_blank" rel="noopener" class="text-xs text-brand-600 underline">Book on Calendly →</a>`;
+        } else {
+          container.innerHTML = `<p class="text-xs text-red-600">${escapeHtml(result.error || 'Booking failed')}</p>`;
+          // Re-show slots after a moment
+          setTimeout(() => { widget.setAttribute('data-loaded', 'false'); loadScheduleSlots(widget); }, 3000);
+        }
+      } catch {
+        container.innerHTML = `<p class="text-xs text-red-600">Network error — try the link below.</p>`;
+        widget.querySelector('.schedule-fallback')?.classList.remove('hidden');
+      }
+    });
   }
 </script>

@@ -123,7 +123,7 @@ export const site = {
       ]
     },
   headshotAlt: 'Tim and Beth Byrd - Legacy Financial & Life professional team photo',
-  // Updated to use real team photo (base path — components will append sizes/webp)
+  // Base path — Team.astro appends sizes/webp; other pages use direct reference
   headshotSrc: '/images/professional-image-of-both-beth-and-tim'
   },
   cta: {

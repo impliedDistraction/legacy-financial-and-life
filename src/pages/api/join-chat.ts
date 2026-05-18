@@ -33,7 +33,8 @@ RESPONSE FORMAT:
 - If they want specifics you cannot answer, direct them to the interest form or a call.
 
 ACTION BLOCKS (place on its own line at end of message, max ONE per message):
-- {{book_call}} — "Schedule a Call" button. Use when prospect seems ready or after good discovery.
+- {{book_call}} — "Schedule a Call" button (links to Calendly). Use as a simple fallback.
+- {{schedule_call}} — Inline scheduling widget showing real available times. Use when prospect seems ready to book or explicitly asks about scheduling. Preferred over {{book_call}}.
 - {{fill_form}} — "Fill Out Interest Form" nudge.
 - {{escalate_issue}} — "Report a Technical Issue" form. Use ONLY when the user describes a problem with the website, chat, forms, or other technical functionality. Do NOT use for recruiting questions.
 
@@ -130,7 +131,7 @@ function trackInjection(ip: string): boolean {
 const OUTPUT_LEAK_PATTERNS = [
   /RULES\s*—\s*FOLLOW\s+THESE/i,
   /ACTION\s+BLOCKS?\s*\(place/i,
-  /\{\{book_call\}\}.*\{\{fill_form\}\}/s,  // multiple action blocks in explanatory context
+  /\{\{book_call\}\}.*\{\{(fill_form|schedule_call)\}\}/s,  // multiple action blocks in explanatory context
   /system\s*prompt\s*:?\s*["'`]/i,
   /\/no_think/,
   /NEVER\s+reveal.*system\s*prompt/i,
