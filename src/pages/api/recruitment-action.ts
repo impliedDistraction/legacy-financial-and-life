@@ -185,7 +185,9 @@ export const POST: APIRoute = async ({ request }) => {
           call_made_at: new Date().toISOString(),
           call_outcome: String(callOutcome || 'no_answer').slice(0, 50),
         };
-        if (callOutcome === 'scheduled' || callOutcome === 'spoke') {
+        if (callOutcome === 'scheduled') {
+          update.status = 'scheduled';
+        } else if (callOutcome === 'spoke') {
           update.status = 'converted';
         }
         break;

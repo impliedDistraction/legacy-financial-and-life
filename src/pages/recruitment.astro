@@ -546,6 +546,8 @@ if (!session) {
               <option value="opened">👁️ Opened</option>
               <option value="clicked">🔗 Clicked</option>
               <option value="visited">🌐 Visited /join</option>
+              <option value="interested">🙋 Interested</option>
+              <option value="scheduled">📅 Scheduled</option>
               <option value="follow_up_1">📨 Follow-up 1 (Day 3)</option>
               <option value="follow_up_2">📨 Follow-up 2 (Day 7)</option>
               <option value="follow_up_exhausted">🚫 No Response</option>
@@ -575,7 +577,9 @@ if (!session) {
             <div class="text-center"><span class="text-lg font-bold text-violet-600" id="stat-track-clicked">-</span><p class="text-xs text-gray-400">Clicked</p></div>
             <div class="text-center"><span class="text-lg font-bold text-cyan-600" id="stat-track-visited">-</span><p class="text-xs text-gray-400">Visited</p></div>
             <div class="text-center"><span class="text-lg font-bold text-teal-600" id="stat-track-chatted">-</span><p class="text-xs text-gray-400">Chatted</p></div>
+            <div class="text-center"><span class="text-lg font-bold text-amber-600" id="stat-track-interested">-</span><p class="text-xs text-gray-400">Interested</p></div>
             <div class="text-center"><span class="text-lg font-bold text-purple-600" id="stat-track-replied">-</span><p class="text-xs text-gray-400">Replied</p></div>
+            <div class="text-center"><span class="text-lg font-bold text-indigo-600" id="stat-track-scheduled">-</span><p class="text-xs text-gray-400">Scheduled</p></div>
             <div class="text-center"><span class="text-lg font-bold text-emerald-600" id="stat-track-converted">-</span><p class="text-xs text-gray-400">Converted</p></div>
             <div class="text-center"><span class="text-lg font-bold text-red-500" id="stat-track-bounced">-</span><p class="text-xs text-gray-400">Bounced</p></div>
             <div class="border-l border-gray-200 pl-4 ml-2"></div>
@@ -2335,10 +2339,10 @@ if (!session) {
     const sort = sentSort.value;
 
     // Build query params
-    const trackingFilters = ['opened', 'clicked', 'visited'];
+    const trackingFilters = ['opened', 'clicked', 'visited', 'interested'];
     let statusFilter = '';
     if (status === 'all_active') {
-      statusFilter = 'status=in.(sent,approved,converted,follow_up_1,follow_up_2)';
+      statusFilter = 'status=in.(sent,approved,converted,scheduled,follow_up_1,follow_up_2)';
     } else if (trackingFilters.includes(status)) {
       statusFilter = `tracking=${status}`;
     } else {
@@ -2667,7 +2671,7 @@ if (!session) {
       ]);
       const stats = await statsRes.json();
       if (!stats.error) {
-        const fields = ['sent', 'opened', 'clicked', 'visited', 'chatted', 'replied', 'converted', 'bounced', 'follow_up', 'no_response'];
+        const fields = ['sent', 'opened', 'clicked', 'visited', 'chatted', 'interested', 'replied', 'scheduled', 'converted', 'bounced', 'follow_up', 'no_response'];
         for (const f of fields) {
           const el = document.getElementById(`stat-track-${f}`);
           if (el) el.textContent = String(stats[f] ?? '-');
@@ -2700,8 +2704,9 @@ if (!session) {
       { key: 'clicked', label: 'Clicked', color: 'bg-violet-400' },
       { key: 'visited', label: 'Visited', color: 'bg-cyan-400' },
       { key: 'chatted', label: 'Chatted', color: 'bg-teal-400' },
-      { key: 'interested', label: 'Interested', color: 'bg-indigo-400' },
+      { key: 'interested', label: 'Interested', color: 'bg-amber-400' },
       { key: 'replied', label: 'Replied', color: 'bg-purple-400' },
+      { key: 'scheduled', label: 'Scheduled', color: 'bg-indigo-400' },
       { key: 'converted', label: 'Converted', color: 'bg-emerald-400' },
     ];
 
@@ -2714,6 +2719,7 @@ if (!session) {
       if (props.chat_session_id || chatLogs[p.id]?.length > 0) reached.push('chatted');
       if (p.interaction_stage === 'interested' || props.text_consent) reached.push('interested');
       if (props.email_replied_at || p.interaction_stage === 'replied') reached.push('replied');
+      if (p.status === 'scheduled') reached.push('scheduled');
       if (p.status === 'converted') reached.push('converted');
       return reached;
     }

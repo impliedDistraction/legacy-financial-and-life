@@ -67,7 +67,7 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
       };
 
       // Promote interaction_stage forward only
-      const STAGE_ORDER = ['new', 'clicked_cta', 'visited_page', 'interested', 'replied', 'contacted'];
+      const STAGE_ORDER = ['new', 'clicked_cta', 'visited_page', 'interested', 'replied', 'booked', 'contacted'];
       const currentIdx = STAGE_ORDER.indexOf(currentStage);
       const targetIdx = STAGE_ORDER.indexOf('replied');
       const stageUpdate = targetIdx > currentIdx ? { interaction_stage: 'replied' } : {};
@@ -184,7 +184,7 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
       delete propsPatch._preserve_first_open;
 
       // Only promote interaction_stage forward, never regress
-      const STAGE_ORDER = ['new', 'clicked_cta', 'visited_page', 'interested', 'contacted'];
+      const STAGE_ORDER = ['new', 'clicked_cta', 'visited_page', 'interested', 'booked', 'contacted'];
       if (update._promote_stage) {
         const targetStage = update._promote_stage as string;
         const currentIdx = STAGE_ORDER.indexOf(currentStage);

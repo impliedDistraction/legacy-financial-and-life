@@ -37,7 +37,7 @@ export const GET: APIRoute = async ({ request }) => {
     // Fetch all sent/converted prospects that have any engagement beyond just being sent
     // (clicked, visited, opened, replied, chatted, or expressed interest)
     const prospectsRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/recruitment_prospects?status=in.(sent,converted,follow_up_1,follow_up_2,follow_up_exhausted)&interaction_stage=neq.new&select=id,name,email,phone,state,city,fit_score,fit_reason,status,interaction_stage,sent_at,properties,research_score,web_presence&order=sent_at.desc.nullslast&limit=50`,
+      `${SUPABASE_URL}/rest/v1/recruitment_prospects?status=in.(sent,converted,scheduled,follow_up_1,follow_up_2,follow_up_exhausted)&interaction_stage=neq.new&select=id,name,email,phone,state,city,fit_score,fit_reason,status,interaction_stage,sent_at,properties,research_score,web_presence&order=sent_at.desc.nullslast&limit=50`,
       { headers },
     );
 
@@ -71,6 +71,7 @@ export const GET: APIRoute = async ({ request }) => {
       if (p.interaction_stage === 'interested') { warmth += 5; signals.push('expressed interest'); }
       if (p.interaction_stage === 'replied') { warmth += 6; signals.push('replied'); }
       if (props.email_replied_at) { warmth += 6; signals.push('email reply'); }
+      if (p.status === 'scheduled') { warmth += 8; signals.push('scheduled'); }
       if (p.status === 'converted') { warmth += 10; signals.push('converted'); }
 
       return { ...p, warmth, signals };

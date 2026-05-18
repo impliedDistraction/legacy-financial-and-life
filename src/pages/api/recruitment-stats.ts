@@ -37,13 +37,16 @@ export const GET: APIRoute = async ({ request }) => {
 
   // Run all count queries in parallel
   // Each query counts prospects where the relevant JSONB property exists and is not null
+  const ACTIVE_STATUSES = 'in.(sent,converted,scheduled,follow_up_1,follow_up_2,follow_up_exhausted)';
   const queries = {
-    sent: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(sent,converted,follow_up_1,follow_up_2,follow_up_exhausted)&select=id&limit=0`,
-    opened: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(sent,converted,follow_up_1,follow_up_2,follow_up_exhausted)&properties->>email_opened_at=not.is.null&select=id&limit=0`,
-    clicked: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(sent,converted,follow_up_1,follow_up_2,follow_up_exhausted)&properties->>email_clicked_at=not.is.null&select=id&limit=0`,
-    visited: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(sent,converted,follow_up_1,follow_up_2,follow_up_exhausted)&properties->>join_page_visited_at=not.is.null&select=id&limit=0`,
-    chatted: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(sent,converted,follow_up_1,follow_up_2,follow_up_exhausted)&properties->>chat_session_id=not.is.null&select=id&limit=0`,
-    replied: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(sent,converted,follow_up_1,follow_up_2,follow_up_exhausted)&properties->>email_replied_at=not.is.null&select=id&limit=0`,
+    sent: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&select=id&limit=0`,
+    opened: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&properties->>email_opened_at=not.is.null&select=id&limit=0`,
+    clicked: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&properties->>email_clicked_at=not.is.null&select=id&limit=0`,
+    visited: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&properties->>join_page_visited_at=not.is.null&select=id&limit=0`,
+    chatted: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&properties->>chat_session_id=not.is.null&select=id&limit=0`,
+    interested: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&interaction_stage=eq.interested&select=id&limit=0`,
+    replied: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&properties->>email_replied_at=not.is.null&select=id&limit=0`,
+    scheduled: `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.scheduled&select=id&limit=0`,
     converted: `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.converted&select=id&limit=0`,
     bounced: `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.bounced&select=id&limit=0`,
     follow_up: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(follow_up_1,follow_up_2)&select=id&limit=0`,

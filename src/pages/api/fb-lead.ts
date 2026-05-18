@@ -233,12 +233,13 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   // 4. 30-day duplicate check — same email or phone within window
   const dedupResult = await checkLeadDedup(email, phone);
   if (!dedupResult.allowed) {
+    const reason = (dedupResult as { allowed: false; reason: string }).reason;
     console.info('Duplicate lead blocked', {
-      reason: dedupResult.reason,
+      reason,
       emailDomain: getEmailDomain(email),
     });
     await trackQuoteEvent('quote_duplicate_blocked', 'submission', 'info', 'legacy', {
-      reason: dedupResult.reason,
+      reason,
     });
     return redirect('/quote-duplicate', 302);
   }

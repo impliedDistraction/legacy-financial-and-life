@@ -1,6 +1,8 @@
 // Enhanced form submission with validation and user feedback
 // Handles loading states, client-side validation, and success/error messaging
 
+declare function gtag(...args: any[]): void;
+
 interface FormValidationError {
   field: string;
   message: string;

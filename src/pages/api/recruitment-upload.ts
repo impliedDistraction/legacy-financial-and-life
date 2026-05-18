@@ -168,8 +168,10 @@ export const GET: APIRoute = async ({ request }) => {
     visited: 'join_page_visited_at',
     chatted: 'chat_session_id',
   };
-  if (tracking && TRACKING_FIELDS[tracking]) {
-    queryUrl += `&status=in.(sent,converted,follow_up_1,follow_up_2,follow_up_exhausted)&properties->>${encodeURIComponent(TRACKING_FIELDS[tracking])}=not.is.null`;
+  if (tracking === 'interested') {
+    queryUrl += `&status=in.(sent,converted,scheduled,follow_up_1,follow_up_2,follow_up_exhausted)&interaction_stage=eq.interested`;
+  } else if (tracking && TRACKING_FIELDS[tracking]) {
+    queryUrl += `&status=in.(sent,converted,scheduled,follow_up_1,follow_up_2,follow_up_exhausted)&properties->>${encodeURIComponent(TRACKING_FIELDS[tracking])}=not.is.null`;
   }
   // Text search across name, email, state, city
   if (search) {
