@@ -15,6 +15,7 @@ interface ImportMetaEnv {
 	readonly RINGY_AUTH_TOKEN?: string;
 	readonly RINGY_SID?: string;
 	readonly CALENDLY_BOOKING_URL?: string;
+	readonly CALENDLY_API_KEY?: string;
 	readonly SUPABASE_LEAD_ANALYTICS_TABLE?: string;
 	readonly SUPABASE_SERVICE_ROLE_KEY?: string;
 	readonly SUPABASE_URL?: string;

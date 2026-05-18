@@ -21,9 +21,12 @@ import { site } from '../content/site';
       <a href="/schedule" class="hover:text-brand-700 transition-colors">Schedule</a>
     </nav>
     <div class="flex items-center gap-2">
-      <a href="/schedule" class="ml-4 inline-block rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold btn-animate hover-lift">
-        {site.hero.cta}
-      </a>
+      <div class="ml-4 flex flex-col items-center">
+        <a href="/schedule" class="inline-block rounded-lg bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold btn-animate hover-lift">
+          {site.hero.cta}
+        </a>
+        <span data-next-available class="hidden mt-1 text-[10px] text-brand-600 font-medium whitespace-nowrap"></span>
+      </div>
       <!-- Mobile menu button -->
       <button
         type="button"

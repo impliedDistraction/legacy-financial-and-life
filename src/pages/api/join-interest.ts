@@ -8,6 +8,23 @@ const WO_SUPABASE_URL = import.meta.env.WO_SUPABASE_URL?.trim();
 const WO_SUPABASE_SERVICE_ROLE_KEY = import.meta.env.WO_SUPABASE_SERVICE_ROLE_KEY?.trim();
 const TABLE = 'recruitment_prospects';
 
+// Rate limit: max 5 interest submissions per IP per 15 minutes
+const interestRateMap = new Map<string, { count: number; resetAt: number }>();
+const INTEREST_LIMIT = 5;
+const INTEREST_WINDOW = 15 * 60 * 1000;
+
+function checkInterestRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = interestRateMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    interestRateMap.set(ip, { count: 1, resetAt: now + INTEREST_WINDOW });
+    return true;
+  }
+  if (entry.count >= INTEREST_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 /**
  * Log a compliance event to the Working Order coordinator project.
  * This creates an auditable record of TCPA consent, opt-outs, etc.
@@ -47,6 +64,16 @@ export const POST: APIRoute = async ({ request }) => {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return new Response(JSON.stringify({ error: 'Service temporarily unavailable' }), {
       status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || request.headers.get('x-real-ip') || 'unknown';
+
+  if (!checkInterestRateLimit(clientIp)) {
+    return new Response(JSON.stringify({ error: 'Too many requests. Please try again later.' }), {
+      status: 429,
       headers: { 'Content-Type': 'application/json' },
     });
   }

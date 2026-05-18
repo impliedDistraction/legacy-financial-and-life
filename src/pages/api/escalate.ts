@@ -7,6 +7,23 @@ const SUPABASE_URL = import.meta.env.SUPABASE_URL?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 const SENTINEL_URL = import.meta.env.SENTINEL_URL?.trim() || 'http://localhost:3377';
 
+// Rate limit: max 5 escalations per IP per 15 minutes
+const escalateRateMap = new Map<string, { count: number; resetAt: number }>();
+const ESCALATE_LIMIT = 5;
+const ESCALATE_WINDOW = 15 * 60 * 1000;
+
+function checkEscalateRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = escalateRateMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    escalateRateMap.set(ip, { count: 1, resetAt: now + ESCALATE_WINDOW });
+    return true;
+  }
+  if (entry.count >= ESCALATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 /**
  * POST /api/escalate
  *
@@ -29,6 +46,13 @@ export const POST: APIRoute = async ({ request }) => {
       status,
       headers: { 'Content-Type': 'application/json' },
     });
+
+  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || request.headers.get('x-real-ip') || 'unknown';
+
+  if (!checkEscalateRateLimit(clientIp)) {
+    return json(429, { error: 'Too many escalation requests. Please try again later.' });
+  }
 
   let body: Record<string, unknown>;
   try {

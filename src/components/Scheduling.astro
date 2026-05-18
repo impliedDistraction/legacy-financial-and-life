@@ -147,7 +147,7 @@ const brandColor = site.scheduling?.brandColor || '#1a62db';
 <script is:inline src="https://assets.calendly.com/assets/external/widget.js" async></script>
 
 <script>
-  // Track Calendly booking events
+  // Track Calendly booking events (inline embed + popup)
   window.addEventListener('message', function(e) {
     if (e.origin === 'https://calendly.com' && e.data?.event === 'calendly.event_scheduled') {
       console.log('Calendly booking successful');
@@ -156,6 +156,9 @@ const brandColor = site.scheduling?.brandColor || '#1a62db';
           event_category: 'engagement',
           event_label: 'calendly_booking'
         });
+      }
+      if (typeof fbq !== 'undefined') {
+        fbq('track', 'Schedule');
       }
     }
   });

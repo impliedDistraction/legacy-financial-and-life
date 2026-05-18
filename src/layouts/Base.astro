@@ -47,5 +47,71 @@ const flagValuesJson = safeJsonStringify(flagValues);
     </main>
     <Analytics />
     <script src="/scripts/animations.js" defer></script>
+
+    <!-- Calendly popup scheduling — intercepts /schedule links site-wide -->
+    <script is:inline>
+    (function() {
+      var BOOKING_URL = 'https://calendly.com/bethandtim-legacyf-l/30min?hide_gdpr_banner=1&primary_color=1a62db';
+      var loaded = false;
+
+      function loadCalendly(cb) {
+        if (loaded) return cb();
+        var css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = 'https://assets.calendly.com/assets/external/widget.css';
+        document.head.appendChild(css);
+
+        var js = document.createElement('script');
+        js.src = 'https://assets.calendly.com/assets/external/widget.js';
+        js.onload = function() { loaded = true; cb(); };
+        document.head.appendChild(js);
+      }
+
+      function openPopup() {
+        if (window.Calendly) {
+          window.Calendly.initPopupWidget({ url: BOOKING_URL });
+        }
+      }
+
+      // Intercept clicks on /schedule links to open popup instead of navigating
+      document.addEventListener('click', function(e) {
+        var link = e.target.closest('a[href="/schedule"]');
+        if (!link) return;
+        // Skip if on the /schedule page itself (let the inline widget handle it)
+        if (window.location.pathname === '/schedule') return;
+
+        e.preventDefault();
+        loadCalendly(openPopup);
+      });
+
+      // Expose for chatbot or programmatic use
+      window.__openSchedule = function() { loadCalendly(openPopup); };
+
+      // Fetch next available slot and display it
+      function showAvailability() {
+        var badges = document.querySelectorAll('[data-next-available]');
+        if (!badges.length) return;
+        fetch('/api/availability')
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(d) {
+            if (!d || !d.nextAvailable) return;
+            var dt = new Date(d.nextAvailable);
+            var opts = { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' };
+            var text = 'Next available: ' + dt.toLocaleString('en-US', opts);
+            badges.forEach(function(el) {
+              el.textContent = text;
+              el.classList.remove('hidden');
+            });
+          })
+          .catch(function() { /* silently fail — availability is optional */ });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', showAvailability);
+      } else {
+        showAvailability();
+      }
+    })();
+    </script>
   </body>
 </html>

@@ -9,7 +9,31 @@ import {
 
 export const prerender = false;
 
+// Rate limit: max 60 analytics events per IP per minute
+const analyticsRateMap = new Map<string, { count: number; resetAt: number }>();
+const ANALYTICS_LIMIT = 60;
+const ANALYTICS_WINDOW = 60 * 1000;
+
+function checkAnalyticsRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = analyticsRateMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    analyticsRateMap.set(ip, { count: 1, resetAt: now + ANALYTICS_WINDOW });
+    return true;
+  }
+  if (entry.count >= ANALYTICS_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 export const POST: APIRoute = async ({ request }) => {
+  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || request.headers.get('x-real-ip') || 'unknown';
+
+  if (!checkAnalyticsRateLimit(clientIp)) {
+    return new Response('Rate limited', { status: 429 });
+  }
+
   let body: Record<string, unknown>;
 
   try {

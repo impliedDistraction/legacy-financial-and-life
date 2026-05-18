@@ -7,6 +7,23 @@ const SUPABASE_URL = import.meta.env.SUPABASE_URL?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 const TABLE = 'recruitment_prospects';
 
+// Rate limit: max 20 visit pings per IP per 15 minutes
+const visitRateMap = new Map<string, { count: number; resetAt: number }>();
+const VISIT_LIMIT = 20;
+const VISIT_WINDOW = 15 * 60 * 1000;
+
+function checkVisitRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = visitRateMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    visitRateMap.set(ip, { count: 1, resetAt: now + VISIT_WINDOW });
+    return true;
+  }
+  if (entry.count >= VISIT_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 /**
  * POST /api/join-visit
  * Fires when a real browser loads the /join page with a ?pid= parameter.
@@ -16,6 +33,13 @@ const TABLE = 'recruitment_prospects';
 export const POST: APIRoute = async ({ request }) => {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     return Response.json({ ok: false }, { status: 503 });
+  }
+
+  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || request.headers.get('x-real-ip') || 'unknown';
+
+  if (!checkVisitRateLimit(clientIp)) {
+    return Response.json({ ok: true }); // silently drop to avoid fingerprinting
   }
 
   let body: { prospectId?: string; tier?: string; referrer?: string };
@@ -30,8 +54,6 @@ export const POST: APIRoute = async ({ request }) => {
     return Response.json({ ok: true }); // silently ignore non-prospect visits
   }
 
-  const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    || request.headers.get('x-real-ip') || '';
   const userAgent = request.headers.get('user-agent') || '';
   const now = new Date().toISOString();
 
