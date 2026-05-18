@@ -240,9 +240,9 @@ if (!session) {
                     <option value="Tennessee">Tennessee (TN)</option>
                   </select>
                 </div>
-                <!-- FL Licensee Filters (shown when fl_licensee source selected) -->
+                <!-- State Licensee Filters (shown when fl_licensee or state_licensee source selected) -->
                 <div id="fl-filters" class="hidden space-y-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                  <p class="text-xs font-medium text-blue-700">🏛️ Florida DFS Licensee Filters</p>
+                  <p class="text-xs font-medium text-blue-700">🏛️ DOI Licensee Filters</p>
                   <div class="grid grid-cols-2 gap-3">
                     <div>
                       <label class="block text-xs font-medium text-gray-600 mb-1">County</label>
@@ -1061,7 +1061,7 @@ if (!session) {
       const current = dd.value;
       dd.innerHTML = '<option value="">All Campaigns</option>';
       for (const c of campaignsCache) {
-        const icon = c.source_type === 'fl_licensee' ? '\u{1f3db}\ufe0f' : c.source_type === 'csv_import' ? '\u{1f4e4}' : '\u{1f50d}';
+        const icon = c.source_type === 'fl_licensee' || c.source_type === 'state_licensee' ? '\u{1f3db}\ufe0f' : c.source_type === 'csv_import' ? '\u{1f4e4}' : '\u{1f50d}';
         const opt = document.createElement('option');
         opt.value = c.id;
         opt.textContent = `${icon} ${c.name}`;
@@ -1128,7 +1128,7 @@ if (!session) {
               <button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}" title="${c.status === 'active' ? 'Pause' : 'Resume'}">${c.status === 'active' ? '⏸' : '▶'}</button>
               <button class="text-xs text-red-500 hover:text-red-700 font-medium" data-campaign-action="stop" data-campaign-id="${c.id}" title="Stop campaign">⏹</button>`;
 
-      const sourceIcon = c.source_type === 'fl_licensee' ? '🏛️ FL Licensee' : c.source_type === 'csv' ? '📤 CSV' : c.source_type === 'pool' ? '🎯 Pool' : '🔍 Prophog';
+      const sourceIcon = c.source_type === 'fl_licensee' ? '🏛️ FL Licensee' : c.source_type === 'state_licensee' ? `🏛️ ${c.search_state || 'State'} Licensee` : c.source_type === 'csv' ? '📤 CSV' : c.source_type === 'pool' ? '🎯 Pool' : '🔍 Prophog';
 
       return `
         <div class="bg-white rounded-xl border border-gray-200 p-4 ${isPast ? 'opacity-75' : 'hover:border-brand-300'} transition-colors">
@@ -1318,14 +1318,14 @@ if (!session) {
     const source = (e.target as HTMLSelectElement).value;
     const flFilters = document.getElementById('fl-filters');
     const stateSelect = document.getElementById('cmp-state')?.closest('div') as HTMLElement;
-    if (flFilters) flFilters.classList.toggle('hidden', source !== 'fl_licensee');
+    if (flFilters) flFilters.classList.toggle('hidden', source !== 'fl_licensee' && source !== 'state_licensee');
     // Lock state to Florida when FL Licensee selected
     if (source === 'fl_licensee' && stateSelect) {
       (document.getElementById('cmp-state') as HTMLSelectElement).value = 'Florida';
     }
-    // Default to Texas when State Licensee selected (primary state with data)
+    // Default to Florida when State Licensee selected (has most data)
     if (source === 'state_licensee' && stateSelect) {
-      (document.getElementById('cmp-state') as HTMLSelectElement).value = 'Texas';
+      (document.getElementById('cmp-state') as HTMLSelectElement).value = 'Florida';
     }
   });
 
