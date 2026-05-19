@@ -475,6 +475,9 @@ if (!session) {
             <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="held">
               🏷️ Held <span class="review-stage-count ml-1 bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="held">0</span>
             </button>
+            <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="no_email">
+              📭 No Email <span class="review-stage-count ml-1 bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="no_email">0</span>
+            </button>
             <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="rejected">
               ❌ Rejected <span class="review-stage-count ml-1 bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="rejected">0</span>
             </button>
@@ -486,6 +489,7 @@ if (!session) {
             <option value="reviewed">Reviewed</option>
             <option value="approved">Approved</option>
             <option value="held">Held</option>
+            <option value="no_email">No Email</option>
             <option value="rejected">Rejected</option>
           </select>
           <div class="flex items-center gap-3 flex-wrap">
@@ -1213,7 +1217,7 @@ if (!session) {
     const feed = document.getElementById('live-feed');
     if (!feed) return;
     try {
-      const res = await fetch('/api/recruitment-upload?limit=20');
+      const res = await fetch('/api/recruitment-upload?limit=20&order=updated_at.desc.nullslast');
       if (!res.ok) throw new Error(`${res.status}`);
       const data = await res.json();
       const prospects = data.prospects || [];
@@ -1224,7 +1228,8 @@ if (!session) {
       feed.innerHTML = prospects.map((p: any) => {
         const scoreEmoji = p.research_score >= 7 ? '🌟' : p.research_score >= 4 ? '✅' : p.research_status === 'unscored' ? '⏳' : '📋';
         const scoreText = p.research_score != null ? `${p.research_score}/10` : 'unscored';
-        const time = new Date(p.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        const ts = p.updated_at || p.created_at;
+        const time = new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
         return `
           <div class="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 text-xs">
             <span class="text-base">${scoreEmoji}</span>
@@ -1831,12 +1836,15 @@ if (!session) {
 
   // Refresh pipeline stage counts
   async function refreshReviewStageCounts() {
-    const stages = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'rejected'];
+    const stages = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'no_email', 'rejected'];
     const campId = reviewCampaignFilter.value;
     const campParam = campId ? `&campaign_id=${encodeURIComponent(campId)}` : '';
     await Promise.all(stages.map(async (s) => {
       try {
-        const res = await fetch(`/api/recruitment-upload?status=${s}&limit=0${campParam}`);
+        const url = s === 'no_email'
+          ? `/api/recruitment-upload?email=missing&limit=0${campParam}`
+          : `/api/recruitment-upload?status=${s}&limit=0${campParam}`;
+        const res = await fetch(url);
         const data = await res.json();
         const el = document.querySelector(`.review-stage-count[data-count="${s}"]`);
         if (el) el.textContent = String(data.total || 0);
@@ -1901,7 +1909,12 @@ if (!session) {
     updateStageBtnStyles();
     try {
       const campId = reviewCampaignFilter.value;
-      let url = `/api/recruitment-upload?status=${status}&limit=${PAGE_SIZE}&offset=${currentOffset}`;
+      let url: string;
+      if (status === 'no_email') {
+        url = `/api/recruitment-upload?email=missing&limit=${PAGE_SIZE}&offset=${currentOffset}`;
+      } else {
+        url = `/api/recruitment-upload?status=${status}&limit=${PAGE_SIZE}&offset=${currentOffset}`;
+      }
       if (campId) url += `&campaign_id=${encodeURIComponent(campId)}`;
       const res = await fetch(url);
       const data = await res.json();

@@ -145,6 +145,7 @@ export const GET: APIRoute = async ({ request }) => {
   const search = url.searchParams.get('search')?.trim();
   const tracking = url.searchParams.get('tracking');
   const order = url.searchParams.get('order');
+  const emailFilter = url.searchParams.get('email');
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 200);
   const offset = parseInt(url.searchParams.get('offset') || '0');
 
@@ -154,6 +155,8 @@ export const GET: APIRoute = async ({ request }) => {
   let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?order=${orderClause}&limit=${limit}&offset=${offset}`;
   if (campaignId) queryUrl += `&campaign_id=eq.${encodeURIComponent(campaignId)}`;
   if (source) queryUrl += `&source=eq.${encodeURIComponent(source)}`;
+  if (emailFilter === 'missing') queryUrl += `&email=is.null`;
+  else if (emailFilter === 'present') queryUrl += `&email=not.is.null`;
   if (status) {
     if (status.startsWith('in.')) {
       queryUrl += `&status=${encodeURIComponent(status)}`;
