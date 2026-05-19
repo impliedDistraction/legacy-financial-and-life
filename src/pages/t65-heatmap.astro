@@ -1,0 +1,438 @@
+---
+/**
+ * /t65-heatmap — T65 (Turning 65) population heatmap.
+ *
+ * Interactive visualization showing T65 density by state and top zip hotspots.
+ * Helps agents quickly identify high-opportunity areas for campaigns/surveys.
+ *
+ * Protected by the same magic-link auth as /recruitment.
+ */
+import Base from '../layouts/Base.astro';
+import '../styles/tailwind.css';
+import { verifySessionCookie } from '../lib/ai-demo-auth';
+
+export const prerender = false;
+
+const session = await verifySessionCookie(Astro.request.headers.get('cookie'));
+if (!session) {
+  return Astro.redirect('/ai-demo-login?redirect=/t65-heatmap', 302);
+}
+---
+<Base title="T65 Heatmap — Legacy Financial & Life" description="Turning-65 population density heatmap">
+
+<div class="bg-gray-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-amber-600 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-sm font-bold text-gray-900">T65 Heatmap</h1>
+          <p class="text-xs text-gray-500">Turning-65 Population Density</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/recruitment" class="text-xs text-brand-600 hover:text-brand-700 font-medium">← Recruitment</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Loading State -->
+  <div id="loading" class="flex items-center justify-center py-20">
+    <div class="text-center">
+      <div class="animate-spin w-8 h-8 border-2 border-amber-600 border-t-transparent rounded-full mx-auto mb-3"></div>
+      <p class="text-sm text-gray-500">Loading T65 data…</p>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div id="content" class="hidden max-w-7xl mx-auto px-4 py-6">
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-lg border border-gray-200 p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">States Tracked</p>
+        <p id="stat-states" class="text-2xl font-bold text-gray-900 mt-1">—</p>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Total T65 Pop</p>
+        <p id="stat-total" class="text-2xl font-bold text-gray-900 mt-1">—</p>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Highest Density</p>
+        <p id="stat-density" class="text-2xl font-bold text-amber-600 mt-1">—</p>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Top Hotspot</p>
+        <p id="stat-hotspot" class="text-2xl font-bold text-gray-900 mt-1">—</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Map Column -->
+      <div class="lg:col-span-2">
+        <div class="bg-white rounded-lg border border-gray-200 p-4">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-semibold text-gray-900">State T65 Density</h2>
+            <div class="flex items-center gap-2 text-xs text-gray-500">
+              <span class="inline-block w-3 h-3 rounded" style="background: #fef3c7"></span>Low
+              <span class="inline-block w-3 h-3 rounded" style="background: #f59e0b"></span>Med
+              <span class="inline-block w-3 h-3 rounded" style="background: #b45309"></span>High
+            </div>
+          </div>
+          <!-- US Tile Grid Map -->
+          <div id="map-container" class="relative">
+            <div id="tile-map" class="grid gap-1" style="grid-template-columns: repeat(11, 1fr); grid-template-rows: repeat(8, 1fr);">
+              <!-- Tiles are positioned by JS based on standard tile grid coordinates -->
+            </div>
+            <!-- Tooltip -->
+            <div id="tooltip" class="hidden absolute bg-gray-900 text-white text-xs rounded-lg px-3 py-2 pointer-events-none shadow-lg z-10">
+            </div>
+          </div>
+          <p class="text-xs text-gray-400 mt-3 text-center">Click a state to see top zip codes. Colored states have T65 data.</p>
+        </div>
+      </div>
+
+      <!-- State Ranking -->
+      <div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4">
+          <h2 class="text-sm font-semibold text-gray-900 mb-3">State Rankings</h2>
+          <div id="state-rankings" class="space-y-2">
+            <!-- populated by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hotspot Table -->
+    <div class="mt-6 bg-white rounded-lg border border-gray-200 p-4">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-gray-900">
+          <span id="hotspot-title">Top Hotspot Zip Codes</span>
+        </h2>
+        <div class="flex items-center gap-2">
+          <select id="state-filter" class="text-xs border border-gray-200 rounded px-2 py-1">
+            <option value="all">All States</option>
+          </select>
+          <select id="sort-by" class="text-xs border border-gray-200 rounded px-2 py-1">
+            <option value="opportunityScore">Opportunity Score</option>
+            <option value="density">T65 Density %</option>
+            <option value="t65Pop">T65 Population</option>
+          </select>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="border-b border-gray-100 text-left text-gray-500 uppercase tracking-wide">
+              <th class="pb-2 pr-3">#</th>
+              <th class="pb-2 pr-3">Zip</th>
+              <th class="pb-2 pr-3">State</th>
+              <th class="pb-2 pr-3 text-right">Total Pop</th>
+              <th class="pb-2 pr-3 text-right">T65 Pop</th>
+              <th class="pb-2 pr-3 text-right">Density</th>
+              <th class="pb-2 text-right">Score</th>
+            </tr>
+          </thead>
+          <tbody id="hotspot-table">
+            <!-- populated by JS -->
+          </tbody>
+        </table>
+      </div>
+      <div id="table-footer" class="mt-3 flex items-center justify-between text-xs text-gray-500">
+        <span id="showing-count"></span>
+        <button id="show-more" class="text-amber-600 hover:text-amber-700 font-medium hidden">Show more →</button>
+      </div>
+    </div>
+
+    <!-- Voter Roll Section (if data available) -->
+    <div id="voter-section" class="hidden mt-6 bg-white rounded-lg border border-gray-200 p-4">
+      <h2 class="text-sm font-semibold text-gray-900 mb-3">
+        🗳️ Voter Roll T65 Data <span class="text-xs font-normal text-gray-500">(individual-level, higher accuracy)</span>
+      </h2>
+      <div id="voter-content"></div>
+    </div>
+
+    <!-- Data freshness -->
+    <p id="freshness" class="text-xs text-gray-400 mt-4 text-center"></p>
+  </div>
+</div>
+
+<style>
+  .state-tile {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: default;
+    transition: transform 0.1s, box-shadow 0.1s;
+    border: 1px solid transparent;
+  }
+  .state-tile.has-data {
+    cursor: pointer;
+    border-color: rgba(0,0,0,0.1);
+  }
+  .state-tile.has-data:hover {
+    transform: scale(1.08);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    z-index: 5;
+  }
+  .state-tile.selected {
+    ring: 2px;
+    box-shadow: 0 0 0 2px #1f2937;
+    transform: scale(1.05);
+  }
+  .density-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #fef3c7, #f59e0b, #b45309);
+  }
+</style>
+
+<script>
+  // @ts-nocheck
+  let allData = null;
+  let visibleCount = 25;
+  let selectedState = 'all';
+
+  async function init() {
+    try {
+      const res = await fetch('/api/t65-data');
+      if (!res.ok) throw new Error('Failed to load');
+      allData = await res.json();
+      render();
+    } catch (err) {
+      document.getElementById('loading').innerHTML =
+        `<p class="text-red-600 text-sm">Failed to load T65 data. Is Sentinel running?</p>`;
+    }
+  }
+
+  function render() {
+    const { census, voter } = allData;
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('content').classList.remove('hidden');
+
+    const states = census.states || {};
+    const hotspots = census.topHotspots || [];
+    const stateList = Object.entries(states).sort((a, b) => b[1].avgDensity - a[1].avgDensity);
+
+    // Summary cards
+    const totalT65 = stateList.reduce((s, [, v]) => s + v.totalT65, 0);
+    const topDensityState = stateList[0];
+    const topHotspot = hotspots[0];
+
+    document.getElementById('stat-states').textContent = stateList.length.toString();
+    document.getElementById('stat-total').textContent = totalT65.toLocaleString();
+    document.getElementById('stat-density').textContent =
+      topDensityState ? `${topDensityState[1].avgDensity}% (${topDensityState[0]})` : '—';
+    document.getElementById('stat-hotspot').textContent =
+      topHotspot ? `${topHotspot.zip} (${topHotspot.state})` : '—';
+
+    // Color the map
+    const densities = stateList.map(([, v]) => v.avgDensity);
+    const minD = Math.min(...densities);
+    const maxD = Math.max(...densities);
+
+    // Build tile grid map
+    // Standard US tile grid positions [col, row] (0-indexed, 11 cols x 8 rows)
+    const tilePositions = {
+      ME:[10,0], VT:[9,1], NH:[10,1], WA:[1,2], MT:[2,2], ND:[3,2], MN:[4,2],
+      WI:[5,2], MI:[7,2], NY:[8,2], MA:[9,2], RI:[10,2], OR:[1,3], ID:[2,3],
+      WY:[3,3], SD:[4,3], IA:[5,3], IL:[6,3], IN:[7,3], OH:[8,3], PA:[9,3],
+      CT:[10,3], CA:[1,4], NV:[2,4], UT:[3,4], CO:[4,4], NE:[5,4], MO:[6,4],
+      KY:[7,4], WV:[8,4], VA:[9,4], NJ:[10,4], AZ:[2,5], NM:[3,5], KS:[4,5],
+      AR:[5,5], TN:[6,5], NC:[7,5], SC:[8,5], MD:[9,5], DE:[10,5], OK:[4,6],
+      LA:[5,6], MS:[6,6], AL:[7,6], GA:[8,6], FL:[9,7], TX:[4,7], HI:[1,7],
+      AK:[0,7]
+    };
+    const trackedStates = new Set(stateList.map(([c]) => c));
+    const stateDataMap = Object.fromEntries(stateList);
+
+    const tileContainer = document.getElementById('tile-map');
+    // Create 8x11 grid cells
+    const cells = {};
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 11; c++) {
+        const cell = document.createElement('div');
+        cell.style.gridColumn = c + 1;
+        cell.style.gridRow = r + 1;
+        cells[`${c},${r}`] = cell;
+        tileContainer.appendChild(cell);
+      }
+    }
+
+    // Place state tiles
+    for (const [code, [col, row]] of Object.entries(tilePositions)) {
+      const cell = cells[`${col},${row}`];
+      if (!cell) continue;
+      cell.classList.add('state-tile');
+      cell.textContent = code;
+      cell.setAttribute('data-state', code);
+
+      if (trackedStates.has(code)) {
+        const info = stateDataMap[code];
+        const t = (info.avgDensity - minD) / (maxD - minD || 1);
+        cell.style.background = densityColor(t);
+        cell.style.color = t > 0.6 ? '#fff' : '#1f2937';
+        cell.classList.add('has-data');
+        cell.addEventListener('mouseenter', (e) => showTooltip(e, code, info));
+        cell.addEventListener('mouseleave', hideTooltip);
+        cell.addEventListener('click', () => selectState(code));
+      } else {
+        cell.style.background = '#f3f4f6';
+        cell.style.color = '#9ca3af';
+      }
+    }
+
+    // State rankings
+    const rankHtml = stateList.map(([code, info], i) => {
+      const t = (info.avgDensity - minD) / (maxD - minD || 1);
+      return `
+        <div class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded px-2 py-1.5 -mx-2 transition-colors"
+             onclick="selectState('${code}')">
+          <span class="text-xs font-mono text-gray-400 w-4">${i + 1}</span>
+          <span class="text-xs font-semibold text-gray-900 w-6">${code}</span>
+          <div class="flex-1">
+            <div class="w-full bg-gray-100 rounded-full h-1.5">
+              <div class="h-1.5 rounded-full" style="width:${t * 100}%; background:${densityColor(t)}"></div>
+            </div>
+          </div>
+          <span class="text-xs text-gray-600 w-16 text-right">${info.avgDensity}%</span>
+          <span class="text-xs text-gray-400 w-20 text-right">${info.totalT65.toLocaleString()}</span>
+        </div>`;
+    }).join('');
+    document.getElementById('state-rankings').innerHTML = rankHtml;
+
+    // Populate filter
+    const filter = document.getElementById('state-filter');
+    for (const [code] of stateList) {
+      const opt = document.createElement('option');
+      opt.value = code;
+      opt.textContent = code;
+      filter.appendChild(opt);
+    }
+    filter.addEventListener('change', (e) => { selectedState = e.target.value; visibleCount = 25; renderTable(); });
+    document.getElementById('sort-by').addEventListener('change', () => { renderTable(); });
+    document.getElementById('show-more').addEventListener('click', () => { visibleCount += 25; renderTable(); });
+
+    renderTable();
+
+    // Voter roll section
+    if (voter && voter.states && Object.keys(voter.states).length > 0) {
+      document.getElementById('voter-section').classList.remove('hidden');
+      let vHtml = '<div class="space-y-3">';
+      for (const [st, info] of Object.entries(voter.states)) {
+        vHtml += `
+          <div class="border border-gray-100 rounded-lg p-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-semibold">${st}</span>
+              <span class="text-xs text-gray-500">${info.totalT65.toLocaleString()} T65 | ${info.imminent.toLocaleString()} imminent (&lt;6 mo)</span>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+              ${(info.topZips || []).slice(0, 5).map(z => `
+                <div class="bg-amber-50 rounded p-2 text-center">
+                  <p class="text-xs font-bold text-amber-700">${z.zip}</p>
+                  <p class="text-[10px] text-gray-600">${z.city || ''}</p>
+                  <p class="text-[10px] text-amber-600">${z.count} T65 / ${z.imminent} imm.</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>`;
+      }
+      vHtml += '</div>';
+      document.getElementById('voter-content').innerHTML = vHtml;
+    }
+
+    // Freshness
+    if (census.lastUpdated) {
+      const d = new Date(census.lastUpdated);
+      document.getElementById('freshness').textContent =
+        `Data last updated: ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    }
+  }
+
+  function renderTable() {
+    const hotspots = allData.census.topHotspots || [];
+    const sortKey = document.getElementById('sort-by').value;
+    let filtered = selectedState === 'all' ? [...hotspots] : hotspots.filter(h => h.state === selectedState);
+    filtered.sort((a, b) => b[sortKey] - a[sortKey]);
+
+    const showing = filtered.slice(0, visibleCount);
+    const tbody = document.getElementById('hotspot-table');
+    tbody.innerHTML = showing.map((h, i) => `
+      <tr class="border-b border-gray-50 hover:bg-amber-50/50 transition-colors">
+        <td class="py-2 pr-3 text-gray-400">${i + 1}</td>
+        <td class="py-2 pr-3 font-mono font-medium text-gray-900">${h.zip}</td>
+        <td class="py-2 pr-3"><span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-700">${h.state}</span></td>
+        <td class="py-2 pr-3 text-right text-gray-600">${h.totalPop.toLocaleString()}</td>
+        <td class="py-2 pr-3 text-right font-medium text-gray-900">${h.t65Pop.toLocaleString()}</td>
+        <td class="py-2 pr-3 text-right">
+          <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${h.density > 20 ? 'bg-amber-100 text-amber-800' : h.density > 15 ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-700'}">
+            ${h.density.toFixed(1)}%
+          </span>
+        </td>
+        <td class="py-2 text-right font-bold text-amber-700">${h.opportunityScore.toFixed(0)}</td>
+      </tr>
+    `).join('');
+
+    document.getElementById('showing-count').textContent =
+      `Showing ${showing.length} of ${filtered.length} hotspots`;
+    const btn = document.getElementById('show-more');
+    if (filtered.length > visibleCount) btn.classList.remove('hidden');
+    else btn.classList.add('hidden');
+
+    document.getElementById('hotspot-title').textContent =
+      selectedState === 'all' ? 'Top Hotspot Zip Codes' : `${selectedState} Hotspot Zip Codes`;
+  }
+
+  function selectState(code) {
+    selectedState = code;
+    visibleCount = 25;
+    document.getElementById('state-filter').value = code;
+
+    // Highlight on map
+    document.querySelectorAll('.state-tile').forEach(el => el.classList.remove('selected'));
+    const el = document.querySelector(`.state-tile[data-state="${code}"]`);
+    if (el) el.classList.add('selected');
+
+    renderTable();
+  }
+  // expose to inline onclick
+  window.selectState = selectState;
+
+  function densityColor(t) {
+    // t: 0-1 normalized density
+    if (t < 0.25) return '#fef3c7';
+    if (t < 0.5) return '#fcd34d';
+    if (t < 0.75) return '#f59e0b';
+    return '#b45309';
+  }
+
+  function showTooltip(e, code, info) {
+    const tip = document.getElementById('tooltip');
+    tip.innerHTML = `
+      <strong>${code}</strong><br>
+      T65 Pop: ${info.totalT65.toLocaleString()}<br>
+      Density: ${info.avgDensity}%<br>
+      Zips: ${info.zipCount}
+    `;
+    tip.classList.remove('hidden');
+    const rect = document.getElementById('map-container').getBoundingClientRect();
+    tip.style.left = (e.clientX - rect.left + 10) + 'px';
+    tip.style.top = (e.clientY - rect.top - 40) + 'px';
+  }
+
+  function hideTooltip() {
+    document.getElementById('tooltip').classList.add('hidden');
+  }
+
+  init();
+</script>
+
+</Base>
