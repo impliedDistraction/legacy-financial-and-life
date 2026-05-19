@@ -43,7 +43,6 @@ if (!session) {
           <span id="status-dot" class="w-2 h-2 bg-gray-300 rounded-full inline-block"></span>
           <span id="status-text">Ready</span>
         </span>
-        <a href="/t65-heatmap" class="text-xs text-amber-600 hover:text-amber-700 font-medium">T65 Map</a>
         <a href="/ai-demo" class="text-xs text-brand-600 hover:text-brand-700 font-medium">← AI Demo</a>
       </div>
     </div>
@@ -875,28 +874,12 @@ if (!session) {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Target Prospect Status</label>
-                <select id="survey-target-status" multiple class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" size="5">
-                  <option value="any_with_email">Any prospect with email (pure survey)</option>
+                <select id="survey-target-status" multiple class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" size="4">
                   <option value="follow_up_exhausted" selected>Follow-up Exhausted (Day 14+)</option>
-                  <option value="held">Held (has email, not yet outreached)</option>
-                  <option value="approved">Approved (reviewed but not sent)</option>
+                  <option value="held">Held (no email — passive research)</option>
+                  <option value="survey_sent">Previously Surveyed</option>
                   <option value="sent">Sent (active outreach)</option>
                 </select>
-                <p class="text-xs text-gray-400 mt-1">Hold Ctrl/Cmd to select multiple. "Any with email" ignores status.</p>
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Send Limit <span class="text-gray-400 font-normal">(0 = unlimited)</span></label>
-                <input type="number" id="survey-send-limit" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" value="50" min="0" step="10" placeholder="50">
-                <p class="text-xs text-gray-400 mt-1">Max total emails to send for this survey</p>
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Linked Recruitment Campaign <span class="text-gray-400 font-normal">(optional)</span></label>
-                <select id="survey-linked-campaign" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                  <option value="">None — standalone survey</option>
-                </select>
-                <p class="text-xs text-gray-400 mt-1">Links survey to a campaign's follow-up pipeline</p>
               </div>
             </div>
             <div>
@@ -1198,89 +1181,6 @@ if (!session) {
       if (tab === 'roadmap') loadRoadmapData();
     });
   });
-
-  // ═══════════════════════════════════════════
-  // URL PARAM HANDLING (from T65 heatmap actions)
-  // ═══════════════════════════════════════════
-  (function handleUrlParams() {
-    const params = new URLSearchParams(window.location.search);
-    const action = params.get('action');
-    const tab = params.get('tab');
-
-    if (tab) {
-      // Switch to the requested tab
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
-      const tabBtn = document.querySelector(`.tab-btn[data-tab="${tab}"]`) as HTMLElement;
-      if (tabBtn) tabBtn.classList.add('active');
-      document.getElementById(`tab-${tab}`)?.classList.remove('hidden');
-    }
-
-    if (action === 'new_campaign') {
-      const state = params.get('state') || '';
-      const county = params.get('county') || '';
-      // Switch to campaigns tab and show the new campaign form
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
-      const campBtn = document.querySelector('.tab-btn[data-tab="campaigns"]') as HTMLElement;
-      if (campBtn) campBtn.classList.add('active');
-      document.getElementById('tab-campaigns')?.classList.remove('hidden');
-      // Open the campaign form & prefill fields after a tick
-      setTimeout(() => {
-        const form = document.getElementById('campaign-form');
-        if (form) form.classList.remove('hidden');
-        const nameField = document.getElementById('cmp-name') as HTMLInputElement;
-        const stateField = document.getElementById('cmp-state') as HTMLSelectElement;
-        const countyField = document.getElementById('cmp-county') as HTMLInputElement;
-        if (nameField && !nameField.value) {
-          nameField.value = `${county ? county + ' County' : state} T65 Recruitment`;
-        }
-        if (stateField && state) {
-          // Match state abbreviation to option text (e.g. "FL" → "Florida (FL)")
-          for (const opt of stateField.options) {
-            if (opt.value.includes(state) || opt.text.includes(`(${state})`)) {
-              opt.selected = true; break;
-            }
-          }
-        }
-        if (countyField && county) countyField.value = county;
-        // Also reveal DOI filters section if county was specified
-        if (county) {
-          const flFilters = document.getElementById('fl-filters');
-          if (flFilters) flFilters.classList.remove('hidden');
-        }
-        nameField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 300);
-    }
-
-    if (action === 'new_survey') {
-      const state = params.get('state') || '';
-      const county = params.get('county') || '';
-      // Switch to surveys tab
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
-      const survBtn = document.querySelector('.tab-btn[data-tab="surveys"]') as HTMLElement;
-      if (survBtn) survBtn.classList.add('active');
-      document.getElementById('tab-surveys')?.classList.remove('hidden');
-      // Open the survey form panel and prefill
-      setTimeout(() => {
-        const formPanel = document.getElementById('survey-form-panel');
-        if (formPanel) formPanel.classList.remove('hidden');
-        const nameField = document.getElementById('survey-name') as HTMLInputElement;
-        const stateField = document.getElementById('survey-states') as HTMLInputElement;
-        if (nameField && !nameField.value) {
-          nameField.value = `${county ? county + ' County' : state} Agent Challenges Survey`;
-        }
-        if (stateField && state) stateField.value = state;
-        nameField?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 300);
-    }
-
-    // Clean URL params without reload
-    if (params.toString()) {
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-  })();
 
   // ═══════════════════════════════════════════
   // CAMPAIGNS MANAGEMENT
@@ -4230,19 +4130,8 @@ if (!session) {
   }
 
   // Survey form setup
-  document.getElementById('survey-create-btn')?.addEventListener('click', async () => {
+  document.getElementById('survey-create-btn')?.addEventListener('click', () => {
     document.getElementById('survey-form-panel')?.classList.remove('hidden');
-    // Populate linked campaign dropdown from cached campaigns
-    const linkedSelect = document.getElementById('survey-linked-campaign') as HTMLSelectElement;
-    if (linkedSelect && campaignsCache.length > 0) {
-      linkedSelect.innerHTML = '<option value="">None — standalone survey</option>';
-      for (const c of campaignsCache) {
-        const opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = `${c.name} (${c.search_state || 'All'})`;
-        linkedSelect.appendChild(opt);
-      }
-    }
     // Add a default first question
     if (document.querySelectorAll('#survey-questions-list > div').length === 0) {
       addSurveyQuestion({ text: '', type: 'single_choice', options: [
@@ -4272,8 +4161,6 @@ if (!session) {
     const targetSelect = document.getElementById('survey-target-status') as HTMLSelectElement;
     const subject = (document.getElementById('survey-subject') as HTMLInputElement)?.value?.trim();
     const introText = (document.getElementById('survey-intro') as HTMLTextAreaElement)?.value?.trim();
-    const sendLimit = parseInt((document.getElementById('survey-send-limit') as HTMLInputElement)?.value || '0', 10);
-    const linkedCampaign = (document.getElementById('survey-linked-campaign') as HTMLSelectElement)?.value;
 
     const target_states = statesRaw ? statesRaw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
     const target_statuses = Array.from(targetSelect.selectedOptions).map(o => o.value);
@@ -4292,8 +4179,6 @@ if (!session) {
     };
     if (subject) payload.properties.subject = subject;
     if (introText) payload.properties.intro_text = introText;
-    if (sendLimit > 0) payload.properties.send_limit = sendLimit;
-    if (linkedCampaign) payload.properties.linked_campaign_id = linkedCampaign;
 
     const res = await fetch('/api/survey-campaigns', {
       method: 'POST',
@@ -4302,7 +4187,6 @@ if (!session) {
     });
 
     if (res.ok) {
-      document.getElementById('survey-form-panel')?.classList.remove('hidden');
       document.getElementById('survey-form-panel')?.classList.add('hidden');
       (document.getElementById('survey-form') as HTMLFormElement)?.reset();
       document.getElementById('survey-questions-list')!.innerHTML = '';
