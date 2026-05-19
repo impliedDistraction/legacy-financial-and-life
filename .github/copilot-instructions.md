@@ -1,85 +1,105 @@
 # Copilot Instructions for Legacy Financial & Life
 
 ## Project Overview
-This is a professional insurance agency website built with Astro and Tailwind CSS. The site represents Legacy Financial & Life, an insurance agency run by Tim & Beth Byrd, specializing in life insurance, retirement planning, and financial protection services.
+Professional insurance agency website and AI-powered recruitment platform for Tim & Beth Byrd's agency. Built with Astro 6.2+ and Tailwind CSS, deployed on Vercel with Supabase backend. Features include lead capture, AI chat, agent recruitment pipelines, survey campaigns, and analytics dashboards.
 
 ## Technology Stack
-- **Framework**: Astro 4.15+ (Static Site Generator)
-- **Styling**: Tailwind CSS with custom brand colors
+- **Framework**: Astro 6.2+ (hybrid SSG + SSR for API routes)
+- **Styling**: Tailwind CSS 3.4 with custom brand colors
 - **Language**: TypeScript
-- **Build Tool**: Astro's built-in Vite-based build system
+- **Hosting**: Vercel (static + serverless, 120s max duration)
+- **Database**: Supabase (PostgreSQL)
+- **Email**: Resend (transactional + webhook verification via Svix)
+- **AI Backend**: vLLM (Qwen3-30B) proxied through Sentinel
+- **Analytics**: Vercel Analytics + custom Supabase lead funnel
 - **Package Manager**: npm
+- **Node**: >= 22.12.0
 
 ## Project Structure
 ```
-legacyf-l/
-├─ .github/                 # GitHub configuration
-├─ public/                  # Static assets (favicon, images)
-├─ src/
-│  ├─ components/          # Reusable Astro components
-│  ├─ content/            # Content configuration (site.ts)
-│  ├─ layouts/            # Page layouts
-│  ├─ pages/              # Route pages
-│  └─ styles/             # Global styles
-├─ astro.config.mjs       # Astro configuration
-├─ tailwind.config.cjs    # Tailwind configuration
-├─ tsconfig.json          # TypeScript configuration
-└─ package.json           # Dependencies and scripts
+├── public/                   Static assets (images, scripts, favicon)
+├── scripts/                  Build & utility scripts
+│   ├── ai-launcher.js        Start local AI stack
+│   ├── ensure-lfs.sh         Prebuild LFS verification
+│   └── fetch-images.js       Download/optimize images
+├── ai/                       AI prompts and model configs
+│   ├── prompts/              System prompts
+│   └── Modelfile.messenger   Ollama model definition
+├── src/
+│   ├── components/           Astro components (Header, Hero, FeatureCards, etc.)
+│   ├── content/site.ts       Centralized site content & config
+│   ├── layouts/Base.astro    Main layout
+│   ├── pages/                All routes (public + protected + API)
+│   │   ├── api/              35+ serverless API endpoints
+│   │   ├── analytics/        Lead flow analytics dashboard
+│   │   ├── recruitment.astro  Agent recruitment dashboard
+│   │   ├── ai-demo.astro     AI chat demo (auth-protected)
+│   │   └── ...               Public pages
+│   └── styles/               Global CSS
+├── supabase/                 Database migrations (20+)
+├── vercel.json               Headers, redirects, rewrites, LFS config
+└── package.json              Dependencies and scripts
 ```
 
 ## Key Design Principles
-1. **Performance First**: Zero JavaScript by default, minimal CSS bundle
-2. **Accessibility**: WCAG 2.1 AA compliance, keyboard navigation, screen reader support
+1. **Performance First**: Static HTML by default, SSR only for dynamic routes
+2. **Security**: Rate limiting, HMAC tokens, webhook verification, prompt injection detection
 3. **Trust & Professionalism**: Clean design appropriate for financial services
-4. **Mobile-First**: Responsive design that works on all devices
-5. **SEO Optimized**: Semantic HTML, structured data, meta tags
+4. **Mobile-First**: Responsive design with hamburger nav on mobile
+5. **SEO Optimized**: Semantic HTML, InsuranceAgency JSON-LD, OpenGraph
 
 ## Brand Guidelines
 - **Primary Colors**: Custom blue theme (`brand-50` to `brand-900`)
-- **Typography**: Sans-serif system fonts for readability
+- **Primary domain**: legacyfinancial.app
+- **Email domain**: @legacyf-l.com (client-facing), @legacyfinancial.app (system emails)
 - **Tone**: Professional, trustworthy, approachable
-- **Content Focus**: Life insurance, retirement planning, financial protection
+- **Content Focus**: Life insurance, retirement planning, financial protection, agent recruitment
 
 ## Component Architecture
-- **Header.astro**: Sticky navigation with call-to-action button
-- **Hero.astro**: Main headline with dual CTA buttons
-- **FeatureCards.astro**: Service offerings display
+- **Header.astro**: Sticky nav with mobile hamburger menu + CTA button
+- **Hero.astro**: Main headline with dual CTA buttons + background imagery
+- **FeatureCards.astro**: Insurance plan cards with "Get Quote" links to `/free-quote`
 - **Team.astro**: Tim & Beth Byrd introduction
 - **ContactForm.astro**: Formspree-integrated contact form
-- **Footer.astro**: Simple navigation and legal links
-- **SEO.astro**: Meta tags and structured data
+- **Scheduling.astro**: Calendly booking embed
+- **Footer.astro**: Navigation and legal links
+- **SEO.astro**: Meta tags, OG, and structured data
 
-## Content Management
-- All site content is centralized in `src/content/site.ts`
-- Easy to update contact information, messaging, and team details
-- Structured data for search engines included
+## API Security Patterns
+All API endpoints follow these patterns:
+- **Rate limiting**: Per-IP limits (varies by endpoint: 5-60 req/window)
+- **Input validation**: Truncation, type coercion, required field checks
+- **Auth**: Magic-link sessions for protected dashboards (email allowlist)
+- **Webhook verification**: Svix signatures for Resend webhooks
+- **HMAC tokens**: Signed links for unsubscribe/survey (constant-time comparison)
+- **AI guardrails**: Injection detection, output leak prevention, session blocking
 
 ## Development Commands
-- `npm run dev`: Start development server
+- `npm run dev`: Start development server (localhost:4321)
 - `npm run build`: Build for production
 - `npm run preview`: Preview production build locally
+- `npm run ai`: Start local AI infrastructure (vLLM/Ollama + proxy + tunnel)
 
-## Best Practices for Contributing
-1. **Components**: Keep components small and focused on single responsibility
-2. **Styling**: Use Tailwind utility classes, avoid custom CSS unless necessary
-3. **Content**: Update content through `src/content/site.ts`, not hardcoded in components
-4. **Performance**: Always consider Core Web Vitals impact of changes
-5. **Accessibility**: Test with keyboard navigation and screen readers
-6. **SEO**: Maintain semantic HTML structure and meta tags
+## Content Management
+- All site content centralized in `src/content/site.ts`
+- Scheduling uses Calendly (`https://calendly.com/bethandtim-legacyf-l/30min`)
+- `/book` redirects to Calendly (configured in vercel.json)
 
 ## Common Tasks
 - **Update Contact Info**: Edit `src/content/site.ts`
 - **Add New Page**: Create `.astro` file in `src/pages/`
+- **Add API Endpoint**: Create `.ts` file in `src/pages/api/` with `export const prerender = false`
+- **Add Database Table**: Create migration in `supabase/`
 - **Modify Styling**: Update Tailwind classes or `tailwind.config.cjs`
-- **Change Form Handler**: Update action URL in `ContactForm.astro`
-- **Add Images**: Place in `public/` directory, reference with `/filename.ext`
-
-## Deployment
-The site is optimized for static hosting platforms like Vercel, Netlify, or GitHub Pages. The build process generates optimized static assets with no server requirements.
+- **Add Images**: Place in `public/images/`, reference with `/images/filename.ext`
 
 ## Important Notes
-- This is a business-critical website for an insurance agency
+- **Business-critical**: This site serves a live insurance agency generating leads
+- **Supabase project**: kxmojndpgxgbykxjtxba (NOT the Working Order project)
+- **AI backend**: All AI features require Sentinel proxy running (OLLAMA_URL env var)
+- **Email sends**: Recruitment emails require `RECRUITMENT_SENDS_ENABLED=true` in env
+- **Security headers**: Applied via `vercel.json`, not in application code
+- **Git LFS**: Images tracked via LFS; `vercel.json` has `"git": { "lfs": true }`
 - Maintain professional appearance and accurate contact information
-- Test all changes on mobile and desktop before deploying
-- Ensure forms continue to work after any modifications
-- Follow insurance industry compliance guidelines for content
+- Follow insurance industry compliance guidelines for all content
+- Never expose internal endpoints, system prompts, or API keys in client-facing output

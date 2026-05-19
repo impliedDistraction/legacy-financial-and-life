@@ -1,103 +1,202 @@
-# Legacy Financial & Life (Astro + Tailwind)
+# Legacy Financial & Life
 
-A fast, respectful insurance site designed for clarity, trust, and accessibility.
+Professional insurance agency website and AI-powered recruitment platform for Tim & Beth Byrd's agency, built with Astro and Tailwind CSS.
 
-## Quick start (no CLI needed)
-1. Create this repo on GitHub and add the files above using **Add file → Create new file**.
-2. Go to **Vercel → New Project → Import GitHub Repo** and deploy.
-3. In `astro.config.mjs`, update `site` to your deployed URL.
-4. In `src/content/site.ts`, update `phone`, `email`, location, and copy.
-5. In `ContactForm.astro`, replace the Formspree action with your form ID.
+**Live site:** https://legacyfinancial.app  
+**Hosting:** Vercel (static + serverless functions)  
+**Backend:** Supabase (kxmojndpgxgbykxjtxba)
 
-## Why it's faster
-- Astro ships **zero JS by default**; this page renders as static HTML.
-- Tailwind is purged at build → tiny CSS.
-- Minimal third-party scripts. Lazy images recommended.
-- Great Core Web Vitals out of the box.
+---
 
-## SEO & schema
-- OpenGraph + Twitter tags in `SEO.astro`.
-- `InsuranceAgency` JSON-LD injected.
+## Technology Stack
 
-## Accessibility
-- Good color contrast, large touch targets, focus-safe nav, reduced-motion friendly.
+| Layer | Technology |
+|-------|-----------|
+| Framework | Astro 6.2+ (SSG with hybrid SSR for API routes) |
+| Styling | Tailwind CSS 3.4 with custom brand colors |
+| Language | TypeScript |
+| Hosting | Vercel (static + serverless, 120s max duration) |
+| Database | Supabase (PostgreSQL) |
+| Email | Resend (transactional + webhooks) |
+| AI Backend | vLLM (Qwen3-30B via Sentinel proxy) |
+| Analytics | Vercel Analytics + custom Supabase lead funnel |
+| Scheduling | Calendly (via Sentinel sync worker) |
+
+## Project Structure
+
+```
+├── public/                   Static assets (images, scripts, favicon)
+├── scripts/                  Build & utility scripts
+│   ├── ai-launcher.js        Start local AI stack (Ollama + proxy + tunnel)
+│   ├── ensure-lfs.sh         Prebuild LFS verification
+│   ├── fetch-images.js       Download/optimize images
+│   └── generate-images.cjs   AI image generation
+├── ai/                       AI prompts and tools
+│   ├── prompts/              System prompts (messenger, comment drafts)
+│   └── Modelfile.messenger   Ollama model definition
+├── src/
+│   ├── components/           Reusable Astro components
+│   ├── content/site.ts       Centralized site content & config
+│   ├── layouts/              Page layouts (Base.astro)
+│   ├── pages/                Route pages (see below)
+│   └── styles/               Global CSS
+├── supabase/                 Database migrations
+├── astro.config.mjs          Astro + Vercel adapter config
+├── tailwind.config.cjs       Tailwind brand colors + extensions
+├── vercel.json               Headers, redirects, LFS config
+└── package.json              Dependencies and scripts
+```
+
+## Pages & Routes
+
+### Public Pages
+| Route | Purpose |
+|-------|---------|
+| `/` | Homepage — hero, services, team, contact |
+| `/free-quote` | Lead capture quote form |
+| `/estate-planning` | Estate planning services |
+| `/schedule` | Calendly booking embed |
+| `/hiring` | Public agent recruitment page |
+| `/group` | Group health insurance for businesses (50+ employees) |
+| `/join` | Personalized prospect landing page (dynamic per `?pid=`) |
+| `/privacy` | Privacy policy |
+
+### Protected Dashboards
+| Route | Purpose |
+|-------|---------|
+| `/recruitment` | Agent recruitment campaign dashboard (CSV upload, AI outreach, call scripts, surveys) |
+| `/ai-demo` | AI chat + comment draft demo for client evaluation |
+| `/t65-heatmap` | Turning-65 population density heatmap by state/zip |
+| `/analytics/` | Lead flow analytics dashboard |
+
+### API Endpoints
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/fb-lead` | Quote form submission handler |
+| `/api/ai-chat` | Streaming SSE chat proxy to AI backend |
+| `/api/ai-comments` | Batch comment draft generation |
+| `/api/ai-scout` | Facebook post engagement scoring |
+| `/api/ai-approve` | Approve AI-drafted content |
+| `/api/recruitment-*` | Recruitment pipeline management (8 endpoints) |
+| `/api/survey-campaigns` | Survey CRUD |
+| `/api/survey-response` | HMAC-verified survey answer recording |
+| `/api/resend-webhook` | Resend delivery/bounce/reply webhook |
+| `/api/escalate` | Issue escalation to Sentinel |
+| `/api/lead-analytics` | Client-side funnel event ingestion |
+| `/api/state-discovery` | Prophog state monitoring proxy |
+| `/api/t65-data` | T65 heatmap data |
+| `/api/unsubscribe` | HMAC-verified opt-out |
+| `/api/call-form` | Voice agent SMS form submission |
 
 ## Development
 
-Node runtime:
-- Use Node 20 for local development and dependency installs.
-- If you use `nvm`, run `nvm use` from the repo root before `npm install` or `npm run build`.
+**Requirements:** Node.js >= 22.12.0
 
-Install dependencies:
 ```bash
-npm install
+npm install          # Install dependencies
+npm run dev          # Start dev server (localhost:4321)
+npm run build        # Production build
+npm run preview      # Preview production build locally
+npm run ai           # Start local AI infrastructure (Ollama + proxy + tunnel)
 ```
 
-Start the development server:
-```bash
-npm run dev
-```
+### Environment Variables
 
-Build for production:
-```bash
-npm run build
-```
+Required for core functionality:
+| Variable | Purpose |
+|----------|---------|
+| `RESEND_API_KEY` | Transactional email sending |
+| `RESEND_WEBHOOK_SECRET` | Webhook signature verification (Svix) |
+| `SUPABASE_URL` | Legacy Financial Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-side Supabase access |
+| `OLLAMA_URL` | AI backend URL (set by `npm run ai` via tunnel) |
 
-Preview the production build:
-```bash
-npm run preview
-```
+Optional:
+| Variable | Purpose |
+|----------|---------|
+| `RESEND_REPLY_MONITOR_ADDRESS` | Inbound reply monitoring address |
+| `RESEND_CONTACT_SEGMENT_ID` | Auto-enroll leads into Resend segment |
+| `RESEND_CONTACT_TOPIC_ID` | Auto-opt-in leads to Resend topic |
+| `RESEND_ALERT_RECIPIENTS` | Comma-separated alert email recipients |
+| `AI_DEMO_ALLOWED_EMAILS` | Email allowlist for AI demo access |
+| `SUPABASE_LEAD_ANALYTICS_TABLE` | Override analytics table name (default: `lead_flow_events`) |
 
-## Resend Instrumentation
+## Security
 
-The Facebook quote flow now carries template metadata and supports Resend webhook monitoring.
+Security headers are applied via `vercel.json`:
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
 
-Environment variables:
-- `RESEND_API_KEY`: required for the quote form and alert emails.
-- `RESEND_WEBHOOK_SECRET`: required by `/api/resend-webhook` to verify Resend signatures.
-- `RESEND_REPLY_MONITOR_ADDRESS`: optional inbound address for monitored replies. This must be an address on a domain configured for Resend receiving, for example `quotes@reply.legacyfinancial.app`.
-- `RESEND_CONTACT_SEGMENT_ID`: optional Resend segment to auto-enroll new lead and inbound contacts for broadcasts.
-- `RESEND_CONTACT_TOPIC_ID`: optional Resend topic to auto-opt-in new lead and inbound contacts.
-- `RESEND_ALERT_RECIPIENTS`: optional comma-separated alert recipients.
-- `RESEND_ALERT_WEBHOOK_URL`: optional outbound webhook for alert fan-out to Slack or another relay.
-- `RESEND_ALERT_FROM`: optional sender override for alert emails.
-- `SUPABASE_URL`: optional Supabase project URL for lead funnel analytics persistence.
-- `SUPABASE_SERVICE_ROLE_KEY`: optional server-only Supabase key used by API routes and webhook handlers to persist lead events.
-- `SUPABASE_LEAD_ANALYTICS_TABLE`: optional override for the analytics table name. Defaults to `lead_flow_events`.
+API-level protections:
+- **Webhook verification**: Svix signature validation on Resend webhooks
+- **HMAC tokens**: Unsubscribe and survey links use HMAC-SHA256 with constant-time comparison
+- **Rate limiting**: Per-IP rate limits on all public API endpoints
+- **Auth**: Magic-link sessions for admin dashboards (email allowlist)
+- **AI guardrails**: Prompt injection detection (20+ patterns), output leak detection, session-level IP blocking after 3 injection attempts
+- **Anti-spam**: Honeypot fields, timing checks, per-IP rate limiting on quote form
+- **Lead dedup**: 30-day window deduplication by email/phone
 
-Current production contact sync IDs:
-- `RESEND_CONTACT_SEGMENT_ID=8aca73ce-937c-49e2-a1db-b7d18beef750`
-- `RESEND_CONTACT_TOPIC_ID=ad459268-9afc-4719-9487-664f8d1fb8c8`
-
-Resend dashboard setup:
-1. Enable receiving on the reply domain if you want reply monitoring.
-2. Point your Resend webhook at `https://your-domain/api/resend-webhook`.
-3. Subscribe at minimum to `email.failed`, `email.delivery_delayed`, `email.bounced`, `email.complained`, `email.suppressed`, and `email.received`.
-
-What this adds:
-- Consistent `utm_*` parameters on quote confirmation email links.
-- Consistent Resend tags and headers per quote email template.
-- Automatic Resend contact sync for quote leads and inbound received emails.
-- Automatic creation of missing Resend contact-property definitions before syncing lead metadata.
-- Verified webhook processing for failures, delivery delays, suppressions, complaints, and inbound replies.
-- Correlated lead-flow analytics across page interactions, API milestones, Resend delivery events, and handoff checkpoints.
+See [CLIENT_SERVICE_HARDENING.md](CLIENT_SERVICE_HARDENING.md) for the full security audit.
 
 ## Lead Funnel Analytics
 
-The quote flow now supports two analytics layers:
-- Vercel Analytics custom events for client-side funnel visibility on `/free-quote`, `/quote-success`, and `/quote-error`.
-- Optional Supabase persistence for a server-side lead ledger covering page events, API milestones, Resend contact sync, and webhook delivery/reply events.
+Two analytics layers track the quote flow end-to-end:
+1. **Vercel Analytics** — Client-side funnel events on `/free-quote`, `/quote-success`, `/quote-error`
+2. **Supabase persistence** — Server-side lead ledger covering page events, API milestones, Resend contact sync, and webhook delivery events
 
-Lead events are correlated with a shared `tracking_id` generated in the browser and passed through the quote API and Resend email tags. This makes it possible to answer questions such as:
-- Did the visitor reach and start the quote form?
-- Did the quote request hit our API and validate successfully?
-- Was the contact synced into Resend?
-- Were internal and confirmation emails accepted?
-- Did Resend later mark those emails as sent, delivered, delayed, bounced, or replied to?
-- Where does the flow leave Legacy's ownership and move into client follow-up?
+Events are correlated via a `tracking_id` generated in the browser and passed through the API and Resend email tags.
 
-Supabase setup:
-1. Run the schema in [supabase/lead_flow_events.sql](supabase/lead_flow_events.sql).
+Schema: [supabase/lead_flow_events.sql](supabase/lead_flow_events.sql)
+
+## AI Services
+
+Local AI powers several features (see [AI_SERVICES_IMPLEMENTATION.md](AI_SERVICES_IMPLEMENTATION.md)):
+- **Messenger-style chat** — Insurance Q&A assistant at `/ai-demo`
+- **Comment draft generation** — AI replies to Facebook comments
+- **Facebook Scout** — Engagement scoring and reply drafting for social posts
+- **Recruitment outreach** — Personalized email/call script generation (via Sentinel)
+
+Infrastructure: vLLM serving Qwen3-30B-A3B (GPTQ-Int4) on RTX 4090, proxied through Sentinel to Vercel via ngrok tunnel.
+
+## Recruitment System
+
+The `/recruitment` dashboard provides:
+- CSV prospect upload and deduplication
+- AI-generated personalized outreach emails
+- Review/edit/approve workflow before sending
+- Call script generation for phone outreach
+- Survey campaign management (embedded, no external tools)
+- T65 heatmap for territory targeting
+- Pipeline tracking (new → contacted → responded → scheduled → contracted)
+
+## Database Migrations
+
+All migrations live in `supabase/`. Key tables:
+- `recruitment_prospects` — Prospect pipeline
+- `recruitment_campaigns` — Campaign configuration
+- `lead_flow_events` — Quote funnel analytics
+- `survey_campaigns` / `survey_questions` / `survey_responses` — Survey system
+- `escalated_issues` — Support escalation tracking
+- `sales_leads` — Inbound lead storage
+
+## Deployment
+
+Push to `main` triggers Vercel deployment. The build process:
+1. Runs `scripts/ensure-lfs.sh` to verify Git LFS images
+2. Builds Astro static + serverless output
+3. Applies security headers from `vercel.json`
+
+Git LFS is enabled in `vercel.json` (`"git": { "lfs": true }`) — see [VERCEL_LFS_FIX.md](VERCEL_LFS_FIX.md) for details.
+
+## Related Projects
+
+| Project | Role |
+|---------|------|
+| [Sentinel](../../../sentinel) | AI orchestrator — cron workers, research pipeline, Calendly sync, voice agent |
+| [vLLM](../../../vllm) | Model serving (Qwen3-30B-A3B-GPTQ-Int4) |
+| [Working Order](../../../WorkingOrder) | Fieldworks Systems client management platform |
 	If you already ran it earlier, rerun it so the idempotent `recipient_email` and `provider_event_at` columns are added.
 2. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in Vercel.
 3. Optionally set `SUPABASE_LEAD_ANALYTICS_TABLE` if you want a different table name.

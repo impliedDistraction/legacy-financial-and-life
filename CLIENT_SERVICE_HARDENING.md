@@ -1,6 +1,7 @@
 # Client Service Hardening Review — Legacy Financial & Life
 
 **Date**: 2026-05-18  
+**Last reviewed**: 2026-05-19  
 **Reviewer**: Sentinel (automated)  
 **Site**: https://legacyfinancial.app  
 **Hosting**: Vercel (static + serverless functions)  
