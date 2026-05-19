@@ -196,7 +196,7 @@ Git LFS is enabled in `vercel.json` (`"git": { "lfs": true }`) — see [VERCEL_L
 |---------|------|
 | [Sentinel](../../../sentinel) | AI orchestrator — cron workers, research pipeline, Calendly sync, voice agent |
 | [vLLM](../../../vllm) | Model serving (Qwen3-30B-A3B-GPTQ-Int4) |
-| [Working Order](../../../WorkingOrder) | Fieldworks Systems client management platform |
+| [Fieldwork Systems](../../../fieldwork-systems) | Client management platform (fwsys.ai) |
 	If you already ran it earlier, rerun it so the idempotent `recipient_email` and `provider_event_at` columns are added.
 2. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in Vercel.
 3. Optionally set `SUPABASE_LEAD_ANALYTICS_TABLE` if you want a different table name.

@@ -56,7 +56,7 @@ The Legacy Financial deployment has **strong application-layer security** (webho
 | **Input sanitization** | All endpoints truncate inputs (200-2000 chars), validate required fields, use type coercion |
 | **Bot click detection** | Webhook handler identifies security scanner user agents and excludes from engagement metrics |
 | **Email send lock** | `RECRUITMENT_SENDS_ENABLED=true` required in env to send — prevents accidental sends |
-| **Compliance logging** | Opt-outs, spam complaints, bounces all logged to Working Order compliance events table |
+| **Compliance logging** | Opt-outs, spam complaints, bounces all logged to Fieldwork Systems compliance events table |
 | **Form anti-spam** | Honeypot field, timing check (3s minimum fill time), per-IP rate limiting on /free-quote |
 | **Lead dedup** | 30-day window deduplication by email/phone prevents double-counting |
 | **Prompt hardening** | System prompts include anti-extraction rules, no raw URL exposure, action block abstraction |

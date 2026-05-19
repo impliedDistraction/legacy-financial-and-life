@@ -5,9 +5,9 @@ export const prerender = false;
 const SUPABASE_URL = import.meta.env.SUPABASE_URL?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
-// Working Order coordinator project (owns the opt-out list)
-const WO_SUPABASE_URL = import.meta.env.WO_SUPABASE_URL?.trim();
-const WO_SUPABASE_SERVICE_ROLE_KEY = import.meta.env.WO_SUPABASE_SERVICE_ROLE_KEY?.trim();
+// Fieldwork Systems coordinator project (owns the opt-out list)
+const WO_SUPABASE_URL = import.meta.env.FWSYS_SUPABASE_URL?.trim() || import.meta.env.WO_SUPABASE_URL?.trim();
+const WO_SUPABASE_SERVICE_ROLE_KEY = import.meta.env.FWSYS_SUPABASE_SERVICE_ROLE_KEY?.trim() || import.meta.env.WO_SUPABASE_SERVICE_ROLE_KEY?.trim();
 
 // HMAC secret — must match what sentinel uses (OPENCLAW_SECRET fallback)
 const HMAC_SECRET = import.meta.env.UNSUBSCRIBE_HMAC_SECRET?.trim()
@@ -48,7 +48,7 @@ function supabaseHeaders(url: string, key: string) {
  * GET /api/unsubscribe?pid={prospectId}&token={hmac}
  *
  * One-click unsubscribe endpoint. Validates HMAC token, marks prospect as
- * opted out in Legacy Financial DB, and inserts into Working Order's global
+ * opted out in Legacy Financial DB, and inserts into Fieldwork Systems' global
  * opt-out list. Redirects to confirmation page.
  */
 export const GET: APIRoute = async ({ url, redirect }) => {
@@ -119,7 +119,7 @@ export const GET: APIRoute = async ({ url, redirect }) => {
         }
       );
 
-      // 2. Insert into Working Order global opt-out list
+      // 2. Insert into Fieldwork Systems global opt-out list
       if (WO_SUPABASE_URL && WO_SUPABASE_SERVICE_ROLE_KEY && prospectEmail) {
         await fetch(
           `${WO_SUPABASE_URL}/rest/v1/wo_opt_out_list`,

@@ -4,8 +4,8 @@ export const prerender = false;
 
 const SUPABASE_URL = import.meta.env.SUPABASE_URL?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-const WO_SUPABASE_URL = import.meta.env.WO_SUPABASE_URL?.trim();
-const WO_SUPABASE_SERVICE_ROLE_KEY = import.meta.env.WO_SUPABASE_SERVICE_ROLE_KEY?.trim();
+const WO_SUPABASE_URL = import.meta.env.FWSYS_SUPABASE_URL?.trim() || import.meta.env.WO_SUPABASE_URL?.trim();
+const WO_SUPABASE_SERVICE_ROLE_KEY = import.meta.env.FWSYS_SUPABASE_SERVICE_ROLE_KEY?.trim() || import.meta.env.WO_SUPABASE_SERVICE_ROLE_KEY?.trim();
 const TABLE = 'recruitment_prospects';
 
 // Rate limit: max 5 interest submissions per IP per 15 minutes
@@ -26,7 +26,7 @@ function checkInterestRateLimit(ip: string): boolean {
 }
 
 /**
- * Log a compliance event to the Working Order coordinator project.
+ * Log a compliance event to the Fieldwork Systems coordinator project.
  * This creates an auditable record of TCPA consent, opt-outs, etc.
  */
 async function logComplianceEvent(event: {

@@ -7,9 +7,9 @@ export const prerender = false;
 const SUPABASE_URL = import.meta.env.SUPABASE_URL?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 
-// Working Order coordinator project (owns the opt-out list)
-const WO_SUPABASE_URL = import.meta.env.WO_SUPABASE_URL?.trim();
-const WO_SUPABASE_SERVICE_ROLE_KEY = import.meta.env.WO_SUPABASE_SERVICE_ROLE_KEY?.trim();
+// Fieldwork Systems coordinator project (owns the opt-out list)
+const WO_SUPABASE_URL = import.meta.env.FWSYS_SUPABASE_URL?.trim() || import.meta.env.WO_SUPABASE_URL?.trim();
+const WO_SUPABASE_SERVICE_ROLE_KEY = import.meta.env.FWSYS_SUPABASE_SERVICE_ROLE_KEY?.trim() || import.meta.env.WO_SUPABASE_SERVICE_ROLE_KEY?.trim();
 
 /**
  * Track recruitment email events (opens, bounces, etc.) back to the prospect record.
@@ -229,7 +229,7 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
       body: JSON.stringify(update),
     });
 
-    // Auto-add to Working Order opt-out list on complaints and hard bounces only
+    // Auto-add to Fieldwork Systems opt-out list on complaints and hard bounces only
     // Soft bounces (mailbox full, temp server issue) are transient and shouldn't opt-out
     const isHardBounce = eventType === 'email.bounced' && (update.properties as Record<string, unknown>)?.bounce_type !== 'soft';
     if (WO_SUPABASE_URL && WO_SUPABASE_SERVICE_ROLE_KEY &&

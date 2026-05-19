@@ -95,7 +95,7 @@ All API endpoints follow these patterns:
 
 ## Important Notes
 - **Business-critical**: This site serves a live insurance agency generating leads
-- **Supabase project**: kxmojndpgxgbykxjtxba (NOT the Working Order project)
+- **Supabase project**: kxmojndpgxgbykxjtxba (NOT the Fieldwork Systems project)
 - **AI backend**: All AI features require Sentinel proxy running (OLLAMA_URL env var)
 - **Email sends**: Recruitment emails require `RECRUITMENT_SENDS_ENABLED=true` in env
 - **Security headers**: Applied via `vercel.json`, not in application code
