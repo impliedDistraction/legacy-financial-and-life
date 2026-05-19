@@ -107,6 +107,29 @@ if (!session) {
       </div>
     </div>
 
+    <!-- County Expansion Panel (appears when state is selected) -->
+    <div id="county-panel" class="hidden mt-6 bg-white rounded-lg border border-amber-200 p-4">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-gray-900">
+          <span id="county-title">County Rankings</span>
+        </h2>
+        <div class="flex items-center gap-2">
+          <select id="county-sort" class="text-xs border border-gray-200 rounded px-2 py-1">
+            <option value="opportunityScore">Opportunity Score</option>
+            <option value="density">T65 Density %</option>
+            <option value="t65Pop">T65 Population</option>
+          </select>
+          <button id="county-close" class="text-xs text-gray-400 hover:text-gray-600">✕ Close</button>
+        </div>
+      </div>
+      <div id="county-list" class="space-y-2">
+        <!-- populated by JS -->
+      </div>
+      <div class="mt-3 text-center">
+        <button id="county-show-more" class="text-xs text-amber-600 hover:text-amber-700 font-medium hidden">Show more counties →</button>
+      </div>
+    </div>
+
     <!-- Hotspot Table -->
     <div class="mt-6 bg-white rounded-lg border border-gray-200 p-4">
       <div class="flex items-center justify-between mb-4">
@@ -184,15 +207,40 @@ if (!session) {
     z-index: 5;
   }
   .state-tile.selected {
-    ring: 2px;
     box-shadow: 0 0 0 2px #1f2937;
     transform: scale(1.05);
   }
-  .density-bar {
-    height: 6px;
-    border-radius: 3px;
-    background: linear-gradient(90deg, #fef3c7, #f59e0b, #b45309);
+  .county-row {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+    transition: border-color 0.15s;
   }
+  .county-row:hover {
+    border-color: #f59e0b;
+  }
+  .action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .action-btn:hover {
+    transform: scale(1.03);
+  }
+  .action-recruit { background: #dbeafe; color: #1d4ed8; }
+  .action-recruit:hover { background: #bfdbfe; }
+  .action-quote { background: #d1fae5; color: #065f46; }
+  .action-quote:hover { background: #a7f3d0; }
+  .action-group { background: #fef3c7; color: #92400e; }
+  .action-group:hover { background: #fde68a; }
+  .action-survey { background: #ede9fe; color: #5b21b6; }
+  .action-survey:hover { background: #ddd6fe; }
 </style>
 
 <script>
@@ -200,6 +248,7 @@ if (!session) {
   let allData = null;
   let visibleCount = 25;
   let selectedState = 'all';
+  let countyVisible = 10;
 
   async function init() {
     try {
@@ -214,7 +263,7 @@ if (!session) {
   }
 
   function render() {
-    const { census, voter } = allData;
+    const { census, voter, counties } = allData;
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('content').classList.remove('hidden');
 
@@ -240,7 +289,6 @@ if (!session) {
     const maxD = Math.max(...densities);
 
     // Build tile grid map
-    // Standard US tile grid positions [col, row] (0-indexed, 11 cols x 8 rows)
     const tilePositions = {
       ME:[10,0], VT:[9,1], NH:[10,1], WA:[1,2], MT:[2,2], ND:[3,2], MN:[4,2],
       WI:[5,2], MI:[7,2], NY:[8,2], MA:[9,2], RI:[10,2], OR:[1,3], ID:[2,3],
@@ -255,7 +303,6 @@ if (!session) {
     const stateDataMap = Object.fromEntries(stateList);
 
     const tileContainer = document.getElementById('tile-map');
-    // Create 8x11 grid cells
     const cells = {};
     for (let r = 0; r < 8; r++) {
       for (let c = 0; c < 11; c++) {
@@ -267,7 +314,6 @@ if (!session) {
       }
     }
 
-    // Place state tiles
     for (const [code, [col, row]] of Object.entries(tilePositions)) {
       const cell = cells[`${col},${row}`];
       if (!cell) continue;
@@ -320,6 +366,13 @@ if (!session) {
     filter.addEventListener('change', (e) => { selectedState = e.target.value; visibleCount = 25; renderTable(); });
     document.getElementById('sort-by').addEventListener('change', () => { renderTable(); });
     document.getElementById('show-more').addEventListener('click', () => { visibleCount += 25; renderTable(); });
+    document.getElementById('county-sort').addEventListener('change', () => { countyVisible = 10; renderCountyPanel(); });
+    document.getElementById('county-close').addEventListener('click', () => {
+      document.getElementById('county-panel').classList.add('hidden');
+      selectedState = 'all';
+      document.querySelectorAll('.state-tile').forEach(el => el.classList.remove('selected'));
+    });
+    document.getElementById('county-show-more').addEventListener('click', () => { countyVisible += 10; renderCountyPanel(); });
 
     renderTable();
 
@@ -391,9 +444,105 @@ if (!session) {
       selectedState === 'all' ? 'Top Hotspot Zip Codes' : `${selectedState} Hotspot Zip Codes`;
   }
 
+  function renderCountyPanel() {
+    if (selectedState === 'all') {
+      document.getElementById('county-panel').classList.add('hidden');
+      return;
+    }
+
+    const countyData = allData.counties?.states?.[selectedState];
+    if (!countyData || !countyData.counties?.length) {
+      document.getElementById('county-panel').classList.add('hidden');
+      return;
+    }
+
+    document.getElementById('county-panel').classList.remove('hidden');
+    document.getElementById('county-title').textContent = `${selectedState} County Rankings`;
+
+    const sortKey = document.getElementById('county-sort').value;
+    const sorted = [...countyData.counties].sort((a, b) => b[sortKey] - a[sortKey]);
+    const showing = sorted.slice(0, countyVisible);
+
+    const listEl = document.getElementById('county-list');
+    listEl.innerHTML = showing.map((c, i) => `
+      <div class="county-row">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-mono text-gray-400 w-5">${i + 1}</span>
+            <span class="text-sm font-semibold text-gray-900">${c.county}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">${c.density}%</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-gray-600">${c.t65Pop.toLocaleString()} T65</span>
+            <span class="text-xs text-gray-400 ml-2">/ ${c.totalPop.toLocaleString()} total</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="flex-1 mr-4">
+            <div class="w-full bg-gray-100 rounded-full h-1.5">
+              <div class="h-1.5 rounded-full bg-amber-400" style="width:${Math.min(100, (c.opportunityScore / sorted[0].opportunityScore) * 100)}%"></div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5 flex-wrap justify-end">
+            ${buildActions(c, selectedState)}
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    const moreBtn = document.getElementById('county-show-more');
+    if (sorted.length > countyVisible) moreBtn.classList.remove('hidden');
+    else moreBtn.classList.add('hidden');
+  }
+
+  function buildActions(county, state) {
+    const actions = [];
+    const countyEnc = encodeURIComponent(county.county);
+    const stateEnc = encodeURIComponent(state);
+
+    // Recruitment campaign — target agents in this county
+    actions.push(`
+      <a href="/recruitment?action=new_campaign&state=${stateEnc}&county=${countyEnc}"
+         class="action-btn action-recruit" title="Launch recruitment campaign targeting ${county.county} County agents">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Recruit
+      </a>
+    `);
+
+    // Group insurance — target businesses (ALE applicable, 50+ employees)
+    actions.push(`
+      <a href="/group?src=heatmap&state=${stateEnc}&county=${countyEnc}"
+         class="action-btn action-group" title="Target ${county.county} County businesses for group coverage">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        Group
+      </a>
+    `);
+
+    // Free quote — consumer lead gen with county targeting via UTM
+    actions.push(`
+      <a href="/free-quote?utm_source=heatmap&utm_campaign=t65_${state.toLowerCase()}&utm_content=${countyEnc}"
+         class="action-btn action-quote" title="Drive Medicare-eligible consumers in ${county.county} to get a quote">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Quote
+      </a>
+    `);
+
+    // Survey — launch a survey campaign for this county's agents
+    actions.push(`
+      <a href="/recruitment?tab=surveys&action=new_survey&state=${stateEnc}&county=${countyEnc}"
+         class="action-btn action-survey" title="Launch survey for ${county.county} County agents">
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+        Survey
+      </a>
+    `);
+
+    return actions.join('');
+  }
+
   function selectState(code) {
     selectedState = code;
     visibleCount = 25;
+    countyVisible = 10;
     document.getElementById('state-filter').value = code;
 
     // Highlight on map
@@ -402,12 +551,16 @@ if (!session) {
     if (el) el.classList.add('selected');
 
     renderTable();
+    renderCountyPanel();
+
+    // Scroll to county panel
+    setTimeout(() => {
+      document.getElementById('county-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
   }
-  // expose to inline onclick
   window.selectState = selectState;
 
   function densityColor(t) {
-    // t: 0-1 normalized density
     if (t < 0.25) return '#fef3c7';
     if (t < 0.5) return '#fcd34d';
     if (t < 0.75) return '#f59e0b';
