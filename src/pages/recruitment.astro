@@ -107,6 +107,9 @@ if (!session) {
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="pipeline">
         ⚙️ Pipeline
       </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="surveys">
+        📊 Surveys
+      </button>
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="roadmap">
         📋 Roadmap
       </button>
@@ -555,6 +558,7 @@ if (!session) {
               <option value="follow_up_1">📨 Follow-up 1 (Day 3)</option>
               <option value="follow_up_2">📨 Follow-up 2 (Day 7)</option>
               <option value="follow_up_exhausted">🚫 No Response</option>
+              <option value="survey_sent">📊 Survey Sent</option>
               <option value="approved">✅ Approved (unsent)</option>
               <option value="converted">🎉 Converted</option>
               <option value="bounced">⚠️ Bounced</option>
@@ -828,6 +832,127 @@ if (!session) {
       </div>
     </div>
 
+    <!-- ═══════════════ SURVEYS TAB ═══════════════ -->
+    <div id="tab-surveys" class="tab-panel hidden">
+      <div class="space-y-6">
+
+        <!-- Survey Campaign List + Create -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Survey Campaigns</h2>
+              <p class="text-xs text-gray-500 mt-0.5">Custom surveys embedded in email — responses stored in Supabase. No external APIs.</p>
+            </div>
+            <button id="survey-create-btn" class="px-4 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors">
+              + New Survey
+            </button>
+          </div>
+
+          <!-- Campaign List -->
+          <div id="survey-campaign-list" class="space-y-3">
+            <div class="text-sm text-gray-400">Loading surveys...</div>
+          </div>
+        </div>
+
+        <!-- Create/Edit Survey Form (hidden by default) -->
+        <div id="survey-form-panel" class="bg-white rounded-xl border border-gray-200 p-6 hidden">
+          <h3 class="text-md font-semibold text-gray-900 mb-4">Create Survey Campaign</h3>
+          <form id="survey-form" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Campaign Name</label>
+              <input type="text" id="survey-name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-500 focus:border-brand-500" placeholder="e.g. GA Agent Pain Points Q2 2026">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea id="survey-description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-500 focus:border-brand-500" placeholder="Brief description of the survey purpose"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Target States</label>
+                <input type="text" id="survey-states" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="GA, AL, MS (comma-separated)">
+                <p class="text-xs text-gray-400 mt-1">Leave blank to target all states</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Target Prospect Status</label>
+                <select id="survey-target-status" multiple class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" size="4">
+                  <option value="follow_up_exhausted" selected>Follow-up Exhausted (Day 14+)</option>
+                  <option value="held">Held (no email — passive research)</option>
+                  <option value="survey_sent">Previously Surveyed</option>
+                  <option value="sent">Sent (active outreach)</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Custom Email Subject <span class="text-gray-400 font-normal">(optional)</span></label>
+              <input type="text" id="survey-subject" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="Auto-generated if blank">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Intro Text <span class="text-gray-400 font-normal">(first paragraph of email)</span></label>
+              <textarea id="survey-intro" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="We're researching the biggest challenges facing insurance agents in your state..."></textarea>
+            </div>
+
+            <!-- Questions Builder -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label class="block text-sm font-medium text-gray-700">Questions</label>
+                <button type="button" id="survey-add-question" class="text-xs font-medium text-brand-600 hover:text-brand-700">+ Add Question</button>
+              </div>
+              <div id="survey-questions-list" class="space-y-3">
+                <!-- Questions are added dynamically -->
+              </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+              <button type="submit" class="px-6 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700">
+                Create Survey
+              </button>
+              <button type="button" id="survey-cancel-btn" class="px-6 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Survey Results Panel (shown when viewing a campaign) -->
+        <div id="survey-results-panel" class="bg-white rounded-xl border border-gray-200 p-6 hidden">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-md font-semibold text-gray-900">Survey Results</h3>
+            <button id="survey-results-close" class="text-sm text-gray-500 hover:text-gray-700">← Back to list</button>
+          </div>
+          <div id="survey-results-content" class="space-y-6">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Passive Pipeline Overview -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-1">Passive Recruiting Pipeline</h2>
+          <p class="text-xs text-gray-500 mb-4">Agents who engage with surveys but aren't in active recruitment states. These build engagement over time and become warm leads when you're ready to recruit in their state.</p>
+          <div id="passive-pipeline-stats" class="grid grid-cols-4 gap-4 mb-4">
+            <div class="text-center p-3 bg-blue-50 rounded-lg">
+              <div class="text-2xl font-bold text-blue-700" id="passive-total">—</div>
+              <div class="text-xs text-blue-600">Survey Engaged</div>
+            </div>
+            <div class="text-center p-3 bg-green-50 rounded-lg">
+              <div class="text-2xl font-bold text-green-700" id="passive-multi">—</div>
+              <div class="text-xs text-green-600">Multi-Response</div>
+            </div>
+            <div class="text-center p-3 bg-purple-50 rounded-lg">
+              <div class="text-2xl font-bold text-purple-700" id="passive-states">—</div>
+              <div class="text-xs text-purple-600">States Covered</div>
+            </div>
+            <div class="text-center p-3 bg-amber-50 rounded-lg">
+              <div class="text-2xl font-bold text-amber-700" id="passive-ready">—</div>
+              <div class="text-xs text-amber-600">Warm & Ready</div>
+            </div>
+          </div>
+          <div id="passive-pipeline-list" class="space-y-2">
+            <div class="text-sm text-gray-400">Launch a survey to start building your passive pipeline.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══════════════ ROADMAP TAB ═══════════════ -->
     <div id="tab-roadmap" class="tab-panel hidden">
       <div class="space-y-6">
@@ -884,7 +1009,7 @@ if (!session) {
                   <h3 class="text-sm font-semibold text-gray-900">Multi-Touch Follow-up Sequences</h3>
                   <span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded font-medium">Live</span>
                 </div>
-                <p class="text-xs text-gray-500 mt-0.5">Automatic follow-up emails at Day 3 and Day 7 for prospects who haven't opened or clicked. Non-responsive prospects move to <code class="text-xs bg-gray-100 px-1 rounded">follow_up_exhausted</code> (No Response) after the final touch. View follow-up status and no-response lists in the Tracking tab.</p>
+                <p class="text-xs text-gray-500 mt-0.5">Automatic follow-up emails at Day 3 and Day 7 for prospects who haven't opened or clicked. Non-responsive prospects move to <code class="text-xs bg-gray-100 px-1 rounded">follow_up_exhausted</code> (No Response) after the final touch. At Day 14, a brief industry survey is sent as a value-add pivot — respondents get early access to published results. View follow-up and survey status in the Tracking tab.</p>
               </div>
             </div>
 
@@ -1052,6 +1177,7 @@ if (!session) {
       if (tab === 'sent') loadSentList();
       if (tab === 'campaigns') loadCampaigns();
       if (tab === 'pipeline') loadPipelineStatus();
+      if (tab === 'surveys') loadSurveyCampaigns();
       if (tab === 'roadmap') loadRoadmapData();
     });
   });
@@ -1250,7 +1376,7 @@ if (!session) {
   // ═══════════════════════════════════════════
   async function refreshPoolStats() {
     try {
-      const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'sent', 'follow_up_1', 'follow_up_2', 'follow_up_exhausted', 'converted', 'rejected'];
+      const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'sent', 'follow_up_1', 'follow_up_2', 'follow_up_exhausted', 'survey_sent', 'converted', 'rejected'];
       const sources = ['prophog_scan', 'csv_import', 'landing_page', 'fl_licensee'];
       const fetches = [
         ...statuses.map(s => fetch(`/api/recruitment-upload?status=${s}&limit=1`).then(r => r.json()).then(d => ({ key: s, count: d.total || 0 }))),
@@ -2421,6 +2547,7 @@ if (!session) {
       if (p.status === 'bounced' || props.bounced_at) indicators.push(`<span class="text-red-500" title="Bounced">⚠️</span>`);
       if (props.follow_up_count >= 1) indicators.push(`<span class="text-orange-500" title="Follow-up ${props.follow_up_count}">📨</span>`);
       if (p.status === 'follow_up_exhausted') indicators.push(`<span class="text-gray-400" title="No response — sequence complete">🚫</span>`);
+      if (p.status === 'survey_sent') indicators.push(`<span class="text-violet-500" title="Survey sent">📊</span>`);
       if (props.call_made_at) indicators.push(`<span class="text-amber-600" title="Called: ${escapeHtml(props.call_outcome || '')}">📞</span>`);
 
       // Stage badge
@@ -2440,6 +2567,7 @@ if (!session) {
         follow_up_1: { label: 'Follow-up 1', color: 'orange' },
         follow_up_2: { label: 'Follow-up 2', color: 'orange' },
         follow_up_exhausted: { label: 'No Response', color: 'gray' },
+        survey_sent: { label: 'Survey Sent', color: 'violet' },
         bounced: { label: 'Bounced', color: 'red' },
       };
       const stageInfo = stageLabels[stage] || { label: stage, color: 'gray' };
@@ -2567,9 +2695,9 @@ if (!session) {
               <!-- Actions -->
               <div class="flex gap-2 flex-wrap">
                 ${p.status === 'approved' && p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Send Email</button>` : ''}
-                ${p.phone && ['sent','follow_up_1','follow_up_2','follow_up_exhausted'].includes(p.status) ? `<a href="tel:${escapeHtml(p.phone)}" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg inline-block text-center">📞 Call ${escapeHtml(p.phone)}</a>` : ''}
-                ${['sent','follow_up_1','follow_up_2','follow_up_exhausted'].includes(p.status) ? `<button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>` : ''}
-                ${['sent','follow_up_1','follow_up_2','follow_up_exhausted','approved'].includes(p.status) ? `<button class="action-btn convert-btn bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">🎉 Mark Converted</button>` : ''}
+                ${p.phone && ['sent','follow_up_1','follow_up_2','follow_up_exhausted','survey_sent'].includes(p.status) ? `<a href="tel:${escapeHtml(p.phone)}" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg inline-block text-center">📞 Call ${escapeHtml(p.phone)}</a>` : ''}
+                ${['sent','follow_up_1','follow_up_2','follow_up_exhausted','survey_sent'].includes(p.status) ? `<button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>` : ''}
+                ${['sent','follow_up_1','follow_up_2','follow_up_exhausted','survey_sent','approved'].includes(p.status) ? `<button class="action-btn convert-btn bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">🎉 Mark Converted</button>` : ''}
               </div>
             </div>
           </details>
@@ -3735,6 +3863,340 @@ if (!session) {
       return `<div class="${colorClass} rounded px-1.5 py-1 text-center text-xs font-medium cursor-default" title="${escapeHtml(title)}">${st}</div>`;
     }).join('');
   }
+
+  // ═══════════════════════════════════════════
+  // SURVEYS
+  // ═══════════════════════════════════════════
+  let surveyQuestionCounter = 0;
+
+  function addSurveyQuestion(defaults?: { text?: string; type?: string; options?: {label: string; value: string}[] }) {
+    surveyQuestionCounter++;
+    const list = document.getElementById('survey-questions-list');
+    if (!list) return;
+    const idx = surveyQuestionCounter;
+    const type = defaults?.type || 'single_choice';
+    const optionsJson = defaults?.options || [
+      { label: 'Option 1', value: 'option_1' },
+      { label: 'Option 2', value: 'option_2' },
+    ];
+
+    const div = document.createElement('div');
+    div.className = 'border border-gray-200 rounded-lg p-3 relative';
+    div.dataset.questionIdx = String(idx);
+    div.innerHTML = `
+      <button type="button" class="survey-remove-q absolute top-2 right-2 text-gray-400 hover:text-red-500 text-xs">✕</button>
+      <div class="grid grid-cols-[1fr_auto] gap-2 mb-2">
+        <input type="text" class="sq-text w-full px-2 py-1.5 border border-gray-200 rounded text-sm" placeholder="Question text" value="${escapeHtml(defaults?.text || '')}">
+        <select class="sq-type px-2 py-1.5 border border-gray-200 rounded text-xs">
+          <option value="single_choice" ${type === 'single_choice' ? 'selected' : ''}>Multiple Choice</option>
+          <option value="scale" ${type === 'scale' ? 'selected' : ''}>Scale (1-5)</option>
+        </select>
+      </div>
+      <div class="sq-options space-y-1">
+        ${optionsJson.map(o => `
+          <div class="flex gap-1 items-center">
+            <input type="text" class="sq-opt-label flex-1 px-2 py-1 border border-gray-100 rounded text-xs" value="${escapeHtml(o.label)}">
+            <input type="text" class="sq-opt-value w-20 px-2 py-1 border border-gray-100 rounded text-xs text-gray-500" value="${escapeHtml(o.value)}" placeholder="value">
+            <button type="button" class="sq-remove-opt text-gray-400 hover:text-red-500 text-xs">✕</button>
+          </div>
+        `).join('')}
+      </div>
+      <button type="button" class="sq-add-opt text-xs text-brand-600 hover:text-brand-700 mt-1">+ Add Option</button>
+    `;
+    list.appendChild(div);
+
+    // Event listeners
+    div.querySelector('.survey-remove-q')?.addEventListener('click', () => div.remove());
+    div.querySelector('.sq-add-opt')?.addEventListener('click', () => {
+      const optContainer = div.querySelector('.sq-options')!;
+      const optDiv = document.createElement('div');
+      optDiv.className = 'flex gap-1 items-center';
+      optDiv.innerHTML = `
+        <input type="text" class="sq-opt-label flex-1 px-2 py-1 border border-gray-100 rounded text-xs" value="" placeholder="Option label">
+        <input type="text" class="sq-opt-value w-20 px-2 py-1 border border-gray-100 rounded text-xs text-gray-500" value="" placeholder="value">
+        <button type="button" class="sq-remove-opt text-gray-400 hover:text-red-500 text-xs">✕</button>
+      `;
+      optContainer.appendChild(optDiv);
+      optDiv.querySelector('.sq-remove-opt')?.addEventListener('click', () => optDiv.remove());
+    });
+    div.querySelectorAll('.sq-remove-opt').forEach(b => b.addEventListener('click', () => (b as HTMLElement).closest('.flex')?.remove()));
+
+    // Type change: if scale, replace options with 1-5
+    div.querySelector('.sq-type')?.addEventListener('change', (e) => {
+      const val = (e.target as HTMLSelectElement).value;
+      const optContainer = div.querySelector('.sq-options')!;
+      if (val === 'scale') {
+        optContainer.innerHTML = [1, 2, 3, 4, 5].map(n => `
+          <div class="flex gap-1 items-center">
+            <input type="text" class="sq-opt-label flex-1 px-2 py-1 border border-gray-100 rounded text-xs" value="${n}">
+            <input type="text" class="sq-opt-value w-20 px-2 py-1 border border-gray-100 rounded text-xs text-gray-500" value="${n}">
+            <button type="button" class="sq-remove-opt text-gray-400 hover:text-red-500 text-xs">✕</button>
+          </div>
+        `).join('');
+      }
+    });
+  }
+
+  function collectSurveyQuestions() {
+    const questions: any[] = [];
+    document.querySelectorAll('#survey-questions-list > div').forEach((div, i) => {
+      const text = (div.querySelector('.sq-text') as HTMLInputElement)?.value?.trim();
+      const type = (div.querySelector('.sq-type') as HTMLSelectElement)?.value || 'single_choice';
+      const options: {label: string; value: string}[] = [];
+      div.querySelectorAll('.sq-options > div').forEach(optDiv => {
+        const label = (optDiv.querySelector('.sq-opt-label') as HTMLInputElement)?.value?.trim();
+        const value = (optDiv.querySelector('.sq-opt-value') as HTMLInputElement)?.value?.trim() || label?.toLowerCase().replace(/\s+/g, '_');
+        if (label) options.push({ label, value });
+      });
+      if (text && options.length > 0) {
+        questions.push({ question_text: text, question_type: type, options, question_order: i });
+      }
+    });
+    return questions;
+  }
+
+  async function loadSurveyCampaigns() {
+    const list = document.getElementById('survey-campaign-list');
+    if (!list) return;
+    try {
+      const res = await fetch('/api/survey-campaigns');
+      const data = await res.json();
+      const campaigns = data.campaigns || [];
+      if (campaigns.length === 0) {
+        list.innerHTML = '<div class="text-sm text-gray-400">No survey campaigns yet. Click "+ New Survey" to create one.</div>';
+        return;
+      }
+      list.innerHTML = campaigns.map((c: any) => {
+        const statusColors: Record<string, string> = {
+          draft: 'bg-gray-100 text-gray-600',
+          active: 'bg-green-100 text-green-700',
+          paused: 'bg-amber-100 text-amber-700',
+          completed: 'bg-blue-100 text-blue-700',
+        };
+        const responseRate = c.send_count > 0 ? Math.round((c.response_count / c.send_count) * 100) : 0;
+        return `
+          <div class="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+            <div class="flex-1">
+              <div class="flex items-center gap-2">
+                <span class="font-medium text-sm text-gray-900">${escapeHtml(c.name)}</span>
+                <span class="text-xs px-1.5 py-0.5 rounded ${statusColors[c.status] || 'bg-gray-100 text-gray-600'}">${c.status}</span>
+              </div>
+              <div class="flex gap-4 mt-1 text-xs text-gray-500">
+                <span>📨 ${c.send_count || 0} sent</span>
+                <span>✅ ${c.response_count || 0} responses</span>
+                ${c.send_count > 0 ? `<span>📈 ${responseRate}% response rate</span>` : ''}
+                <span>🗺️ ${(c.target_states || []).join(', ') || 'All states'}</span>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button class="survey-view-btn text-xs text-brand-600 hover:text-brand-700 font-medium" data-id="${c.id}">View Results</button>
+              ${c.status === 'draft' ? `<button class="survey-activate-btn text-xs text-green-600 hover:text-green-700 font-medium" data-id="${c.id}">Activate</button>` : ''}
+              ${c.status === 'active' ? `<button class="survey-pause-btn text-xs text-amber-600 hover:text-amber-700 font-medium" data-id="${c.id}">Pause</button>` : ''}
+              ${c.status === 'paused' ? `<button class="survey-activate-btn text-xs text-green-600 hover:text-green-700 font-medium" data-id="${c.id}">Resume</button>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Add event listeners
+      list.querySelectorAll('.survey-view-btn').forEach(btn => {
+        btn.addEventListener('click', () => viewSurveyResults((btn as HTMLElement).dataset.id!));
+      });
+      list.querySelectorAll('.survey-activate-btn').forEach(btn => {
+        btn.addEventListener('click', () => updateSurveyStatus((btn as HTMLElement).dataset.id!, 'activate'));
+      });
+      list.querySelectorAll('.survey-pause-btn').forEach(btn => {
+        btn.addEventListener('click', () => updateSurveyStatus((btn as HTMLElement).dataset.id!, 'pause'));
+      });
+    } catch (e) {
+      list.innerHTML = '<div class="text-sm text-red-500">Failed to load surveys</div>';
+    }
+
+    // Load passive pipeline stats
+    loadPassivePipeline();
+  }
+
+  async function updateSurveyStatus(id: string, action: string) {
+    await fetch('/api/survey-campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action }),
+    });
+    loadSurveyCampaigns();
+  }
+
+  async function viewSurveyResults(id: string) {
+    const panel = document.getElementById('survey-results-panel');
+    const content = document.getElementById('survey-results-content');
+    if (!panel || !content) return;
+
+    content.innerHTML = '<div class="text-sm text-gray-400">Loading results...</div>';
+    panel.classList.remove('hidden');
+
+    try {
+      const res = await fetch(`/api/survey-campaigns?id=${encodeURIComponent(id)}`);
+      const data = await res.json();
+      const { campaign, questions, sends, responded, unique_respondents } = data;
+
+      let html = `
+        <div class="grid grid-cols-4 gap-3 mb-6">
+          <div class="text-center p-3 bg-gray-50 rounded-lg">
+            <div class="text-xl font-bold text-gray-800">${sends}</div>
+            <div class="text-xs text-gray-500">Sent</div>
+          </div>
+          <div class="text-center p-3 bg-green-50 rounded-lg">
+            <div class="text-xl font-bold text-green-700">${responded}</div>
+            <div class="text-xs text-green-600">Responded</div>
+          </div>
+          <div class="text-center p-3 bg-blue-50 rounded-lg">
+            <div class="text-xl font-bold text-blue-700">${unique_respondents}</div>
+            <div class="text-xs text-blue-600">Unique Respondents</div>
+          </div>
+          <div class="text-center p-3 bg-purple-50 rounded-lg">
+            <div class="text-xl font-bold text-purple-700">${sends > 0 ? Math.round((responded / sends) * 100) : 0}%</div>
+            <div class="text-xs text-purple-600">Response Rate</div>
+          </div>
+        </div>
+      `;
+
+      // Render each question's results
+      for (const q of questions) {
+        const counts = q.response_counts || {};
+        const totalAnswers = Object.values(counts).reduce((a: number, b: any) => a + b, 0) as number;
+        const options = q.options || [];
+
+        html += `<div class="border border-gray-100 rounded-lg p-4">
+          <h4 class="font-medium text-sm text-gray-900 mb-3">${escapeHtml(q.question_text)}</h4>`;
+
+        if (totalAnswers === 0) {
+          html += `<p class="text-xs text-gray-400">No responses yet</p>`;
+        } else {
+          html += `<div class="space-y-2">`;
+          for (const opt of options) {
+            const count = counts[opt.value] || 0;
+            const pct = totalAnswers > 0 ? Math.round((count / totalAnswers) * 100) : 0;
+            html += `
+              <div class="flex items-center gap-3">
+                <div class="flex-1">
+                  <div class="flex justify-between text-xs mb-0.5">
+                    <span class="text-gray-700">${escapeHtml(opt.label)}</span>
+                    <span class="text-gray-500">${count} (${pct}%)</span>
+                  </div>
+                  <div class="w-full bg-gray-100 rounded-full h-2">
+                    <div class="bg-brand-500 rounded-full h-2 transition-all" style="width: ${pct}%"></div>
+                  </div>
+                </div>
+              </div>
+            `;
+          }
+          html += `</div>`;
+        }
+        html += `</div>`;
+      }
+
+      content.innerHTML = html;
+    } catch (e) {
+      content.innerHTML = '<div class="text-sm text-red-500">Failed to load results</div>';
+    }
+  }
+
+  async function loadPassivePipeline() {
+    // Fetch prospects with interaction_stage = 'survey_engaged' or status = 'survey_sent'
+    try {
+      const res = await fetch('/api/recruitment-upload?status=survey_sent&limit=100');
+      if (!res.ok) return;
+      const data = await res.json();
+      const prospects = data.prospects || [];
+
+      const totalEl = document.getElementById('passive-total');
+      const multiEl = document.getElementById('passive-multi');
+      const statesEl = document.getElementById('passive-states');
+      const readyEl = document.getElementById('passive-ready');
+
+      if (totalEl) totalEl.textContent = String(prospects.length);
+
+      // Count unique states
+      const states = new Set(prospects.map((p: any) => p.state).filter(Boolean));
+      if (statesEl) statesEl.textContent = String(states.size);
+
+      // Multi-response: prospects surveyed more than once (have survey_campaign_id in properties)
+      const multi = prospects.filter((p: any) => p.properties?.survey_response_count > 1);
+      if (multiEl) multiEl.textContent = String(multi.length);
+
+      // Warm & ready: engaged prospects with good fit scores
+      const ready = prospects.filter((p: any) => (p.fit_score || 0) >= 70 || p.interaction_stage === 'survey_engaged');
+      if (readyEl) readyEl.textContent = String(ready.length);
+    } catch {}
+  }
+
+  // Survey form setup
+  document.getElementById('survey-create-btn')?.addEventListener('click', () => {
+    document.getElementById('survey-form-panel')?.classList.remove('hidden');
+    // Add a default first question
+    if (document.querySelectorAll('#survey-questions-list > div').length === 0) {
+      addSurveyQuestion({ text: '', type: 'single_choice', options: [
+        { label: '', value: '' },
+        { label: '', value: '' },
+      ]});
+    }
+  });
+
+  document.getElementById('survey-cancel-btn')?.addEventListener('click', () => {
+    document.getElementById('survey-form-panel')?.classList.add('hidden');
+  });
+
+  document.getElementById('survey-add-question')?.addEventListener('click', () => {
+    addSurveyQuestion();
+  });
+
+  document.getElementById('survey-results-close')?.addEventListener('click', () => {
+    document.getElementById('survey-results-panel')?.classList.add('hidden');
+  });
+
+  document.getElementById('survey-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = (document.getElementById('survey-name') as HTMLInputElement)?.value?.trim();
+    const description = (document.getElementById('survey-description') as HTMLTextAreaElement)?.value?.trim();
+    const statesRaw = (document.getElementById('survey-states') as HTMLInputElement)?.value?.trim();
+    const targetSelect = document.getElementById('survey-target-status') as HTMLSelectElement;
+    const subject = (document.getElementById('survey-subject') as HTMLInputElement)?.value?.trim();
+    const introText = (document.getElementById('survey-intro') as HTMLTextAreaElement)?.value?.trim();
+
+    const target_states = statesRaw ? statesRaw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
+    const target_statuses = Array.from(targetSelect.selectedOptions).map(o => o.value);
+    const questions = collectSurveyQuestions();
+
+    if (!name) { alert('Name is required'); return; }
+    if (questions.length === 0) { alert('At least one question is required'); return; }
+
+    const payload: any = {
+      name,
+      description,
+      target_states,
+      target_statuses,
+      questions,
+      properties: {},
+    };
+    if (subject) payload.properties.subject = subject;
+    if (introText) payload.properties.intro_text = introText;
+
+    const res = await fetch('/api/survey-campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      document.getElementById('survey-form-panel')?.classList.add('hidden');
+      (document.getElementById('survey-form') as HTMLFormElement)?.reset();
+      document.getElementById('survey-questions-list')!.innerHTML = '';
+      surveyQuestionCounter = 0;
+      loadSurveyCampaigns();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      alert(`Error: ${err.error || 'Failed to create survey'}`);
+    }
+  });
 </script>
 
 </Base>
