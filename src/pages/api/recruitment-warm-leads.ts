@@ -100,6 +100,7 @@ export const GET: APIRoute = async ({ request }) => {
       if (props.chat_session_id || props.chat_engaged) { warmth += 4 * d; signals.push('chatted with AI'); }
       if (props.text_consent) { warmth += 5 * d; signals.push('gave consent'); }
       if (p.interaction_stage === 'interested') { warmth += 5 * d; signals.push('expressed interest'); }
+      if (p.interaction_stage === 'invited_to_call') { warmth += 6 * d; signals.push('📅 invite sent'); }
       if (p.interaction_stage === 'replied') { warmth += 6 * d; signals.push('replied'); }
       if (props.email_replied_at) { warmth += 6 * d; signals.push('email reply'); }
       if (p.status === 'scheduled') { warmth += 8 * d; signals.push('scheduled'); }
