@@ -6,10 +6,63 @@ export const prerender = false;
 
 const SUPABASE_URL = import.meta.env.SUPABASE_URL?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+const RESEND_API_KEY = import.meta.env.RESEND_API_KEY?.trim();
+const RECRUITMENT_ALERT_TO = import.meta.env.RECRUITMENT_ALERT_TO?.trim() || import.meta.env.RESEND_ALERT_RECIPIENTS?.trim() || '';
+const SITE_URL = import.meta.env.SITE?.trim() || 'https://legacyfinancial.app';
 
 // Fieldwork Systems coordinator project (owns the opt-out list)
 const WO_SUPABASE_URL = import.meta.env.FWSYS_SUPABASE_URL?.trim() || import.meta.env.WO_SUPABASE_URL?.trim();
 const WO_SUPABASE_SERVICE_ROLE_KEY = import.meta.env.FWSYS_SUPABASE_SERVICE_ROLE_KEY?.trim() || import.meta.env.WO_SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+/**
+ * Fire a recruitment-specific alert to Josh (or configured recipient) when
+ * a prospect replies. Includes prospect name, stage, and message preview.
+ */
+async function alertRecruitmentReply(opts: {
+  senderEmail: string;
+  prospectName?: string;
+  prospectId?: string;
+  stage?: string;
+  subject: string;
+  preview: string;
+}) {
+  const recipients = RECRUITMENT_ALERT_TO.split(',').map(e => e.trim()).filter(Boolean);
+  if (!recipients.length || !RESEND_API_KEY) return;
+
+  const { senderEmail, prospectName, prospectId, stage, subject, preview } = opts;
+  const dashUrl = `${SITE_URL}/recruitment`;
+  const who = prospectName ? `${prospectName} (${senderEmail})` : senderEmail;
+  const stageLabel = stage ? `Stage: ${stage}` : 'Unknown prospect';
+
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: 'Recruitment Alerts <ops@legacyfinancial.app>',
+      to: recipients,
+      reply_to: senderEmail,
+      subject: `💬 Recruitment Reply — ${who}`,
+      html: [
+        '<div style="font-family:sans-serif;max-width:600px">',
+        `<h2 style="color:#1e40af">Recruitment Reply Received</h2>`,
+        `<p><strong>From:</strong> ${who}</p>`,
+        `<p><strong>${stageLabel}</strong>${prospectId ? ` | ID: ${prospectId}` : ''}</p>`,
+        `<p><strong>Subject:</strong> ${subject || '(no subject)'}</p>`,
+        '<hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0">',
+        `<p style="white-space:pre-wrap;color:#374151">${preview || '(empty message)'}</p>`,
+        '<hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0">',
+        `<p><a href="${dashUrl}" style="color:#2563eb">Open Recruitment Dashboard →</a></p>`,
+        '<p style="color:#6b7280;font-size:12px">Reply directly to this email to respond to the prospect.</p>',
+        '</div>',
+      ].join(''),
+      text: `Recruitment Reply from ${who}\n${stageLabel}\nSubject: ${subject}\n\n${preview}\n\nDashboard: ${dashUrl}`,
+      headers: { 'X-Legacy-Template': 'recruitment-alert' },
+    }),
+  }).catch(err => console.error('Failed to send recruitment reply alert:', err));
+}
 
 /**
  * Track recruitment email events (opens, bounces, etc.) back to the prospect record.
@@ -30,10 +83,16 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
     const senderEmail = emailMatch?.[1]?.toLowerCase().trim();
     if (!senderEmail) return;
 
+    // Build reply preview (truncate to 500 chars)
+    const rawText = typeof data.text === 'string' ? data.text : '';
+    const subject = typeof data.subject === 'string' ? data.subject : '';
+    const replyPreview = rawText.replace(/\s+/g, ' ').trim().slice(0, 500);
+    const now = new Date().toISOString();
+
     try {
       // Look up prospect by email
       const lookupRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/recruitment_prospects?email=ilike.${encodeURIComponent(senderEmail)}&select=id,properties,interaction_stage&limit=1`,
+        `${SUPABASE_URL}/rest/v1/recruitment_prospects?email=ilike.${encodeURIComponent(senderEmail)}&select=id,name,properties,interaction_stage&limit=1`,
         {
           headers: {
             apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -42,18 +101,21 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
           },
         }
       );
-      if (!lookupRes.ok) return;
+      if (!lookupRes.ok) {
+        // Still alert for unknown sender if lookup failed
+        await alertRecruitmentReply({ senderEmail, subject, preview: replyPreview });
+        return;
+      }
       const [prospect] = await lookupRes.json();
-      if (!prospect) return;
+
+      if (!prospect) {
+        // Unknown sender — still alert so no message goes unseen
+        await alertRecruitmentReply({ senderEmail, subject, preview: replyPreview });
+        return;
+      }
 
       const existing = prospect.properties || {};
       const currentStage = prospect.interaction_stage || 'new';
-
-      // Build reply preview (truncate to 500 chars)
-      const rawText = typeof data.text === 'string' ? data.text : '';
-      const subject = typeof data.subject === 'string' ? data.subject : '';
-      const replyPreview = rawText.replace(/\s+/g, ' ').trim().slice(0, 500);
-      const now = new Date().toISOString();
 
       // Append to reply history
       const replies = Array.isArray(existing.email_replies) ? existing.email_replies : [];
@@ -85,6 +147,16 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
           properties: propsPatch,
           ...stageUpdate,
         }),
+      });
+
+      // Fire recruitment-specific alert with prospect context
+      await alertRecruitmentReply({
+        senderEmail,
+        prospectName: prospect.name,
+        prospectId: prospect.id,
+        stage: currentStage,
+        subject,
+        preview: replyPreview,
       });
     } catch (err) {
       console.error('Failed to track inbound reply to recruitment prospect:', err);
