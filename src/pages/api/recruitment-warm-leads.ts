@@ -50,31 +50,62 @@ export const GET: APIRoute = async ({ request }) => {
       return Response.json({ leads: [], chatLogs: {} });
     }
 
-    // Score each prospect by engagement depth
+    // Decay function: warmth decays based on days since last activity.
+    // Half-life of ~5 days — after 5 days a signal is worth 50%, after 10 days ~25%, etc.
+    const HALF_LIFE_DAYS = 5;
+    const now = Date.now();
+
+    function decay(timestamp: unknown): number {
+      if (!timestamp) return 0.3; // No timestamp → treat as old (30% weight)
+      const ms = new Date(timestamp as string).getTime();
+      if (isNaN(ms)) return 0.3;
+      const daysSince = (now - ms) / (1000 * 60 * 60 * 24);
+      return Math.pow(0.5, daysSince / HALF_LIFE_DAYS);
+    }
+
+    // Find the most recent activity timestamp for a prospect
+    function lastActivity(props: Record<string, unknown>, p: any): unknown {
+      const timestamps = [
+        props.email_opened_at, props.email_clicked_at,
+        props.join_page_visited_at, props.chat_engaged_at,
+        props.email_replied_at, p.sent_at,
+      ].filter(Boolean);
+      if (timestamps.length === 0) return null;
+      return timestamps.reduce((latest, ts) => {
+        const d = new Date(ts as string).getTime();
+        return d > new Date(latest as string).getTime() ? ts : latest;
+      });
+    }
+
+    // Score each prospect by engagement depth, decayed over time
     const scored = prospects.map((p: any) => {
       const props = (p.properties || {}) as Record<string, unknown>;
       let warmth = 0;
       const signals: string[] = [];
 
-      if (props.email_opened_at) { warmth += 1; signals.push('opened'); }
+      // Use most recent activity for decay factor
+      const lastTs = lastActivity(props, p);
+      const d = decay(lastTs);
+
+      if (props.email_opened_at) { warmth += 1 * d; signals.push('opened'); }
       if (props.email_clicked_at) {
         const isBot = !!props.email_click_bot_detected;
-        if (!isBot) { warmth += 2; signals.push('clicked'); }
-        else { warmth += 0.5; signals.push('clicked (bot?)'); }
+        if (!isBot) { warmth += 2 * d; signals.push('clicked'); }
+        else { warmth += 0.5 * d; signals.push('clicked (bot?)'); }
       }
-      if (props.join_page_visited_at) { warmth += 3; signals.push('visited /join'); }
+      if (props.join_page_visited_at) { warmth += 3 * d; signals.push('visited /join'); }
       if (props.join_page_visit_count && Number(props.join_page_visit_count) > 1) {
-        warmth += 1; signals.push(`${props.join_page_visit_count} visits`);
+        warmth += 1 * d; signals.push(`${props.join_page_visit_count} visits`);
       }
-      if (props.chat_session_id || props.chat_engaged) { warmth += 4; signals.push('chatted with AI'); }
-      if (props.text_consent) { warmth += 5; signals.push('gave consent'); }
-      if (p.interaction_stage === 'interested') { warmth += 5; signals.push('expressed interest'); }
-      if (p.interaction_stage === 'replied') { warmth += 6; signals.push('replied'); }
-      if (props.email_replied_at) { warmth += 6; signals.push('email reply'); }
-      if (p.status === 'scheduled') { warmth += 8; signals.push('scheduled'); }
-      if (p.status === 'converted') { warmth += 10; signals.push('converted'); }
+      if (props.chat_session_id || props.chat_engaged) { warmth += 4 * d; signals.push('chatted with AI'); }
+      if (props.text_consent) { warmth += 5 * d; signals.push('gave consent'); }
+      if (p.interaction_stage === 'interested') { warmth += 5 * d; signals.push('expressed interest'); }
+      if (p.interaction_stage === 'replied') { warmth += 6 * d; signals.push('replied'); }
+      if (props.email_replied_at) { warmth += 6 * d; signals.push('email reply'); }
+      if (p.status === 'scheduled') { warmth += 8 * d; signals.push('scheduled'); }
+      if (p.status === 'converted') { warmth += 10 * d; signals.push('converted'); }
 
-      return { ...p, warmth, signals };
+      return { ...p, warmth, signals, lastActivity: lastTs, decayFactor: d };
     });
 
     // Sort by warmth descending, filter out 0-warmth

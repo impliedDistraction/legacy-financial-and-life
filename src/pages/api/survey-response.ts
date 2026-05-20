@@ -162,25 +162,35 @@ export const GET: APIRoute = async ({ url }) => {
         }),
       });
 
-      // Update campaign response_count (approximate, updated on each answer)
-      await supa(`survey_campaigns?id=eq.${encodeURIComponent(cid)}`, {
-        method: 'PATCH',
-        headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          response_count: campaign.response_count + 1,
-          updated_at: new Date().toISOString(),
-        }),
-      });
+      // Mark survey_sends as responded (check if already responded to avoid double-counting)
+      const sendCheckRes = await supa(
+        `survey_sends?campaign_id=eq.${encodeURIComponent(cid)}&prospect_id=eq.${encodeURIComponent(pid)}&select=id,responded&limit=1`
+      );
+      const [sendRecord] = sendCheckRes.ok ? await sendCheckRes.json() : [null];
+      const isFirstResponse = sendRecord && !sendRecord.responded;
 
-      // Mark survey_sends as responded
-      await supa(`survey_sends?campaign_id=eq.${encodeURIComponent(cid)}&prospect_id=eq.${encodeURIComponent(pid)}`, {
-        method: 'PATCH',
-        headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          responded: true,
-          responded_at: new Date().toISOString(),
-        }),
-      });
+      if (sendRecord) {
+        await supa(`survey_sends?id=eq.${encodeURIComponent(sendRecord.id)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            responded: true,
+            responded_at: new Date().toISOString(),
+          }),
+        });
+      }
+
+      // Only increment response_count for first-time respondents (not per-answer)
+      if (isFirstResponse) {
+        await supa(`survey_campaigns?id=eq.${encodeURIComponent(cid)}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            response_count: campaign.response_count + 1,
+            updated_at: new Date().toISOString(),
+          }),
+        });
+      }
 
       // Update prospect engagement tracking
       await supa(`recruitment_prospects?id=eq.${encodeURIComponent(pid)}`, {

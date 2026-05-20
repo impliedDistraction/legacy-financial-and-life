@@ -604,7 +604,7 @@ if (!session) {
               <h3 class="font-semibold text-gray-900 text-sm">Hot Leads — Ready to Call</h3>
               <span class="text-xs text-gray-500 ml-auto" id="hot-leads-count"></span>
             </div>
-            <p class="text-xs text-gray-500 mb-3">These prospects engaged beyond just receiving an email. Sorted by engagement depth — the top one is your best bet for a call right now.</p>
+            <p class="text-xs text-gray-500 mb-3">Sorted by engagement depth &amp; recency. Leads cool over time — act on hot ones before they go cold.</p>
             <div id="hot-leads-list" class="space-y-2"></div>
           </div>
         </div>
@@ -2308,6 +2308,12 @@ if (!session) {
               <button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
             ` : ''}
+            ${status === 'held' ? `
+              <span class="text-xs text-amber-600 italic">⏸️ ${(p.properties?.agent_reasons || []).length ? escapeHtml((p.properties.agent_reasons).join(' · ')) : p.properties?.held_reason === 'no_email' ? 'No email address' : 'Held for manual review'}</span>
+              <button class="action-btn approve-btn bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✓ Approve</button>
+              ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Approve & Send</button>` : ''}
+              <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
+            ` : ''}
             ${status === 'rejected' ? `
               <span class="text-xs text-gray-400 italic">${p.qa_rejection_reason ? 'QA: ' + escapeHtml(p.qa_rejection_reason) : (p.properties?.rejection_reason) ? 'Reason: ' + escapeHtml(p.properties.rejection_reason) : 'No reason given'}</span>
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg ml-auto" data-id="${p.id}" title="Permanently delete">🗑️ Delete forever</button>
@@ -2825,6 +2831,11 @@ if (!session) {
     } catch { /* silent */ }
   }
 
+  // Safelist for warmth decay dynamic classes:
+  // border-amber-100 border-amber-300 bg-amber-100 text-amber-700
+  // border-orange-100 border-orange-300 bg-orange-100 text-orange-700
+  // border-gray-100 border-gray-300 bg-gray-100 text-gray-700
+  // hover:border-amber-300 hover:border-orange-300 hover:border-gray-300
   function renderHotLeads(leads: any[], chatLogs: Record<string, any[]>) {
     const section = document.getElementById('hot-leads-section')!;
     const list = document.getElementById('hot-leads-list')!;
@@ -2913,17 +2924,22 @@ if (!session) {
           </details>`;
       }
 
+      // Color the card border and icon based on warmth decay
+      const warmColor = p.decayFactor > 0.7 ? 'amber' : p.decayFactor > 0.4 ? 'orange' : 'gray';
+      const tempEmoji = p.decayFactor > 0.7 ? '🔥' : p.decayFactor > 0.4 ? '🌡️' : '❄️';
+      const tempLabel = p.decayFactor > 0.7 ? 'Hot' : p.decayFactor > 0.4 ? 'Warm' : 'Cooling';
+
       return `
-        <div class="bg-white rounded-lg border border-amber-100 p-3 hover:border-amber-300 transition-colors">
+        <div class="bg-white rounded-lg border border-${warmColor}-100 p-3 hover:border-${warmColor}-300 transition-colors">
           <div class="flex items-center gap-3">
-            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-              <span class="text-sm">🔥</span>
+            <div class="flex-shrink-0 w-8 h-8 rounded-full bg-${warmColor}-100 flex items-center justify-center">
+              <span class="text-sm">${tempEmoji}</span>
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="font-semibold text-sm text-gray-900">${escapeHtml(p.name)}</span>
                 ${p.fit_score ? `<span class="text-xs font-bold ${p.fit_score >= 7 ? 'text-green-600' : 'text-amber-600'}">${p.fit_score}/10</span>` : ''}
-                <span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">Warmth: ${Math.round(p.warmth)}</span>
+                <span class="text-xs bg-${warmColor}-100 text-${warmColor}-700 px-1.5 py-0.5 rounded font-medium">${tempLabel}: ${Math.round(p.warmth)}</span>
               </div>
               <div class="text-xs text-gray-500 mt-0.5">
                 ${p.phone ? `📞 <a href="tel:${escapeHtml(p.phone)}" class="text-brand-600 hover:underline">${escapeHtml(p.phone)}</a>` : '<span class="text-amber-500">No phone</span>'}
@@ -2944,17 +2960,75 @@ if (!session) {
         </div>`;
     }).join('');
 
-    // Bind view buttons to scroll to matching card in sent list
+    // Bind view buttons to toggle inline detail panel
     list.querySelectorAll('.hot-lead-view-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const id = (btn as HTMLElement).dataset.id;
-        // Look for the prospect card in the sent list
-        const card = sentList.querySelector(`[data-prospect-id="${id}"]`);
-        if (card) {
-          (card as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
-          card.classList.add('ring-2', 'ring-amber-400');
-          setTimeout(() => card.classList.remove('ring-2', 'ring-amber-400'), 3000);
+        const el = btn as HTMLElement;
+        const id = el.dataset.id;
+        const card = el.closest('.bg-white') as HTMLElement;
+        if (!card) return;
+
+        // Toggle existing detail panel
+        const existing = card.querySelector('.hot-lead-detail');
+        if (existing) {
+          existing.remove();
+          el.textContent = 'View';
+          return;
         }
+
+        // Find the prospect data
+        const prospect = leads.find((p: any) => p.id === id);
+        if (!prospect) return;
+        const props = prospect.properties || {};
+        const logs = chatLogs[id!] || [];
+
+        el.textContent = 'Hide';
+
+        // Build detail panel
+        const detail = document.createElement('div');
+        detail.className = 'hot-lead-detail mt-3 border-t border-amber-100 pt-3 space-y-2';
+
+        // Timeline
+        const timelineItems: string[] = [];
+        if (prospect.sent_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(prospect.sent_at)}</span><span>📧 Email sent</span></div>`);
+        if (props.follow_up_1_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.follow_up_1_at)}</span><span class="text-orange-600">📨 Follow-up 1</span></div>`);
+        if (props.follow_up_2_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.follow_up_2_at)}</span><span class="text-orange-600">📨 Follow-up 2</span></div>`);
+        if (props.email_opened_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.email_opened_at)}</span><span class="text-green-600">👁️ Opened</span></div>`);
+        if (props.email_clicked_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.email_clicked_at)}</span><span class="text-purple-600">🔗 Clicked${props.email_click_bot_detected ? ' (bot?)' : ''}</span></div>`);
+        if (props.join_page_visited_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.join_page_visited_at)}</span><span class="text-cyan-600">🌐 Visited /join${props.join_page_visit_count > 1 ? ' (' + props.join_page_visit_count + 'x)' : ''}</span></div>`);
+        if (props.email_replied_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.email_replied_at)}</span><span class="text-indigo-600">💬 Replied</span></div>`);
+        if (props.call_made_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.call_made_at)}</span><span class="text-amber-600">📞 Called</span></div>`);
+
+        let detailHtml = `<div class="bg-gray-50 rounded-lg p-2"><p class="text-xs font-medium text-gray-700 mb-1">Timeline</p><div class="space-y-1 text-xs">${timelineItems.join('')}</div></div>`;
+
+        // Fit reason
+        if (prospect.fit_reason) {
+          detailHtml += `<p class="text-xs text-gray-500 italic">${escapeHtml(prospect.fit_reason)}</p>`;
+        }
+
+        // Decay info
+        if (prospect.lastActivity) {
+          const ago = timeSince(prospect.lastActivity);
+          const pct = Math.round((prospect.decayFactor || 1) * 100);
+          detailHtml += `<p class="text-xs text-gray-400">Last activity: ${ago} ago (warmth at ${pct}% strength)</p>`;
+        }
+
+        // Chat preview (if any — already shown above, but full view here)
+        if (logs.length > 0) {
+          detailHtml += `
+            <div class="bg-white rounded-lg border border-gray-200 p-2 max-h-48 overflow-y-auto space-y-1.5">
+              <p class="text-xs font-medium text-teal-600 mb-1">💬 Full Chat (${logs.length} messages)</p>
+              ${logs.map((log: any) => `
+                <div class="text-xs">
+                  <div class="flex gap-1.5"><span class="text-blue-600 font-medium flex-shrink-0">Them:</span><span class="text-gray-700">${escapeHtml(log.user_message || '')}</span></div>
+                  <div class="flex gap-1.5 mt-0.5"><span class="text-brand-600 font-medium flex-shrink-0">AI:</span><span class="text-gray-600">${escapeHtml(log.assistant_message || '')}</span></div>
+                </div>
+              `).join('<hr class="border-gray-100">')}
+            </div>`;
+        }
+
+        detail.innerHTML = detailHtml;
+        card.appendChild(detail);
       });
     });
 
@@ -3983,7 +4057,7 @@ if (!session) {
               </div>
               <div class="flex gap-4 mt-1 text-xs text-gray-500">
                 <span>📨 ${c.send_count || 0} sent</span>
-                <span>✅ ${c.response_count || 0} responses</span>
+                <span>✅ ${c.response_count || 0} respondents</span>
                 ${c.send_count > 0 ? `<span>📈 ${responseRate}% response rate</span>` : ''}
                 <span>🗺️ ${(c.target_states || []).join(', ') || 'All states'}</span>
               </div>

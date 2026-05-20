@@ -78,10 +78,32 @@ export const GET: APIRoute = async ({ request, url }) => {
     });
   }
 
-  // List all campaigns
-  const res = await supa('survey_campaigns?order=created_at.desc');
-  if (!res.ok) return jsonRes({ error: 'Failed to fetch campaigns' }, 500);
-  const campaigns = await res.json();
+  // List all campaigns with accurate counts from survey_sends
+  const [campRes, sendsCountRes] = await Promise.all([
+    supa('survey_campaigns?order=created_at.desc'),
+    supa('survey_sends?select=campaign_id,responded'),
+  ]);
+  if (!campRes.ok) return jsonRes({ error: 'Failed to fetch campaigns' }, 500);
+  const campaigns = await campRes.json();
+  const allSends = sendsCountRes.ok ? await sendsCountRes.json() : [];
+
+  // Build accurate counts per campaign from survey_sends (truth source)
+  const sendCounts: Record<string, { sent: number; responded: number }> = {};
+  for (const s of allSends) {
+    if (!sendCounts[s.campaign_id]) sendCounts[s.campaign_id] = { sent: 0, responded: 0 };
+    sendCounts[s.campaign_id].sent++;
+    if (s.responded) sendCounts[s.campaign_id].responded++;
+  }
+
+  // Override cached counts with accurate values
+  for (const c of campaigns) {
+    const accurate = sendCounts[c.id];
+    if (accurate) {
+      c.send_count = accurate.sent;
+      c.response_count = accurate.responded;
+    }
+  }
+
   return jsonRes({ campaigns });
 };
 
