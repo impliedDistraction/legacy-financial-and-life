@@ -866,13 +866,28 @@ if (!session) {
               <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea id="survey-description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-brand-500 focus:border-brand-500" placeholder="Brief description of the survey purpose"></textarea>
             </div>
+            <!-- Targeting Mode Toggle -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Targeting Mode</label>
+              <div class="flex gap-3">
+                <label class="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                  <input type="radio" name="survey-targeting-mode" value="pipeline" checked class="text-brand-600">
+                  <span class="text-sm">Pipeline (in-flow prospects)</span>
+                </label>
+                <label class="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg cursor-pointer has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                  <input type="radio" name="survey-targeting-mode" value="standalone" class="text-brand-600">
+                  <span class="text-sm">Standalone (target from source)</span>
+                </label>
+              </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Target States</label>
                 <input type="text" id="survey-states" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="GA, AL, MS (comma-separated)">
                 <p class="text-xs text-gray-400 mt-1">Leave blank to target all states</p>
               </div>
-              <div>
+              <div id="survey-status-group">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Target Prospect Status</label>
                 <select id="survey-target-status" multiple class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" size="4">
                   <option value="follow_up_exhausted" selected>Follow-up Exhausted (Day 14+)</option>
@@ -880,6 +895,33 @@ if (!session) {
                   <option value="survey_sent">Previously Surveyed</option>
                   <option value="sent">Sent (active outreach)</option>
                 </select>
+              </div>
+            </div>
+
+            <!-- Standalone Targeting Options (hidden by default) -->
+            <div id="survey-standalone-opts" class="hidden space-y-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Source</label>
+                  <select id="survey-source" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="any_with_email">Any with email</option>
+                    <option value="fl_licensee">🏛️ FL Licensee</option>
+                    <option value="state_licensee">🏛️ State Licensee (other)</option>
+                    <option value="prophog_scan">🔍 Prophog</option>
+                    <option value="csv_import">📤 CSV Import</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Send Limit <span class="text-gray-400 font-normal">(0 = unlimited)</span></label>
+                  <input type="number" id="survey-send-limit" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" value="0" min="0">
+                </div>
+              </div>
+              <div id="survey-county-group">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Target Counties <span class="text-gray-400 font-normal">(T65 Heatmap)</span></label>
+                <div id="survey-county-picker" class="border border-gray-300 rounded-lg p-3 max-h-48 overflow-y-auto">
+                  <p class="text-xs text-gray-400">Select FL state above to load T65 heatmap counties</p>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Top counties by T65 opportunity score. Leave unchecked to target all counties.</p>
               </div>
             </div>
             <div>
@@ -4219,6 +4261,69 @@ if (!session) {
     document.getElementById('survey-form-panel')?.classList.add('hidden');
   });
 
+  // Targeting mode toggle — show/hide standalone options
+  document.querySelectorAll('input[name="survey-targeting-mode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const mode = (e.target as HTMLInputElement).value;
+      const standaloneOpts = document.getElementById('survey-standalone-opts');
+      const statusGroup = document.getElementById('survey-status-group');
+      if (mode === 'standalone') {
+        standaloneOpts?.classList.remove('hidden');
+        statusGroup?.classList.add('hidden');
+      } else {
+        standaloneOpts?.classList.add('hidden');
+        statusGroup?.classList.remove('hidden');
+      }
+    });
+  });
+
+  // T65 county picker — loads when FL is in target states and standalone mode is active
+  let t65CountiesCache: any[] | null = null;
+  async function loadT65Counties() {
+    if (t65CountiesCache) return t65CountiesCache;
+    try {
+      const res = await fetch('/api/t65-data');
+      if (!res.ok) return [];
+      const data = await res.json();
+      // Sentinel returns { counties: { states: { FL: { counties: [...] } } } }
+      const fl = data?.counties?.states?.FL?.counties || data?.states?.FL?.counties || [];
+      t65CountiesCache = fl.sort((a: any, b: any) => (b.opportunityScore || 0) - (a.opportunityScore || 0));
+      return t65CountiesCache;
+    } catch { return []; }
+  }
+
+  async function renderCountyPicker() {
+    const picker = document.getElementById('survey-county-picker');
+    if (!picker) return;
+    const statesRaw = (document.getElementById('survey-states') as HTMLInputElement)?.value?.trim().toUpperCase() || '';
+    const hasFL = !statesRaw || statesRaw.split(',').map(s => s.trim()).includes('FL');
+    if (!hasFL) {
+      picker.innerHTML = '<p class="text-xs text-gray-400">County targeting available for FL only. Add FL to target states.</p>';
+      return;
+    }
+    const counties = await loadT65Counties();
+    if (counties.length === 0) {
+      picker.innerHTML = '<p class="text-xs text-gray-400">No T65 county data available. Run census worker to populate.</p>';
+      return;
+    }
+    picker.innerHTML = counties.map((c: any) => `
+      <label class="flex items-center gap-2 py-1 cursor-pointer hover:bg-gray-100 rounded px-1">
+        <input type="checkbox" value="${c.county}" class="rounded text-brand-600">
+        <span class="text-sm">${c.county}</span>
+        <span class="text-xs text-gray-400 ml-auto">${(c.t65Pop || 0).toLocaleString()} T65 · ${(c.density || 0).toFixed(1)}%</span>
+      </label>
+    `).join('');
+  }
+
+  // Re-render county picker when states change
+  document.getElementById('survey-states')?.addEventListener('blur', renderCountyPicker);
+  // Also render when standalone mode is toggled on
+  document.querySelectorAll('input[name="survey-targeting-mode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      if ((e.target as HTMLInputElement).value === 'standalone') renderCountyPicker();
+    });
+  });
+
   document.getElementById('survey-add-question')?.addEventListener('click', () => {
     addSurveyQuestion();
   });
@@ -4236,8 +4341,14 @@ if (!session) {
     const subject = (document.getElementById('survey-subject') as HTMLInputElement)?.value?.trim();
     const introText = (document.getElementById('survey-intro') as HTMLTextAreaElement)?.value?.trim();
 
+    // Targeting mode
+    const mode = (document.querySelector('input[name="survey-targeting-mode"]:checked') as HTMLInputElement)?.value || 'pipeline';
+    const isStandalone = mode === 'standalone';
+
     const target_states = statesRaw ? statesRaw.split(',').map(s => s.trim().toUpperCase()).filter(Boolean) : [];
-    const target_statuses = Array.from(targetSelect.selectedOptions).map(o => o.value);
+    const target_statuses = isStandalone
+      ? ['any_with_email']
+      : Array.from(targetSelect.selectedOptions).map(o => o.value);
     const questions = collectSurveyQuestions();
 
     if (!name) { alert('Name is required'); return; }
@@ -4253,6 +4364,19 @@ if (!session) {
     };
     if (subject) payload.properties.subject = subject;
     if (introText) payload.properties.intro_text = introText;
+
+    // Standalone targeting props
+    if (isStandalone) {
+      const source = (document.getElementById('survey-source') as HTMLSelectElement)?.value;
+      const sendLimit = parseInt((document.getElementById('survey-send-limit') as HTMLInputElement)?.value || '0', 10);
+      const checkedCounties = Array.from(document.querySelectorAll('#survey-county-picker input[type="checkbox"]:checked'))
+        .map((cb: any) => cb.value);
+
+      if (source && source !== 'any_with_email') payload.properties.target_source = source;
+      if (sendLimit > 0) payload.properties.send_limit = sendLimit;
+      if (checkedCounties.length > 0) payload.properties.target_counties = checkedCounties;
+      payload.properties.standalone = true;
+    }
 
     const res = await fetch('/api/survey-campaigns', {
       method: 'POST',

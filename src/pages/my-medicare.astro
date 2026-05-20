@@ -1,0 +1,480 @@
+---
+import Base from '../layouts/Base.astro';
+import '../styles/tailwind.css';
+
+export const prerender = false;
+
+// Token-based access — no login needed, just a signed link
+const token = Astro.url.searchParams.get('token');
+if (!token) {
+  return Astro.redirect('/');
+}
+---
+
+<Base
+  title="My Medicare Dashboard — Legacy Financial & Life"
+  description="Your personal Medicare planning portal. View your coverage, chat with our advisor, and request plan reviews anytime."
+>
+  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
+    <div class="mx-auto max-w-6xl flex items-center justify-between gap-4 px-4 py-3">
+      <a href="/" class="text-sm font-medium text-brand-600">Legacy Financial & Life</a>
+      <span class="text-xs text-slate-500">Your Medicare Dashboard</span>
+    </div>
+  </header>
+
+  <main class="bg-slate-50 min-h-screen">
+    <!-- Loading state -->
+    <div id="loading" class="flex items-center justify-center py-20">
+      <div class="text-center">
+        <div class="inline-block w-8 h-8 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin"></div>
+        <p class="mt-4 text-slate-600">Loading your dashboard...</p>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div id="error" class="hidden max-w-lg mx-auto py-20 px-4 text-center">
+      <div class="text-4xl mb-4">🔒</div>
+      <h2 class="text-xl font-bold text-slate-900 mb-2">Access Expired</h2>
+      <p class="text-slate-600 mb-6">This link may have expired or is invalid. Please contact Beth for a new access link.</p>
+      <a href="tel:7063335641" class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white hover:bg-brand-700 transition-colors">
+        Call (706) 333-5641
+      </a>
+    </div>
+
+    <!-- Dashboard content (hidden until loaded) -->
+    <div id="dashboard" class="hidden">
+      <!-- Welcome banner -->
+      <div class="bg-gradient-to-r from-brand-600 to-brand-700 text-white px-4 py-8">
+        <div class="mx-auto max-w-4xl">
+          <h1 class="text-2xl font-bold" id="welcome-name">Welcome back</h1>
+          <p class="text-brand-100 mt-1" id="welcome-subtitle">Your Medicare planning hub</p>
+        </div>
+      </div>
+
+      <div class="mx-auto max-w-4xl px-4 py-8 grid gap-8">
+
+        <!-- Status Card -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <span class="text-2xl">📋</span> Your Medicare Status
+          </h2>
+          <div class="grid sm:grid-cols-3 gap-4" id="status-cards">
+            <div class="rounded-lg bg-slate-50 p-4">
+              <div class="text-xs font-medium text-slate-500 uppercase">Status</div>
+              <div class="text-lg font-semibold text-slate-900 mt-1" id="status-label">—</div>
+            </div>
+            <div class="rounded-lg bg-slate-50 p-4">
+              <div class="text-xs font-medium text-slate-500 uppercase">Next Step</div>
+              <div class="text-sm text-slate-700 mt-1" id="status-next-step">—</div>
+            </div>
+            <div class="rounded-lg bg-slate-50 p-4">
+              <div class="text-xs font-medium text-slate-500 uppercase">Next Check-in</div>
+              <div class="text-sm text-slate-700 mt-1" id="status-checkin">—</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Timeline / Key Dates -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <span class="text-2xl">📅</span> Your Medicare Timeline
+          </h2>
+          <div id="timeline" class="space-y-3">
+            <!-- Populated by JS -->
+          </div>
+        </section>
+
+        <!-- Your Information (editable review) -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <span class="text-2xl">👤</span> Your Information
+            </h2>
+            <button id="btn-update-info" class="text-sm text-brand-600 hover:text-brand-700 font-medium">
+              Request Update
+            </button>
+          </div>
+          <div id="client-info" class="grid sm:grid-cols-2 gap-4 text-sm">
+            <!-- Populated by JS -->
+          </div>
+        </section>
+
+        <!-- Medications -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <span class="text-2xl">💊</span> Your Medications
+            </h2>
+            <button id="btn-add-medication" class="text-sm text-brand-600 hover:text-brand-700 font-medium">
+              + Add Medication
+            </button>
+          </div>
+          <div id="medications-list" class="space-y-2">
+            <p class="text-slate-500 text-sm">No medications on file yet.</p>
+          </div>
+          <!-- Add medication form (hidden) -->
+          <div id="add-med-form" class="hidden mt-4 border-t pt-4">
+            <div class="flex gap-2">
+              <input type="text" id="med-input" placeholder="Type medication name..."
+                class="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:outline-none" />
+              <button id="btn-submit-med" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors">
+                Add
+              </button>
+            </div>
+            <div id="med-suggestions" class="mt-2 hidden rounded-lg border border-slate-200 bg-white shadow-lg max-h-48 overflow-y-auto"></div>
+          </div>
+        </section>
+
+        <!-- Plan Review -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <span class="text-2xl">🔍</span> Plan Reviews
+          </h2>
+          <div id="plan-reviews" class="space-y-3">
+            <p class="text-slate-500 text-sm">No plan reviews yet.</p>
+          </div>
+          <button id="btn-request-review" class="mt-4 rounded-lg bg-brand-50 border border-brand-200 px-4 py-3 text-sm font-medium text-brand-700 hover:bg-brand-100 transition-colors w-full text-center">
+            Request Free Plan Review
+          </button>
+        </section>
+
+        <!-- Chat with Advisor -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h2 class="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <span class="text-2xl">💬</span> Ask a Medicare Question
+          </h2>
+          <p class="text-slate-600 text-sm mb-4">
+            Our AI advisor can answer Medicare questions 24/7. Beth reviews all conversations and follows up personally when needed.
+          </p>
+          <div id="chat-container" class="border rounded-lg">
+            <div id="chat-messages" class="h-64 overflow-y-auto p-4 space-y-3 bg-slate-50 rounded-t-lg">
+              <div class="text-sm text-slate-500 text-center py-8">
+                Ask anything about Medicare, enrollment timing, or your coverage options.
+              </div>
+            </div>
+            <div class="flex border-t">
+              <input type="text" id="chat-input" placeholder="Type your question..."
+                class="flex-1 px-4 py-3 text-sm focus:outline-none rounded-bl-lg" />
+              <button id="btn-send-chat" class="px-5 py-3 bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 transition-colors rounded-br-lg">
+                Send
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Contact Beth -->
+        <section class="bg-gradient-to-r from-brand-50 to-blue-50 rounded-xl border border-brand-200 p-6 text-center">
+          <h2 class="text-lg font-semibold text-slate-900 mb-2">Need personal help?</h2>
+          <p class="text-slate-600 text-sm mb-4">Beth is always here to review your coverage and answer questions.</p>
+          <div class="flex flex-wrap items-center justify-center gap-3">
+            <a href="https://calendly.com/bethandtim-legacyf-l/30min" target="_blank"
+              class="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white hover:bg-brand-700 transition-colors">
+              Book a Call
+            </a>
+            <a href="tel:7063335641"
+              class="inline-flex items-center gap-2 rounded-lg border border-brand-300 px-5 py-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 transition-colors">
+              Call (706) 333-5641
+            </a>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <script define:vars={{ }}>
+    const token = new URLSearchParams(window.location.search).get('token');
+
+    async function loadDashboard() {
+      try {
+        const res = await fetch(`/api/t65-dashboard?token=${encodeURIComponent(token)}`);
+        if (!res.ok) throw new Error('unauthorized');
+        const data = await res.json();
+        renderDashboard(data);
+      } catch (e) {
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('error').classList.remove('hidden');
+      }
+    }
+
+    function renderDashboard(data) {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+
+      // Welcome
+      document.getElementById('welcome-name').textContent = `Welcome back, ${data.first_name}`;
+      const statusLabels = {
+        intake: 'Getting Started',
+        strategy_building: 'Building Your Strategy',
+        awaiting_iep: 'Waiting for Enrollment Window',
+        enrollment_ready: 'Ready to Enroll',
+        enrolled: 'Enrolled in Medicare',
+        active_client: 'Active Client',
+        annual_review: 'Annual Review Period'
+      };
+      document.getElementById('status-label').textContent = statusLabels[data.status] || data.status;
+
+      // Next step
+      const nextSteps = {
+        intake: 'Complete your profile so we can build your strategy.',
+        strategy_building: 'Beth is reviewing your options — she\'ll reach out soon.',
+        awaiting_iep: `Your enrollment window opens ${formatDate(data.iep_start)}`,
+        enrollment_ready: 'Contact Beth to finalize your enrollment.',
+        enrolled: 'You\'re all set! We\'ll check in at your next review.',
+        active_client: 'Everything is on track. Chat with us anytime.',
+        annual_review: 'Time to review your plans for next year.'
+      };
+      document.getElementById('status-next-step').textContent = nextSteps[data.status] || '';
+
+      // Next check-in
+      document.getElementById('status-checkin').textContent = data.next_checkin_date
+        ? formatDate(data.next_checkin_date)
+        : 'Not scheduled';
+
+      // Timeline
+      renderTimeline(data);
+
+      // Client info
+      renderClientInfo(data);
+
+      // Medications
+      renderMedications(data.prescriptions || []);
+
+      // Plan reviews
+      renderPlanReviews(data.plan_reviews || []);
+    }
+
+    function renderTimeline(data) {
+      const el = document.getElementById('timeline');
+      const events = [];
+
+      if (data.date_of_birth) {
+        const dob = new Date(data.date_of_birth);
+        const turn65 = new Date(dob.getFullYear() + 65, dob.getMonth(), dob.getDate());
+        const iepStart = new Date(turn65);
+        iepStart.setMonth(iepStart.getMonth() - 3);
+        const iepEnd = new Date(turn65);
+        iepEnd.setMonth(iepEnd.getMonth() + 3);
+
+        events.push({ date: iepStart, label: 'IEP Opens (3 months before 65)', type: 'milestone' });
+        events.push({ date: turn65, label: '65th Birthday', type: 'birthday' });
+        events.push({ date: iepEnd, label: 'IEP Closes (penalties begin if not enrolled)', type: 'deadline' });
+      }
+
+      if (data.planned_retirement_date) {
+        events.push({ date: new Date(data.planned_retirement_date), label: 'Planned Retirement', type: 'milestone' });
+      }
+
+      events.sort((a, b) => a.date - b.date);
+
+      const now = new Date();
+      el.innerHTML = events.map(e => {
+        const isPast = e.date < now;
+        const isUrgent = !isPast && (e.date - now) < 90 * 24 * 60 * 60 * 1000;
+        const colorClass = isPast ? 'bg-slate-200 text-slate-500' :
+                          isUrgent ? 'bg-red-100 text-red-700 border-red-200' :
+                          'bg-brand-50 text-brand-700 border-brand-200';
+        const icon = e.type === 'deadline' ? '⚠️' : e.type === 'birthday' ? '🎂' : '📌';
+        return `<div class="flex items-center gap-3 rounded-lg border p-3 ${colorClass}">
+          <span class="text-lg">${icon}</span>
+          <div class="flex-1">
+            <div class="text-sm font-medium">${e.label}</div>
+            <div class="text-xs opacity-75">${formatDate(e.date)}</div>
+          </div>
+          ${isPast ? '<span class="text-xs">✓ Past</span>' : ''}
+        </div>`;
+      }).join('');
+
+      if (events.length === 0) {
+        el.innerHTML = '<p class="text-slate-500 text-sm">Add your date of birth to see your Medicare timeline.</p>';
+      }
+    }
+
+    function renderClientInfo(data) {
+      const el = document.getElementById('client-info');
+      const fields = [
+        ['Name', `${data.first_name} ${data.last_name}`],
+        ['Location', data.county_name ? `${data.county_name}, ${data.state_code} ${data.zip_code}` : data.zip_code || '—'],
+        ['Date of Birth', data.date_of_birth ? formatDate(data.date_of_birth) : '—'],
+        ['Marital Status', data.marital_status || '—'],
+        ['Employment', data.employment_status || '—'],
+        ['Employer Size', data.employer_size || '—'],
+        ['Planned Retirement', data.planned_retirement_date ? formatDate(data.planned_retirement_date) : '—'],
+        ['Current Coverage', data.current_coverage_type || '—'],
+      ];
+      el.innerHTML = fields.map(([label, value]) =>
+        `<div class="flex justify-between py-2 border-b border-slate-100">
+          <span class="text-slate-500">${label}</span>
+          <span class="font-medium text-slate-900">${value}</span>
+        </div>`
+      ).join('');
+    }
+
+    function renderMedications(meds) {
+      const el = document.getElementById('medications-list');
+      if (!meds.length) return;
+      el.innerHTML = meds.map(med =>
+        `<div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+          <span class="text-sm font-medium text-slate-900">${med.name}</span>
+          <span class="text-xs text-slate-500">${med.dosage || ''}</span>
+        </div>`
+      ).join('');
+    }
+
+    function renderPlanReviews(reviews) {
+      const el = document.getElementById('plan-reviews');
+      if (!reviews.length) return;
+      el.innerHTML = reviews.map(r =>
+        `<div class="border rounded-lg p-4">
+          <div class="flex items-center justify-between">
+            <span class="font-medium text-sm">${r.review_type === 'annual' ? 'Annual Review' : 'Plan Review'} — ${r.review_year}</span>
+            <span class="text-xs px-2 py-1 rounded-full ${r.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}">${r.status}</span>
+          </div>
+          ${r.recommendation ? `<p class="text-sm text-slate-600 mt-2">${r.recommendation}</p>` : ''}
+        </div>`
+      ).join('');
+    }
+
+    function formatDate(d) {
+      return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    // ─── Medication add flow ───────────────────────────────────────
+    const btnAddMed = document.getElementById('btn-add-medication');
+    const addMedForm = document.getElementById('add-med-form');
+    const medInput = document.getElementById('med-input');
+    const medSuggestions = document.getElementById('med-suggestions');
+    let debounceTimer;
+
+    btnAddMed.addEventListener('click', () => {
+      addMedForm.classList.toggle('hidden');
+      if (!addMedForm.classList.contains('hidden')) medInput.focus();
+    });
+
+    medInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      const query = medInput.value.trim();
+      if (query.length < 2) { medSuggestions.classList.add('hidden'); return; }
+      debounceTimer = setTimeout(() => autocompleteeDrug(query), 300);
+    });
+
+    async function autocompleteeDrug(query) {
+      try {
+        const res = await fetch(`/api/drug-search?q=${encodeURIComponent(query)}&token=${encodeURIComponent(token)}`);
+        if (!res.ok) return;
+        const drugs = await res.json();
+        if (!drugs.length) { medSuggestions.classList.add('hidden'); return; }
+        medSuggestions.classList.remove('hidden');
+        medSuggestions.innerHTML = drugs.slice(0, 8).map(d =>
+          `<button type="button" class="drug-option w-full text-left px-3 py-2 text-sm hover:bg-brand-50 border-b last:border-0" data-rxcui="${d.rxcui}" data-name="${d.name}">
+            <span class="font-medium">${d.name}</span> <span class="text-slate-500">${d.strength}</span>
+          </button>`
+        ).join('');
+        medSuggestions.querySelectorAll('.drug-option').forEach(btn => {
+          btn.addEventListener('click', () => addMedication(btn.dataset.name, btn.dataset.rxcui));
+        });
+      } catch {}
+    }
+
+    async function addMedication(name, rxcui) {
+      medSuggestions.classList.add('hidden');
+      medInput.value = '';
+      // POST to API
+      try {
+        await fetch('/api/t65-dashboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, action: 'add_medication', medication: { name, rxcui } })
+        });
+        // Optimistic UI update
+        const el = document.getElementById('medications-list');
+        const placeholder = el.querySelector('p');
+        if (placeholder) placeholder.remove();
+        el.insertAdjacentHTML('beforeend',
+          `<div class="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50">
+            <span class="text-sm font-medium text-slate-900">${name}</span>
+            <span class="text-xs text-green-600">✓ Added</span>
+          </div>`
+        );
+      } catch {}
+    }
+
+    // ─── Chat ────────────────────────────────────────────────────────
+    const chatInput = document.getElementById('chat-input');
+    const chatMessages = document.getElementById('chat-messages');
+    const btnSendChat = document.getElementById('btn-send-chat');
+
+    function appendMessage(role, text) {
+      const bubble = document.createElement('div');
+      bubble.className = role === 'user'
+        ? 'ml-auto max-w-[80%] rounded-lg bg-brand-600 text-white px-4 py-2 text-sm'
+        : 'mr-auto max-w-[80%] rounded-lg bg-white border border-slate-200 px-4 py-2 text-sm text-slate-800';
+      bubble.textContent = text;
+      // Remove placeholder
+      const placeholder = chatMessages.querySelector('.text-center');
+      if (placeholder) placeholder.remove();
+      chatMessages.appendChild(bubble);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    async function sendChat() {
+      const msg = chatInput.value.trim();
+      if (!msg) return;
+      chatInput.value = '';
+      appendMessage('user', msg);
+
+      // Show typing indicator
+      const typing = document.createElement('div');
+      typing.className = 'mr-auto max-w-[80%] rounded-lg bg-white border border-slate-200 px-4 py-2 text-sm text-slate-400';
+      typing.textContent = 'Thinking...';
+      typing.id = 'typing';
+      chatMessages.appendChild(typing);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      try {
+        const res = await fetch('/api/t65-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, message: msg })
+        });
+        const data = await res.json();
+        document.getElementById('typing')?.remove();
+        appendMessage('assistant', data.response || 'Sorry, I had trouble with that. Please try again.');
+      } catch {
+        document.getElementById('typing')?.remove();
+        appendMessage('assistant', 'Connection error. Please try again.');
+      }
+    }
+
+    btnSendChat.addEventListener('click', sendChat);
+    chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
+
+    // ─── Request plan review ─────────────────────────────────────────
+    document.getElementById('btn-request-review').addEventListener('click', async () => {
+      try {
+        await fetch('/api/t65-dashboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, action: 'request_review' })
+        });
+        document.getElementById('btn-request-review').textContent = '✓ Review Requested — Beth will follow up';
+        document.getElementById('btn-request-review').disabled = true;
+      } catch {}
+    });
+
+    // ─── Request info update ─────────────────────────────────────────
+    document.getElementById('btn-update-info').addEventListener('click', () => {
+      // Open chat with prefilled message
+      chatInput.value = "I'd like to update my information. ";
+      chatInput.focus();
+    });
+
+    // ─── Init ────────────────────────────────────────────────────────
+    loadDashboard();
+  </script>
+
+  <style>
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .animate-spin { animation: spin 1s linear infinite; }
+  </style>
+</Base>
