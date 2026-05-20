@@ -30,7 +30,7 @@ async function alertRecruitmentReply(opts: {
   if (!recipients.length || !RESEND_API_KEY) return;
 
   const { senderEmail, prospectName, prospectId, stage, subject, preview } = opts;
-  const dashUrl = `${SITE_URL}/recruitment`;
+  const dashUrl = prospectId ? `${SITE_URL}/recruitment?pid=${prospectId}` : `${SITE_URL}/recruitment`;
   const who = prospectName ? `${prospectName} (${senderEmail})` : senderEmail;
   const stageLabel = stage ? `Stage: ${stage}` : 'Unknown prospect';
 
@@ -90,7 +90,7 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
     const now = new Date().toISOString();
 
     try {
-      // Look up prospect by email
+      // Look up prospect by email (exact match first)
       const lookupRes = await fetch(
         `${SUPABASE_URL}/rest/v1/recruitment_prospects?email=ilike.${encodeURIComponent(senderEmail)}&select=id,name,properties,interaction_stage&limit=1`,
         {
@@ -102,11 +102,33 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
         }
       );
       if (!lookupRes.ok) {
-        // Still alert for unknown sender if lookup failed
         await alertRecruitmentReply({ senderEmail, subject, preview: replyPreview });
         return;
       }
-      const [prospect] = await lookupRes.json();
+      let [prospect] = await lookupRes.json();
+
+      // Fuzzy fallback: match by email username (handles corporate domain aliases like uhc.com ↔ umr.com)
+      if (!prospect) {
+        const username = senderEmail.split('@')[0];
+        if (username && username.length >= 4) {
+          const fuzzyRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/recruitment_prospects?email=ilike.${encodeURIComponent(username + '@%')}&select=id,name,properties,interaction_stage&limit=1`,
+            {
+              headers: {
+                apikey: SUPABASE_SERVICE_ROLE_KEY,
+                Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+          if (fuzzyRes.ok) {
+            const fuzzyResults = await fuzzyRes.json();
+            if (fuzzyResults.length === 1) {
+              prospect = fuzzyResults[0];
+            }
+          }
+        }
+      }
 
       if (!prospect) {
         // Unknown sender — still alert so no message goes unseen

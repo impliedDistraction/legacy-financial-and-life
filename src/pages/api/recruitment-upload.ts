@@ -176,10 +176,15 @@ export const GET: APIRoute = async ({ request }) => {
   } else if (tracking && TRACKING_FIELDS[tracking]) {
     queryUrl += `&status=in.(sent,converted,scheduled,follow_up_1,follow_up_2,follow_up_exhausted)&properties->>${encodeURIComponent(TRACKING_FIELDS[tracking])}=not.is.null`;
   }
-  // Text search across name, email, state, city
+  // Text search across name, email, state, city (or exact ID match for UUIDs)
   if (search) {
     const s = search.replace(/[%_]/g, '');
-    queryUrl += `&or=(name.ilike.*${encodeURIComponent(s)}*,email.ilike.*${encodeURIComponent(s)}*,state.ilike.*${encodeURIComponent(s)}*,city.ilike.*${encodeURIComponent(s)}*)`;
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+    if (isUuid) {
+      queryUrl += `&id=eq.${encodeURIComponent(s)}`;
+    } else {
+      queryUrl += `&or=(name.ilike.*${encodeURIComponent(s)}*,email.ilike.*${encodeURIComponent(s)}*,state.ilike.*${encodeURIComponent(s)}*,city.ilike.*${encodeURIComponent(s)}*)`;
+    }
   }
 
   const response = await fetch(queryUrl, {

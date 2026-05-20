@@ -4271,6 +4271,27 @@ if (!session) {
       alert(`Error: ${err.error || 'Failed to create survey'}`);
     }
   });
+
+  // ═══════════════════════════════════════════
+  // DEEPLINK: ?pid= switches to Sent tab and searches for prospect
+  // ═══════════════════════════════════════════
+  (() => {
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get('pid');
+    if (pid) {
+      // Switch to sent tab
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelector('[data-tab="sent"]')?.classList.add('active');
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      document.getElementById('tab-sent')?.classList.remove('hidden');
+      // Set filter to show all statuses and search by prospect ID
+      sentFilter.value = 'all_active';
+      sentSearch.value = pid;
+      sentOffset = 0;
+      sentProspects = [];
+      loadSentList();
+    }
+  })();
 </script>
 
 </Base>
