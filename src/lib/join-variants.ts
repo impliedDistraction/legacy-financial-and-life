@@ -33,7 +33,7 @@ const VARIANT_A: Record<ProspectTier, VariantContent> = {
     cards: [
       { emoji: '🤖', title: 'AI Does Your Prospecting', body: 'Our system researches, qualifies, and reaches out to potential clients automatically. You show up to warm conversations.' },
       { emoji: '⏰', title: 'Get Your Hours Back', body: "Compliance tracking, follow-up sequences, and CRM automation — the admin that eats your week, handled for you." },
-      { emoji: '📈', title: 'Alliance FMO Access', body: "Direct carrier contracts at the highest level. Your book is yours — no captive arrangements, no middlemen." },
+      { emoji: '�️', title: 'Life, Health & Wealth', body: "Cover every stage of your clients' financial lives — life insurance, health coverage, and retirement planning. One team, full product access." },
     ],
     chatOpener: "Hey! 👋 Sounds like you've been in the industry a while. I'm curious — what does your day actually look like right now? Are you spending your time where you want to be?",
   },
@@ -45,7 +45,7 @@ const VARIANT_A: Record<ProspectTier, VariantContent> = {
     cards: [
       { emoji: '🎯', title: 'Leads That Come to You', body: 'AI-powered prospecting finds qualified leads and warms them up before you ever pick up the phone.' },
       { emoji: '👨‍🏫', title: 'Learn What Actually Works', body: '1-on-1 mentorship from agents with 15+ years and 300+ policies. Skip the trial and error.' },
-      { emoji: '💰', title: 'Keep What You Earn', body: "No desk fees, no lead charges. Direct carrier contracts through Alliance FMO — your book stays yours." },
+      { emoji: '�', title: 'Full-Time or Part-Time', body: "Build your business on your terms. Whether you want a full-time career or flexible part-time income, our system works around your schedule." },
     ],
     chatOpener: "Hey! 👋 Thanks for checking us out. Getting started in insurance can be a lot — what's been the biggest challenge so far? Where does most of your time end up going?",
   },
@@ -56,8 +56,8 @@ const VARIANT_A: Record<ProspectTier, VariantContent> = {
     },
     cards: [
       { emoji: '🤖', title: 'AI-Powered Lead Gen', body: "Stop spending hours on prospecting. Our AI finds, qualifies, and warms up clients for you." },
-      { emoji: '⏰', title: 'Work-Life Balance', body: "Automation handles follow-up, scheduling, and admin. Spend time with clients and family, not spreadsheets." },
-      { emoji: '💰', title: 'Your Book, Your Clients', body: "Alliance FMO contracts. No captive agreements. Leave anytime with everything you built." },
+      { emoji: '⏰', title: 'Full-Time or Part-Time', body: "Whether you're going all-in or building on the side, our systems flex around your life. No minimums, no mandatory office hours." },
+      { emoji: '🛡️', title: 'Life, Health & Wealth', body: "Life insurance, health coverage, retirement planning — serve your clients across every financial milestone with full product access." },
     ],
     chatOpener: "Hey! 👋 Thanks for checking us out. I'd love to learn a little about you — what does your day actually look like right now? Where does most of your time go?",
   },
@@ -74,7 +74,7 @@ const VARIANT_B: Record<ProspectTier, VariantContent> = {
     cards: [
       { emoji: '🤝', title: 'A Team That Has Your Back', body: "Dedicated operations support handles follow-ups, paperwork, and compliance so you can focus on relationships that matter." },
       { emoji: '📋', title: 'Proven Systems, Not Guesswork', body: "Our playbook is built on 15+ years and 300+ policies placed. Skip the trial and error — use what already works." },
-      { emoji: '📈', title: 'Alliance FMO Access', body: "Direct carrier contracts at the highest level. Your book is yours — no captive arrangements, no middlemen." },
+      { emoji: '�️', title: 'Life, Health & Wealth', body: "Cover every stage of your clients' financial lives — life insurance, health coverage, and retirement planning. One team, full product access." },
     ],
     chatOpener: "Hey! 👋 Sounds like you've been in the industry a while. What does a typical week look like for you? Are you spending your time the way you want?",
   },
@@ -86,7 +86,7 @@ const VARIANT_B: Record<ProspectTier, VariantContent> = {
     cards: [
       { emoji: '👨‍🏫', title: 'Real Mentorship, Day One', body: "1-on-1 coaching from experienced agents. Weekly calls, script practice, and product training until you're confident." },
       { emoji: '🎯', title: 'Leads on Your Calendar', body: "Our team pre-qualifies prospects and books appointments so you walk into warm conversations, not cold calls." },
-      { emoji: '💰', title: 'Keep What You Earn', body: "No desk fees, no lead charges. Direct carrier contracts through Alliance FMO — your book stays yours." },
+      { emoji: '�', title: 'Full-Time or Part-Time', body: "Build your business on your terms. Whether you want a full-time career or flexible part-time income, our system works around your schedule." },
     ],
     chatOpener: "Hey! 👋 Thanks for checking us out. Starting in insurance can feel overwhelming — what's been on your mind? Anything you're trying to figure out?",
   },
@@ -97,8 +97,8 @@ const VARIANT_B: Record<ProspectTier, VariantContent> = {
     },
     cards: [
       { emoji: '🤝', title: 'People-First Culture', body: "A team that answers when you call. Mentors who remember what it was like starting out. Real support, not just a contract." },
-      { emoji: '⏰', title: 'Work-Life Balance', body: "Our systems handle follow-ups, scheduling, and admin work so you can be present for your family and your clients." },
-      { emoji: '💰', title: 'Your Book, Your Clients', body: "Alliance FMO contracts. No captive agreements. Leave anytime with everything you built." },
+      { emoji: '🕐', title: 'Full-Time or Part-Time', body: "Whether you're going all-in or building on the side, our systems flex around your life. No minimums, no mandatory office hours." },
+      { emoji: '🛡️', title: 'Life, Health & Wealth', body: "Life insurance, health coverage, retirement planning — serve your clients across every financial milestone with full product access." },
     ],
     chatOpener: "Hey! 👋 Thanks for stopping by. I'd love to hear a little about you — what's your situation right now? What are you looking for in an opportunity?",
   },
@@ -144,7 +144,7 @@ const PAIN_POINT_CONTENT: Record<PainPoint, PainPointContent> = {
     heroAngle: 'learning alone',
   },
   captive_restrictions: {
-    card: { emoji: '🔓', title: 'Freedom to Sell What Fits', body: "Access 40+ carriers through Alliance FMO. Recommend what's best for the client, not what your captive tells you to." },
+    card: { emoji: '🔓', title: 'Freedom to Sell What Fits', body: "Access 40+ carriers through Alliance FMO. Recommend what's best for the client — Life, Health, or Wealth products — without captive restrictions." },
     heroAngle: 'carrier restrictions',
   },
   work_life_balance: {
@@ -152,7 +152,7 @@ const PAIN_POINT_CONTENT: Record<PainPoint, PainPointContent> = {
     heroAngle: 'burnout',
   },
   carrier_access: {
-    card: { emoji: '📈', title: 'Top-Level Contracts', body: "Alliance FMO gets you the same commission levels as agencies 10x your size. Your book stays yours." },
+    card: { emoji: '📈', title: 'Top-Level Contracts', body: "Alliance FMO gets you the same commission levels as agencies 10x your size. Full access across Life, Health, and Wealth products." },
     heroAngle: 'limited carrier access',
   },
   compliance_burden: {
