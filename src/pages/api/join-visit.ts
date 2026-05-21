@@ -42,14 +42,14 @@ export const POST: APIRoute = async ({ request }) => {
     return Response.json({ ok: true }); // silently drop to avoid fingerprinting
   }
 
-  let body: { prospectId?: string; tier?: string; referrer?: string };
+  let body: { prospectId?: string; tier?: string; referrer?: string; variant?: string };
   try {
     body = await request.json();
   } catch {
     return Response.json({ ok: false, error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { prospectId, tier, referrer } = body;
+  const { prospectId, tier, referrer, variant } = body;
   if (!prospectId || typeof prospectId !== 'string' || prospectId.length < 10) {
     return Response.json({ ok: true }); // silently ignore non-prospect visits
   }
@@ -87,6 +87,7 @@ export const POST: APIRoute = async ({ request }) => {
       ip: clientIp,
       userAgent: userAgent.slice(0, 300),
       tier: tier || 'unknown',
+      variant: variant || 'A',
       referrer: referrer || null,
     };
 
@@ -137,6 +138,7 @@ export const POST: APIRoute = async ({ request }) => {
       properties: {
         prospect_id: prospectId,
         tier: tier || 'unknown',
+        variant: variant || 'A',
         visit_number: visits.length,
         user_agent: userAgent.slice(0, 200),
         referrer: referrer || null,

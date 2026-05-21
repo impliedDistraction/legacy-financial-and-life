@@ -82,6 +82,11 @@ export const POST: APIRoute = async ({ request }) => {
     const body = await request.json();
     const { name, email, phone, state, textConsent, referralConsent, prospectId } = body;
 
+    // Read the A/B variant from cookie for tracking
+    const cookieHeader = request.headers.get('cookie') || '';
+    const variantMatch = cookieHeader.match(/lfl_join_variant=([ABC])/);
+    const joinVariant = variantMatch ? variantMatch[1] : 'A';
+
     // When prospectId is present, the form only collects consent (no name/email/phone required)
     if (!prospectId && (!name || !email || !phone)) {
       return new Response(JSON.stringify({ error: 'Name, email, and phone are required' }), {
@@ -129,6 +134,7 @@ export const POST: APIRoute = async ({ request }) => {
               referral_consent_ip: referralConsent ? (request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown') : null,
               landing_page_visited_at: now,
               landing_page_state: cleanState,
+              join_variant: joinVariant,
             },
             updated_at: now,
           };
@@ -200,6 +206,7 @@ export const POST: APIRoute = async ({ request }) => {
         referral_consent_ip: referralConsent ? (request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown') : null,
         landing_page_submitted_at: now,
         warm_lead: true,
+        join_variant: joinVariant,
       },
       created_at: now,
       updated_at: now,

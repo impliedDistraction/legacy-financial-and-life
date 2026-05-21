@@ -38,6 +38,15 @@ export const FLAG_DEFINITIONS: FlagDefinitionsType = {
       { value: false, label: 'Disabled' },
     ],
   },
+  'join-variant': {
+    description: 'A/B test variant for /join recruitment page. A=AI-focused, B=People-focused, C=Survey-driven.',
+    options: [
+      { value: 'random', label: 'Random assignment (default)' },
+      { value: 'A', label: 'Force variant A (AI-focused)' },
+      { value: 'B', label: 'Force variant B (people-focused)' },
+      { value: 'C', label: 'Force variant C (survey-driven)' },
+    ],
+  },
 };
 
 // ── runtime resolution ──────────────────────────────────────────────
@@ -51,6 +60,7 @@ export function resolveFlagValues(): FlagValuesType {
     'quote-flow-variant': resolveEnvString('FLAG_QUOTE_FLOW_VARIANT', 'control'),
     'quote-confirmation-variant': resolveEnvString('FLAG_QUOTE_CONFIRMATION_VARIANT', 'default'),
     'ringy-enabled': resolveBoolEnv('FLAG_RINGY_ENABLED', true),
+    'join-variant': resolveEnvString('FLAG_JOIN_VARIANT', 'random'),
   };
 }
 
@@ -58,7 +68,7 @@ export function resolveFlagValues(): FlagValuesType {
  * Return which flag keys to annotate on a given Vercel custom event.
  */
 export function quoteFlowFlagKeys(): string[] {
-  return ['quote-flow-variant', 'quote-confirmation-variant', 'ringy-enabled'];
+  return ['quote-flow-variant', 'quote-confirmation-variant', 'ringy-enabled', 'join-variant'];
 }
 
 // ── tiny helpers ────────────────────────────────────────────────────

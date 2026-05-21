@@ -3,6 +3,14 @@ import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import '../styles/tailwind.css';
+import {
+  resolveVariant,
+  getVariantContent,
+  fetchTopPainPoints,
+  VARIANT_COOKIE,
+  type JoinVariant,
+  type PainPoint,
+} from '../lib/join-variants';
 
 export const prerender = false;
 
@@ -67,6 +75,39 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
     } catch { /* non-critical — fall back to generic page */ }
   }
 }
+
+// ─── A/B Variant Resolution ──────────────────────────────────────
+const forceVariant = Astro.url.searchParams.get('variant');
+const flagOverride = import.meta.env.FLAG_JOIN_VARIANT?.trim();
+const effectiveForce = (flagOverride && flagOverride !== 'random') ? flagOverride : forceVariant;
+
+const [variant, isNewAssignment] = resolveVariant(
+  Astro.request.headers.get('cookie'),
+  import.meta.env.FLAG_JOIN_VARIANT_WEIGHTS,
+  effectiveForce,
+);
+
+// For variant C, fetch survey pain point aggregates
+let surveyPainPoints: PainPoint[] | undefined;
+if (variant === 'C') {
+  const SB_URL = import.meta.env.SUPABASE_URL?.trim();
+  const SB_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (SB_URL && SB_KEY) {
+    surveyPainPoints = await fetchTopPainPoints(SB_URL, SB_KEY);
+  }
+}
+
+const content = getVariantContent(variant, prospectTier, surveyPainPoints);
+
+// Set sticky cookie if new assignment
+if (isNewAssignment) {
+  Astro.cookies.set(VARIANT_COOKIE, variant, {
+    path: '/join',
+    maxAge: 60 * 60 * 24 * 90, // 90 days
+    httpOnly: false, // readable by client-side tracking
+    sameSite: 'lax',
+  });
+}
 ---
 <Base
   title="Join Legacy Financial & Life"
@@ -75,94 +116,30 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
   <Header />
 
   <!-- Server-rendered prospect context for client-side tracking -->
-  <div id="prospect-context" data-tier={prospectTier} data-pid={pid} data-name={prospectName} data-simplified={String(!!(pid || testPersona))} class="hidden"></div>
+  <div id="prospect-context" data-tier={prospectTier} data-pid={pid} data-name={prospectName} data-simplified={String(!!(pid || testPersona))} data-variant={variant} class="hidden"></div>
 
   <!-- Hero -->
   <section class="relative isolate overflow-hidden bg-gradient-to-br from-brand-50 to-white">
     <div class="mx-auto max-w-4xl px-4 py-16 sm:py-24 text-center">
-      {prospectTier === 'established' ? (
-        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
-          {prospectName ? `${prospectName}, ` : ''}What If Your Busiest Day Was Only Client Calls?
-        </h1>
-        <p class="mt-6 text-lg text-slate-700 max-w-2xl mx-auto">
-          You didn't get licensed to spend half your week on admin, lead lists, and carrier portals.
-          Legacy Financial & Life gives experienced agents AI-powered tools that handle prospecting
-          and paperwork — so every hour goes to clients and commissions.
-        </p>
-      ) : prospectTier === 'new' ? (
-        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
-          {prospectName ? `${prospectName}, ` : ''}Stop Guessing Where Your Next Client Comes From
-        </h1>
-        <p class="mt-6 text-lg text-slate-700 max-w-2xl mx-auto">
-          Finding qualified prospects is the hardest part of starting out. Legacy Financial & Life
-          gives new agents AI-powered lead systems, direct mentorship, and a team that's transparent
-          about how the business actually works — no trial and error required.
-        </p>
-      ) : (
-        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
-          Get Your Time Back — Let AI Handle the Grind
-        </h1>
-        <p class="mt-6 text-lg text-slate-700 max-w-2xl mx-auto">
-          Lead gen, follow-up, research, compliance tracking — the stuff that eats your week.
-          Legacy Financial & Life agents use AI tools that do the busywork automatically, so you
-          spend more time with clients and less time behind a screen.
-        </p>
-      )}
+      <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
+        {prospectName && (prospectTier === 'established' || prospectTier === 'new') ? `${prospectName}, ` : ''}{content.hero.headline}
+      </h1>
+      <p class="mt-6 text-lg text-slate-700 max-w-2xl mx-auto">
+        {content.hero.subhead}
+      </p>
     </div>
   </section>
 
   <!-- What We Offer -->
   <section class="mx-auto max-w-4xl px-4 py-12">
     <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {prospectTier === 'established' ? (
+      {content.cards.map(card => (
         <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div class="text-3xl mb-3">🤖</div>
-          <h3 class="font-bold text-slate-900 mb-2">AI Does Your Prospecting</h3>
-          <p class="text-sm text-slate-600">Our system researches, qualifies, and reaches out to potential clients automatically. You show up to warm conversations.</p>
+          <div class="text-3xl mb-3">{card.emoji}</div>
+          <h3 class="font-bold text-slate-900 mb-2">{card.title}</h3>
+          <p class="text-sm text-slate-600">{card.body}</p>
         </div>
-        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div class="text-3xl mb-3">⏰</div>
-          <h3 class="font-bold text-slate-900 mb-2">Get Your Hours Back</h3>
-          <p class="text-sm text-slate-600">Compliance tracking, follow-up sequences, and CRM automation — the admin that eats your week, handled for you.</p>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div class="text-3xl mb-3">📈</div>
-          <h3 class="font-bold text-slate-900 mb-2">Alliance FMO Access</h3>
-          <p class="text-sm text-slate-600">Direct carrier contracts at the highest level. Your book is yours — no captive arrangements, no middlemen.</p>
-        </div>
-      ) : prospectTier === 'new' ? (
-        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div class="text-3xl mb-3">🎯</div>
-          <h3 class="font-bold text-slate-900 mb-2">Leads That Come to You</h3>
-          <p class="text-sm text-slate-600">AI-powered prospecting finds qualified leads and warms them up before you ever pick up the phone.</p>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div class="text-3xl mb-3">👨‍🏫</div>
-          <h3 class="font-bold text-slate-900 mb-2">Learn What Actually Works</h3>
-          <p class="text-sm text-slate-600">1-on-1 mentorship from agents with 15+ years and 300+ policies. Skip the trial and error.</p>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div class="text-3xl mb-3">💰</div>
-          <h3 class="font-bold text-slate-900 mb-2">Keep What You Earn</h3>
-          <p class="text-sm text-slate-600">No desk fees, no lead charges. Direct carrier contracts through Alliance FMO — your book stays yours.</p>
-        </div>
-      ) : (
-        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div class="text-3xl mb-3">🤖</div>
-          <h3 class="font-bold text-slate-900 mb-2">AI-Powered Lead Gen</h3>
-          <p class="text-sm text-slate-600">Stop spending hours on prospecting. Our AI finds, qualifies, and warms up clients for you.</p>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div class="text-3xl mb-3">⏰</div>
-          <h3 class="font-bold text-slate-900 mb-2">Work-Life Balance</h3>
-          <p class="text-sm text-slate-600">Automation handles follow-up, scheduling, and admin. Spend time with clients and family, not spreadsheets.</p>
-        </div>
-        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div class="text-3xl mb-3">💰</div>
-          <h3 class="font-bold text-slate-900 mb-2">Your Book, Your Clients</h3>
-          <p class="text-sm text-slate-600">Alliance FMO contracts. No captive agreements. Leave anytime with everything you built.</p>
-        </div>
-      )}
+      ))}
     </div>
   </section>
 
@@ -341,13 +318,7 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
             <span class="text-white text-[10px] font-bold">LF</span>
           </div>
           <div class="bg-white rounded-xl rounded-tl-sm px-3 py-2 max-w-[85%] shadow-sm border border-slate-100">
-            {prospectTier === 'established' ? (
-              <p class="text-sm text-slate-700">Hey{prospectName ? ` ${prospectName}` : ''}! 👋 Sounds like you've been in the industry a while. I'm curious — what does your day actually look like right now? Are you spending your time where you want to be?</p>
-            ) : prospectTier === 'new' ? (
-              <p class="text-sm text-slate-700">Hey{prospectName ? ` ${prospectName}` : ''}! 👋 Thanks for checking us out. Getting started in insurance can be a lot — what's been the biggest challenge so far? Where does most of your time end up going?</p>
-            ) : (
-              <p class="text-sm text-slate-700">Hey! 👋 Thanks for checking us out. I'd love to learn a little about you — what does your day actually look like right now? Where does most of your time go?</p>
-            )}
+            <p class="text-sm text-slate-700">{prospectName ? content.chatOpener.replace('Hey!', `Hey ${prospectName}!`) : content.chatOpener}</p>
           </div>
         </div>
       </div>
@@ -400,6 +371,13 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
     form.classList.add('hidden');
     bookingCta.classList.remove('hidden');
     directBookHint?.classList.add('hidden');
+
+    // Track conversion with variant info
+    try {
+      const va = (window as any).va;
+      const variant = ctxEl?.dataset.variant || 'A';
+      if (typeof va === 'function') va('event', { name: 'join_form_submitted', variant });
+    } catch { /* non-critical */ }
   }
 
   form?.addEventListener('submit', async (e) => {
@@ -471,6 +449,7 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
     const ctx = document.getElementById('prospect-context');
     const pid = ctx?.dataset.pid || '';
     const tier = ctx?.dataset.tier || 'unknown';
+    const variant = ctx?.dataset.variant || 'A';
     if (!pid || pid.length < 10) return;
 
     // Deduplicate: only fire once per session per prospect
@@ -484,6 +463,7 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
       body: JSON.stringify({
         prospectId: pid,
         tier,
+        variant,
         referrer: document.referrer || null,
       }),
       keepalive: true,
@@ -535,7 +515,9 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
   function trackChatEvent(name: string, props?: Record<string, string | number>) {
     try {
       const va = (window as any).va;
-      if (typeof va === 'function') va('event', { name, ...props });
+      const ctx = document.getElementById('prospect-context');
+      const variant = ctx?.dataset.variant || 'A';
+      if (typeof va === 'function') va('event', { name, variant, ...props });
     } catch { /* non-critical */ }
   }
 
