@@ -25,11 +25,6 @@ interface ImportMetaEnv {
 	readonly FLAG_QUOTE_FLOW_VARIANT?: string;
 	readonly FLAG_QUOTE_CONFIRMATION_VARIANT?: string;
 	readonly FLAG_RINGY_ENABLED?: string;
-	readonly FLAG_JOIN_VARIANT?: string;
-	readonly FLAG_JOIN_VARIANT_WEIGHTS?: string;
-
-	// Recruitment alerts
-	readonly RECRUITMENT_ALERT_TO?: string;
 
 	// Analytics dashboard auth
 	readonly ANALYTICS_ALLOWED_EMAILS?: string;
