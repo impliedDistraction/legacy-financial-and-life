@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS quote_threads (
   missing_fields TEXT[] DEFAULT '{}',
 
   -- Classification
-  request_type TEXT CHECK (request_type IN ('under_65', 'medicare', 'life', 'unknown')),
+  request_type TEXT CHECK (request_type IN ('under_65', 'medicare', 'life', 'property', 'unknown')),
   product_type TEXT,   -- medicare_advantage, med_supp, aca_marketplace, life, etc.
   zip TEXT,
   state TEXT,
