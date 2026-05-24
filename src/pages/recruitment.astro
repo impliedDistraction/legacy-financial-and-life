@@ -764,6 +764,76 @@ if (!session) {
 
     <!-- ═══════════════ PIPELINE TAB ═══════════════ -->
     <div id="tab-pipeline" class="tab-panel hidden">
+
+      <!-- Infrastructure Monitor -->
+      <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-900">Infrastructure Status</h2>
+          <div class="flex items-center gap-2">
+            <div id="infra-status-dot" class="w-2.5 h-2.5 rounded-full bg-gray-300 animate-pulse"></div>
+            <span id="infra-status-label" class="text-xs text-gray-500">Checking...</span>
+            <button id="infra-refresh-btn" class="ml-2 text-xs text-brand-600 hover:text-brand-700 font-medium">↻</button>
+          </div>
+        </div>
+
+        <div id="infra-panel" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+          <div class="bg-gray-50 rounded-lg p-3">
+            <div class="text-xs text-gray-500 mb-1">GPU Machine</div>
+            <div id="infra-gpu-status" class="text-sm font-medium text-gray-400">—</div>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-3">
+            <div class="text-xs text-gray-500 mb-1">Ngrok Tunnel</div>
+            <div id="infra-tunnel-status" class="text-sm font-medium text-gray-400">—</div>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-3">
+            <div class="text-xs text-gray-500 mb-1">Cron Workers</div>
+            <div id="infra-cron-status" class="text-sm font-medium text-gray-400">—</div>
+          </div>
+          <div class="bg-gray-50 rounded-lg p-3">
+            <div class="text-xs text-gray-500 mb-1">Send Lock</div>
+            <div id="infra-sends-status" class="text-sm font-medium text-gray-400">—</div>
+          </div>
+        </div>
+
+        <!-- Extended info (GPU, uptime, etc) -->
+        <div id="infra-details" class="hidden border-t border-gray-100 pt-3 mt-3">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            <div>
+              <span class="text-gray-500">vLLM:</span>
+              <span id="infra-vllm" class="ml-1 font-medium">—</span>
+            </div>
+            <div>
+              <span class="text-gray-500">GPU Temp:</span>
+              <span id="infra-gpu-temp" class="ml-1 font-medium">—</span>
+            </div>
+            <div>
+              <span class="text-gray-500">VRAM:</span>
+              <span id="infra-vram" class="ml-1 font-medium">—</span>
+            </div>
+            <div>
+              <span class="text-gray-500">Uptime:</span>
+              <span id="infra-uptime" class="ml-1 font-medium">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Remote Control Actions -->
+        <div id="infra-controls" class="hidden border-t border-gray-100 pt-4 mt-4">
+          <div class="flex flex-wrap gap-2">
+            <button id="ctrl-toggle-sends" class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 hover:border-brand-500 hover:text-brand-700 transition-colors font-medium">
+              🔓 Toggle Send Lock
+            </button>
+            <button id="ctrl-restart-cron" class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 hover:border-amber-500 hover:text-amber-700 transition-colors font-medium">
+              🔄 Restart Cron Workers
+            </button>
+            <button id="ctrl-restart-launcher" class="text-xs px-3 py-1.5 rounded-lg border border-red-200 hover:border-red-500 hover:text-red-700 transition-colors font-medium">
+              ⚠️ Restart Launcher
+            </button>
+          </div>
+          <p class="text-xs text-gray-400 mt-2">Control actions are sent through the ngrok tunnel to the GPU machine.</p>
+        </div>
+      </div>
+
       <div class="grid lg:grid-cols-2 gap-6">
         <!-- Pipeline Status -->
         <div class="space-y-4">
@@ -3618,6 +3688,143 @@ if (!session) {
   // ═══════════════════════════════════════════
   // PIPELINE TAB
   // ═══════════════════════════════════════════
+
+  // --- Infrastructure Monitor ---
+  async function loadInfraStatus() {
+    const dot = document.getElementById('infra-status-dot');
+    const label = document.getElementById('infra-status-label');
+    const details = document.getElementById('infra-details');
+    const controls = document.getElementById('infra-controls');
+
+    try {
+      const res = await fetch('/api/system-status');
+      const data = await res.json();
+
+      if (data.offline || !res.ok) {
+        dot?.classList.remove('bg-green-500', 'bg-amber-500', 'animate-pulse');
+        dot?.classList.add('bg-red-500');
+        if (label) label.textContent = 'Offline';
+        if (label) label.className = 'text-xs text-red-600 font-medium';
+        setInfraField('infra-gpu-status', '🔴 Unreachable', 'text-red-600');
+        setInfraField('infra-tunnel-status', '—', 'text-gray-400');
+        setInfraField('infra-cron-status', '—', 'text-gray-400');
+        setInfraField('infra-sends-status', '—', 'text-gray-400');
+        details?.classList.add('hidden');
+        controls?.classList.add('hidden');
+        return;
+      }
+
+      // Machine is online
+      dot?.classList.remove('bg-gray-300', 'bg-red-500', 'bg-amber-500', 'animate-pulse');
+      dot?.classList.add('bg-green-500');
+      if (label) { label.textContent = 'Online'; label.className = 'text-xs text-green-600 font-medium'; }
+
+      // GPU
+      if (data.gpu) {
+        setInfraField('infra-gpu-status', `🟢 ${data.gpu.name}`, 'text-green-700');
+        setInfraField('infra-gpu-temp', `${data.gpu.tempC}°C`, data.gpu.tempC > 80 ? 'text-red-600' : 'text-green-700');
+        setInfraField('infra-vram', `${data.gpu.memUsedMB}/${data.gpu.memTotalMB} MB (${Math.round(data.gpu.memUsedMB / data.gpu.memTotalMB * 100)}%)`, 'text-gray-700');
+      } else {
+        setInfraField('infra-gpu-status', '🟡 No GPU info', 'text-amber-600');
+      }
+
+      // Tunnel
+      if (data.tunnel) {
+        const short = data.tunnel.replace('https://', '').split('.')[0];
+        setInfraField('infra-tunnel-status', `🟢 ${short}…`, 'text-green-700');
+      } else {
+        setInfraField('infra-tunnel-status', '🔴 No tunnel', 'text-red-600');
+      }
+
+      // Cron
+      setInfraField('infra-cron-status',
+        data.cronAlive ? '🟢 Running' : '🔴 Dead',
+        data.cronAlive ? 'text-green-700' : 'text-red-600'
+      );
+
+      // Sends
+      setInfraField('infra-sends-status',
+        data.sendsEnabled ? '🟢 Unlocked' : '🔒 Locked',
+        data.sendsEnabled ? 'text-green-700' : 'text-amber-700'
+      );
+      // Update the send-lock badge in the review agent section too
+      const lockBadge = document.getElementById('send-lock-badge');
+      if (lockBadge) {
+        lockBadge.textContent = data.sendsEnabled ? '🔓 Unlocked' : '🔒 Locked';
+        lockBadge.className = `px-2 py-1 rounded text-xs font-medium ${data.sendsEnabled ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`;
+      }
+
+      // vLLM
+      setInfraField('infra-vllm', data.vllmOnline ? '🟢 Online' : '🔴 Offline', data.vllmOnline ? 'text-green-700' : 'text-red-600');
+
+      // Uptime
+      if (data.uptime) {
+        const hrs = Math.floor(data.uptime / 3600);
+        const mins = Math.floor((data.uptime % 3600) / 60);
+        setInfraField('infra-uptime', hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`, 'text-gray-700');
+      }
+
+      // Show details & controls
+      details?.classList.remove('hidden');
+      controls?.classList.remove('hidden');
+
+      // Update toggle button text
+      const toggleBtn = document.getElementById('ctrl-toggle-sends');
+      if (toggleBtn) {
+        toggleBtn.textContent = data.sendsEnabled ? '🔒 Lock Sends' : '🔓 Unlock Sends';
+      }
+
+    } catch {
+      dot?.classList.remove('bg-green-500', 'bg-amber-500', 'animate-pulse');
+      dot?.classList.add('bg-red-500');
+      if (label) { label.textContent = 'Error'; label.className = 'text-xs text-red-600'; }
+    }
+  }
+
+  function setInfraField(id: string, text: string, className: string) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = text; el.className = `text-sm font-medium ${className}`; }
+  }
+
+  // Infrastructure control actions
+  async function infraControl(action: string, btn: HTMLButtonElement) {
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳...';
+    try {
+      const res = await fetch('/api/system-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        btn.textContent = '✅ Done';
+        setTimeout(() => { btn.textContent = origText || ''; btn.disabled = false; loadInfraStatus(); }, 2000);
+      } else {
+        btn.textContent = `❌ ${data.error || 'Failed'}`;
+        setTimeout(() => { btn.textContent = origText || ''; btn.disabled = false; }, 3000);
+      }
+    } catch {
+      btn.textContent = '❌ Unreachable';
+      setTimeout(() => { btn.textContent = origText || ''; btn.disabled = false; }, 3000);
+    }
+  }
+
+  document.getElementById('ctrl-toggle-sends')?.addEventListener('click', function() { infraControl('toggle-sends', this as HTMLButtonElement); });
+  document.getElementById('ctrl-restart-cron')?.addEventListener('click', function() { infraControl('restart-cron', this as HTMLButtonElement); });
+  document.getElementById('ctrl-restart-launcher')?.addEventListener('click', function() {
+    if (confirm('This will restart the entire Sentinel launcher (including tunnel). The dashboard will briefly lose connection. Continue?')) {
+      infraControl('restart-launcher', this as HTMLButtonElement);
+    }
+  });
+  document.getElementById('infra-refresh-btn')?.addEventListener('click', loadInfraStatus);
+
+  // Auto-load infra status when pipeline tab is shown
+  const pipelineTabBtn = document.querySelector('[data-tab="pipeline"]');
+  if (pipelineTabBtn) {
+    pipelineTabBtn.addEventListener('click', () => { loadInfraStatus(); loadPipelineStatus(); });
+  }
 
   async function loadPipelineStatus() {
     const statsEl = document.getElementById('pipeline-stats');
