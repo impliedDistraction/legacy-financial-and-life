@@ -1507,12 +1507,21 @@ if (!session) {
       const pipelineActive = (counts.pending || 0) + (counts.drafted || 0) + (counts.reviewed || 0) + (counts.approved || 0);
       const goal = c.send_limit || c.credit_budget || 100;
       const goalMet = totalSent >= goal;
-      // Status logic: completed > goal-met > serving (pipeline active) > raw status
-      const displayStatus = c.status === 'completed' ? 'completed'
+
+      // Detect expired search window (date filter end date in the past)
+      const isExpired = (() => {
+        const endDate = c.search_filters?.licenseEffectiveTo;
+        if (!endDate) return false;
+        return new Date(endDate) < new Date();
+      })();
+
+      // Status logic: expired > completed > goal-met > serving (pipeline active) > raw status
+      const displayStatus = isExpired && c.status !== 'completed' ? 'expired'
+        : c.status === 'completed' ? 'completed'
         : (c.status === 'paused' && goalMet) ? 'completed'
         : (c.status === 'paused' && pipelineActive > 0) ? 'serving'
         : c.status;
-      const statusColor = displayStatus === 'active' ? 'green' : displayStatus === 'serving' ? 'blue' : displayStatus === 'completed' ? 'gray' : displayStatus === 'paused' ? 'amber' : 'gray';
+      const statusColor = displayStatus === 'expired' ? 'red' : displayStatus === 'active' ? 'green' : displayStatus === 'serving' ? 'blue' : displayStatus === 'completed' ? 'gray' : displayStatus === 'paused' ? 'amber' : 'gray';
       const progressPct = goal > 0 ? Math.round((totalSent / goal) * 100) : 0;
       const lastRun = c.last_run_at ? new Date(c.last_run_at).toLocaleString() : 'Never';
       const nextRun = c.next_run_at ? new Date(c.next_run_at).toLocaleString() : 'Queued';
@@ -1531,14 +1540,18 @@ if (!session) {
           <div class="flex items-start justify-between mb-2">
             <div>
               <h3 class="font-semibold text-gray-900">${escapeHtml(c.name)}</h3>
-              <p class="text-xs text-gray-500 mt-0.5">${sourceIcon} · ${escapeHtml(c.search_state)}${c.search_filters?.onlyNewAgents ? ' · 🆕 New Agents' : ''}${c.search_filters?.licenseEffectiveFrom ? ' · 📅 ' + escapeHtml(c.search_filters.licenseEffectiveFrom) : ''}</p>
+              <p class="text-xs text-gray-500 mt-0.5">${sourceIcon} · ${escapeHtml(c.search_state)}${c.search_filters?.onlyNewAgents ? ' · 🆕 New Agents' : ''}${c.search_filters?.licenseEffectiveFrom ? ' · 📅 ' + escapeHtml(c.search_filters.licenseEffectiveFrom) + (c.search_filters?.licenseEffectiveTo ? ' → ' + escapeHtml(c.search_filters.licenseEffectiveTo) : '') : ''}</p>
             </div>
             <div class="flex items-center gap-2">
               ${relaunchBadge}
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-700">${displayStatus}</span>
               ${actionButtons}
             </div>
-          </div>
+          </div>${isExpired ? `
+          <!-- Expired campaign warning -->
+          <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg">
+            <p class="text-xs text-red-700 font-medium">⚠️ Search window expired — date filter ended ${escapeHtml(c.search_filters.licenseEffectiveTo)}. No new agents can be found. Consider stopping this campaign or updating the date range.</p>
+          </div>` : ''}
           <!-- Outreach Progress -->
           <div class="mb-3">
             <div class="flex items-center justify-between text-xs mb-1">

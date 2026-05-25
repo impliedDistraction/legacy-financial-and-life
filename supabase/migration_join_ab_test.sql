@@ -7,7 +7,8 @@
 -- This migration adds a convenience view for querying A/B test results.
 
 -- View: join page variant performance metrics
-CREATE OR REPLACE VIEW join_variant_metrics AS
+CREATE OR REPLACE VIEW join_variant_metrics
+WITH (security_invoker = true) AS
 SELECT
   (properties->>'variant')::text AS variant,
   event_name,
