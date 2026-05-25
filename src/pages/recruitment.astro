@@ -4787,7 +4787,7 @@ if (!session) {
       return;
     }
     const counties = await loadT65Counties();
-    if (!counties || counties.length === 0) {
+    if (counties.length === 0) {
       picker.innerHTML = '<p class="text-xs text-gray-400">No T65 county data available. Run census worker to populate.</p>';
       return;
     }
