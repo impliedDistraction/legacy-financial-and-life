@@ -1549,8 +1549,9 @@ if (!session) {
             </div>
           </div>${isExpired ? `
           <!-- Expired campaign warning -->
-          <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg">
-            <p class="text-xs text-red-700 font-medium">⚠️ Search window expired — date filter ended ${escapeHtml(c.search_filters.licenseEffectiveTo)}. No new agents can be found. Consider stopping this campaign or updating the date range.</p>
+          <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-2">
+            <p class="text-xs text-red-700 font-medium">⚠️ Search window expired — date filter ended ${escapeHtml(c.search_filters.licenseEffectiveTo)}. No new agents can be found.</p>
+            <button class="shrink-0 text-xs bg-brand-600 hover:bg-brand-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors" data-campaign-action="relaunch" data-campaign-id="${c.id}" title="Create new campaign with updated date range">🔄 Relaunch</button>
           </div>` : ''}
           <!-- Outreach Progress -->
           <div class="mb-3">
@@ -1598,6 +1599,53 @@ if (!session) {
         const action = el.dataset.campaignAction;
         const id = el.dataset.campaignId;
         if (action === 'stop' && !confirm('Stop this campaign? It will be moved to Past Campaigns.')) return;
+        if (action === 'relaunch') {
+          // Find the campaign from cache and relaunch with updated date range
+          const campaign = campaignsCache.find((c: any) => c.id === id);
+          if (!campaign) return;
+          const oldEnd = campaign.search_filters?.licenseEffectiveTo;
+          const oldStart = campaign.search_filters?.licenseEffectiveFrom;
+          // New range: from old end date to today
+          const today = new Date().toISOString().split('T')[0];
+          const newStart = oldEnd || oldStart || today;
+          const newFilters = { ...campaign.search_filters, licenseEffectiveFrom: newStart, licenseEffectiveTo: today };
+          const newName = campaign.name.replace(/v\d+$/, '').trim() + ' v' + (parseInt(campaign.name.match(/v(\d+)$/)?.[1] || '1') + 1);
+          if (!confirm(`Relaunch as "${newName}"?\nNew date range: ${newStart} → ${today}`)) return;
+          try {
+            // Stop the old campaign
+            await fetch('/api/recruitment-campaigns', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'stop', id }),
+            });
+            // Create the new campaign
+            await fetch('/api/recruitment-campaigns', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'create',
+                name: newName,
+                source: campaign.source_type,
+                searchState: campaign.search_state,
+                searchFilters: newFilters,
+                sendLimit: campaign.send_limit,
+                creditBudget: campaign.credit_budget,
+                maxPagesPerRun: campaign.max_pages_per_run,
+                intervalMinutes: campaign.schedule_interval_minutes,
+                jitterMinutes: campaign.schedule_jitter_minutes,
+                autoRelaunch: campaign.auto_relaunch,
+                signOff: campaign.sign_off,
+                replyToEmail: campaign.reply_to_email,
+                requireReview: campaign.require_review,
+                notes: `Relaunched from "${campaign.name}" (${campaign.id.slice(0,8)})`,
+              }),
+            });
+            loadCampaigns();
+          } catch (err) {
+            console.error('Relaunch failed:', err);
+          }
+          return;
+        }
         try {
           await fetch('/api/recruitment-campaigns', {
             method: 'POST',
@@ -4739,7 +4787,7 @@ if (!session) {
       return;
     }
     const counties = await loadT65Counties();
-    if (counties.length === 0) {
+    if (!counties || counties.length === 0) {
       picker.innerHTML = '<p class="text-xs text-gray-400">No T65 county data available. Run census worker to populate.</p>';
       return;
     }

@@ -182,13 +182,15 @@ export const GET: APIRoute = async ({ url }) => {
 
       // Only increment response_count for first-time respondents (not per-answer)
       if (isFirstResponse) {
-        await supa(`survey_campaigns?id=eq.${encodeURIComponent(cid)}`, {
-          method: 'PATCH',
-          headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify({
-            response_count: campaign.response_count + 1,
-            updated_at: new Date().toISOString(),
-          }),
+        // Use raw SQL via PostgREST rpc for atomic increment (avoids race condition)
+        await fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_survey_response_count`, {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_SERVICE_ROLE_KEY!,
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ campaign_id_input: cid }),
         });
       }
 

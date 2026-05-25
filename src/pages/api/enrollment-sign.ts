@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { isRateLimited } from '../../lib/lead-dedup';
 
 export const prerender = false;
@@ -87,8 +87,13 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   // Update session and selection status
-  await supabaseUpdate('quote_sessions', sessionId, { status: 'pending_approval' });
-  await supabaseUpdate('plan_selections', selectionId, { status: 'pending_approval' });
+  const sessionUpdate = await supabaseUpdate('quote_sessions', sessionId, { status: 'pending_approval' });
+  const selectionUpdate = await supabaseUpdate('plan_selections', selectionId, { status: 'pending_approval' });
+
+  if (!sessionUpdate || !selectionUpdate) {
+    console.error('[enrollment-sign] Failed to update session/selection status');
+    return jsonResponse(500, { error: 'Signature recorded but status update failed. Please contact support.' });
+  }
 
   // Record event
   await supabaseInsert('enrollment_events', {
@@ -147,7 +152,7 @@ async function supabaseInsert(table: string, record: Record<string, unknown>) {
   return { ok: true };
 }
 
-async function supabaseUpdate(table: string, id: string, updates: Record<string, unknown>) {
+async function supabaseUpdate(table: string, id: string, updates: Record<string, unknown>): Promise<boolean> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
     method: 'PATCH',
     headers: {
@@ -161,5 +166,7 @@ async function supabaseUpdate(table: string, id: string, updates: Record<string,
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     console.error(`[enrollment-sign] Update ${table} failed: ${res.status}: ${text}`);
+    return false;
   }
+  return true;
 }

@@ -49,6 +49,10 @@ export const POST: APIRoute = async ({ request }) => {
     return jsonResponse(400, { error: 'Zip code and name are required.' });
   }
 
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return jsonResponse(400, { error: 'Invalid email address.' });
+  }
+
   // Resolve county (we trust the frontend sent a valid zip, but re-resolve server-side)
   const sentinelUrl = import.meta.env.SENTINEL_URL || import.meta.env.OLLAMA_URL;
   let state = String(body.state ?? '').slice(0, 2);

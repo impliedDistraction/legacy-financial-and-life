@@ -59,7 +59,7 @@ if (testPersona && TEST_PERSONAS[testPersona]) {
           const props = p.properties || {};
           const statesCount = props.states_count || 0;
           const daysSinceLicense = props.licensed_date
-            ? Math.floor((Date.now() - new Date(props.licensed_date).getTime()) / 86400000)
+            ? (() => { const d = new Date(props.licensed_date); return isNaN(d.getTime()) ? null : Math.floor((Date.now() - d.getTime()) / 86400000); })()
             : null;
 
           // Classification logic

@@ -110,9 +110,11 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
       // Fuzzy fallback: match by email username (handles corporate domain aliases like uhc.com ↔ umr.com)
       if (!prospect) {
         const username = senderEmail.split('@')[0];
-        if (username && username.length >= 4) {
+        // Reject generic usernames that would produce false matches
+        const genericUsernames = ['admin', 'info', 'sales', 'support', 'contact', 'hello', 'help', 'noreply', 'no-reply', 'mail', 'team', 'office', 'billing'];
+        if (username && username.length >= 6 && !genericUsernames.includes(username)) {
           const fuzzyRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/recruitment_prospects?email=ilike.${encodeURIComponent(username + '@%')}&select=id,name,properties,interaction_stage&limit=1`,
+            `${SUPABASE_URL}/rest/v1/recruitment_prospects?email=ilike.${encodeURIComponent(username + '@%')}&select=id,name,properties,interaction_stage&limit=2`,
             {
               headers: {
                 apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -123,6 +125,7 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
           );
           if (fuzzyRes.ok) {
             const fuzzyResults = await fuzzyRes.json();
+            // Only use if exactly 1 match (ambiguous = skip)
             if (fuzzyResults.length === 1) {
               prospect = fuzzyResults[0];
             }

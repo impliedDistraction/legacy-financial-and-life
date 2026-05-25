@@ -26,6 +26,7 @@
     "vercel": "^51.4.0"
   },
   "devDependencies": {
+    "@types/node": "^25.9.1",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.45",
     "puppeteer": "^22.15.0",

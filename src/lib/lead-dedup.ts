@@ -59,11 +59,37 @@ export function isSubmissionTooFast(data: FormData): boolean {
   return elapsedSeconds < MIN_FORM_FILL_SECONDS;
 }
 
-// ── IP-based rate limiting (via Supabase) ───────────────────────────
+// ── IP-based rate limiting (local in-memory + Supabase fallback) ────
 
-export async function isRateLimited(
-  clientIp: string,
-): Promise<boolean> {
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+/**
+ * Per-key rate limiter with configurable max and window.
+ * Uses in-memory Map for fast per-endpoint limits.
+ * Falls back to Supabase-based check when called with just an IP (legacy).
+ */
+export function isRateLimited(
+  key: string,
+  max?: number,
+  windowMs?: number,
+): boolean | Promise<boolean> {
+  // If max/windowMs provided, use fast local rate limiter
+  if (max !== undefined && windowMs !== undefined) {
+    const now = Date.now();
+    const entry = rateLimitMap.get(key);
+    if (!entry || now >= entry.resetAt) {
+      rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
+      return false;
+    }
+    entry.count++;
+    return entry.count > max;
+  }
+
+  // Legacy path: Supabase-based hourly rate limit (for fb-lead, etc.)
+  return isRateLimitedSupabase(key);
+}
+
+async function isRateLimitedSupabase(clientIp: string): Promise<boolean> {
   const supabaseUrl = getSupabaseUrl();
   const serviceRoleKey = getSupabaseKey();
   if (!supabaseUrl || !serviceRoleKey) return false; // fail open

@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { isRateLimited } from '../../lib/lead-dedup';
 
 export const prerender = false;
@@ -59,7 +60,6 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   // Verify HMAC token (prevents unauthorized approval without the email link)
-  const { createHmac } = await import('node:crypto');
   const secret = import.meta.env.ENROLLMENT_HMAC_SECRET || import.meta.env.UNSUBSCRIBE_HMAC_SECRET || '';
   const expectedToken = createHmac('sha256', secret)
     .update(`${sessionId}:${selectionId}:${agentEmail}`)
@@ -150,9 +150,9 @@ function asUUID(value: unknown): string | null {
 }
 
 function timingSafeCompare(a: string, b: string): boolean {
-  const { timingSafeEqual } = require('node:crypto');
-  const bufA = Buffer.from(a, 'utf8');
-  const bufB = Buffer.from(b, 'utf8');
+  const encoder = new TextEncoder();
+  const bufA = encoder.encode(a);
+  const bufB = encoder.encode(b);
   if (bufA.length !== bufB.length) return false;
   return timingSafeEqual(bufA, bufB);
 }

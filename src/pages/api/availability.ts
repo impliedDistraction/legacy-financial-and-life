@@ -12,7 +12,10 @@ const CACHE_TTL = 5 * 60 * 1000;
 /** Extract user_uuid from Calendly PAT (JWT) to build user URI without users:read scope */
 function userUriFromToken(token: string): string | null {
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const parts = token.split('.');
+    if (parts.length !== 3 || !parts[1]) return null;
+    const payload = JSON.parse(atob(parts[1]));
+    if (!payload?.user_uuid) return null;
     return `${CALENDLY_API}/users/${payload.user_uuid}`;
   } catch {
     return null;
@@ -50,6 +53,9 @@ export const GET: APIRoute = async () => {
     );
     if (!typesRes.ok) throw new Error('Failed to fetch event types');
     const types = await typesRes.json();
+    if (!types?.collection || !Array.isArray(types.collection)) {
+      throw new Error('Invalid Calendly event types response');
+    }
 
     const eventType = types.collection.find(
       (t: { slug: string }) => t.slug === BOOKING_SLUG

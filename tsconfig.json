@@ -1,11 +1,12 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "jsx": "preserve",
     "jsxImportSource": "react",
     "module": "esnext",
     "moduleResolution": "bundler",
     "target": "ES2022",
-    "types": ["astro/client"]
+    "types": ["astro/client", "node"]
   }
 }
