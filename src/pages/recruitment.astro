@@ -990,6 +990,83 @@ if (!session) {
               </div>
             </div>
           </div>
+
+          <!-- Send Velocity Controls -->
+          <div class="bg-white rounded-xl border border-gray-200 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-lg font-semibold text-gray-900">Send Velocity</h2>
+              <div id="velocity-status" class="text-xs text-gray-400">Loading...</div>
+            </div>
+            <!-- Effective rate summary -->
+            <div id="velocity-summary" class="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+              <div class="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <div id="vel-effective-rate" class="text-lg font-bold text-blue-700">—</div>
+                  <div class="text-[10px] text-blue-500">sends/hr (effective)</div>
+                </div>
+                <div>
+                  <div id="vel-daily-target" class="text-lg font-bold text-blue-700">—</div>
+                  <div class="text-[10px] text-blue-500">daily target</div>
+                </div>
+                <div>
+                  <div id="vel-daily-cap" class="text-lg font-bold text-blue-700">—</div>
+                  <div class="text-[10px] text-blue-500">daily hard cap</div>
+                </div>
+              </div>
+            </div>
+            <!-- Controls -->
+            <div class="space-y-3">
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Target per Hour</label>
+                  <input type="number" id="vel-target-per-hour" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" min="1" max="20" />
+                  <p class="text-xs text-gray-400 mt-0.5">Logical rate × 24 = daily target, compressed into business hours</p>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Daily Hard Cap</label>
+                  <input type="number" id="vel-daily-hard-cap" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" min="10" max="1000" />
+                  <p class="text-xs text-gray-400 mt-0.5">Absolute ceiling — never exceeded</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Hourly Hard Cap</label>
+                  <input type="number" id="vel-hourly-hard-cap" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" min="1" max="50" />
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Catch-up Max/hr</label>
+                  <input type="number" id="vel-catchup-max" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" min="0" max="10" />
+                  <p class="text-xs text-gray-400 mt-0.5">Extra sends/hr when behind schedule</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Send Window Start (ET)</label>
+                  <select id="vel-window-start" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    <option value="7">7:00 AM</option>
+                    <option value="8">8:00 AM</option>
+                    <option value="9">9:00 AM</option>
+                    <option value="10">10:00 AM</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-600 mb-1">Send Window End (ET)</label>
+                  <select id="vel-window-end" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
+                    <option value="17">5:00 PM</option>
+                    <option value="18">6:00 PM</option>
+                    <option value="19">7:00 PM</option>
+                    <option value="20">8:00 PM</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex items-center justify-between pt-2">
+                <p class="text-xs text-gray-400">Changes take effect immediately on next cron cycle (90s)</p>
+                <button id="vel-save-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors">
+                  Save Velocity Settings
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Ready to Send Queue -->
@@ -4248,6 +4325,92 @@ if (!session) {
   });
 
   document.getElementById('pipeline-refresh-btn')?.addEventListener('click', loadPipelineStatus);
+
+  // ═══════════════════════════════════════════
+  // SEND VELOCITY SETTINGS
+  // ═══════════════════════════════════════════
+  async function loadVelocitySettings() {
+    try {
+      const res = await fetch('/api/send-settings');
+      if (!res.ok) {
+        document.getElementById('velocity-status')!.textContent = '⚠️ Failed to load';
+        return;
+      }
+      const data = await res.json();
+      const s = data.settings || {};
+      const c = data.computed || {};
+
+      // Populate inputs
+      (document.getElementById('vel-target-per-hour') as HTMLInputElement).value = s.send_target_per_hour?.value || '6';
+      (document.getElementById('vel-daily-hard-cap') as HTMLInputElement).value = s.send_daily_hard_cap?.value || '200';
+      (document.getElementById('vel-hourly-hard-cap') as HTMLInputElement).value = s.send_hourly_hard_cap?.value || '20';
+      (document.getElementById('vel-catchup-max') as HTMLInputElement).value = s.send_catchup_max_per_hour?.value || '6';
+      (document.getElementById('vel-window-start') as HTMLSelectElement).value = s.send_window_start?.value || '8';
+      (document.getElementById('vel-window-end') as HTMLSelectElement).value = s.send_window_end?.value || '18';
+
+      // Update summary
+      document.getElementById('vel-effective-rate')!.textContent = String(c.effectiveRatePerHour || '—');
+      document.getElementById('vel-daily-target')!.textContent = String(c.dailyTarget || '—');
+      document.getElementById('vel-daily-cap')!.textContent = s.send_daily_hard_cap?.value || '—';
+
+      // Status
+      const lastUpdate = s.send_target_per_hour?.updated_at;
+      document.getElementById('velocity-status')!.textContent = lastUpdate
+        ? `Updated ${new Date(lastUpdate).toLocaleDateString()}`
+        : 'Using defaults';
+    } catch {
+      document.getElementById('velocity-status')!.textContent = '⚠️ Error';
+    }
+  }
+
+  function updateVelocitySummary() {
+    const target = parseInt((document.getElementById('vel-target-per-hour') as HTMLInputElement).value) || 6;
+    const start = parseInt((document.getElementById('vel-window-start') as HTMLSelectElement).value) || 8;
+    const end = parseInt((document.getElementById('vel-window-end') as HTMLSelectElement).value) || 18;
+    const bizHours = end - start;
+    const dailyTarget = target * 24;
+    const effective = bizHours > 0 ? Math.round((dailyTarget / bizHours) * 10) / 10 : 0;
+    document.getElementById('vel-effective-rate')!.textContent = String(effective);
+    document.getElementById('vel-daily-target')!.textContent = String(dailyTarget);
+    document.getElementById('vel-daily-cap')!.textContent = (document.getElementById('vel-daily-hard-cap') as HTMLInputElement).value;
+  }
+
+  // Live-update summary on input change
+  ['vel-target-per-hour', 'vel-daily-hard-cap', 'vel-window-start', 'vel-window-end'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', updateVelocitySummary);
+    document.getElementById(id)?.addEventListener('change', updateVelocitySummary);
+  });
+
+  document.getElementById('vel-save-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('vel-save-btn') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    try {
+      const settings = {
+        send_target_per_hour: (document.getElementById('vel-target-per-hour') as HTMLInputElement).value,
+        send_daily_hard_cap: (document.getElementById('vel-daily-hard-cap') as HTMLInputElement).value,
+        send_hourly_hard_cap: (document.getElementById('vel-hourly-hard-cap') as HTMLInputElement).value,
+        send_catchup_max_per_hour: (document.getElementById('vel-catchup-max') as HTMLInputElement).value,
+        send_window_start: (document.getElementById('vel-window-start') as HTMLSelectElement).value,
+        send_window_end: (document.getElementById('vel-window-end') as HTMLSelectElement).value,
+      };
+      const res = await fetch('/api/send-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      btn.textContent = '✓ Saved';
+      setTimeout(() => { btn.textContent = 'Save Velocity Settings'; btn.disabled = false; }, 2000);
+      loadVelocitySettings(); // refresh summary
+    } catch {
+      btn.textContent = '❌ Failed';
+      setTimeout(() => { btn.textContent = 'Save Velocity Settings'; btn.disabled = false; }, 3000);
+    }
+  });
+
+  // Load velocity settings on pipeline tab activation
+  loadVelocitySettings();
 
   // ═══════════════════════════════════════════
   // ROADMAP — follow-up timeline + state discovery
