@@ -1,0 +1,724 @@
+---
+/**
+ * /sales — Outbound sales campaign dashboard.
+ *
+ * Allows Beth/Tim to:
+ * 1. Create sales campaigns by objective (T65, health, life, key-person)
+ * 2. Get Apollo search prompts for lead sourcing
+ * 3. Upload Apollo lead lists (CSV paste)
+ * 4. Manage campaign lifecycle (draft → sourcing → ready → active)
+ * 5. View prospect pool and campaign performance
+ *
+ * Protected by the same magic-link auth as /recruitment.
+ */
+import Base from '../layouts/Base.astro';
+import '../styles/tailwind.css';
+import { verifySessionCookie } from '../lib/ai-demo-auth';
+
+export const prerender = false;
+
+const session = await verifySessionCookie(Astro.request.headers.get('cookie'));
+if (!session) {
+  return Astro.redirect('/ai-demo-login?redirect=/sales', 302);
+}
+---
+<Base title="Sales Campaigns — Legacy Financial & Life" description="Outbound sales campaign management">
+
+<div class="bg-gray-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-sm font-bold text-gray-900">Sales Campaigns</h1>
+          <p class="text-xs text-gray-500">Legacy Financial & Life</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/recruitment" class="text-xs text-brand-600 hover:text-brand-700 font-medium">← Recruitment</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats Bar -->
+  <section class="max-w-7xl mx-auto px-4 pt-6 pb-2">
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+        <div class="text-2xl font-bold text-gray-900" id="stat-pool">—</div>
+        <div class="text-xs text-gray-500">Unassigned Pool</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+        <div class="text-2xl font-bold text-blue-600" id="stat-campaigns">—</div>
+        <div class="text-xs text-gray-500">Active Campaigns</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+        <div class="text-2xl font-bold text-amber-600" id="stat-ready">—</div>
+        <div class="text-xs text-gray-500">Ready to Send</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+        <div class="text-2xl font-bold text-green-600" id="stat-sent">—</div>
+        <div class="text-xs text-gray-500">Sent</div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-200 p-3 text-center">
+        <div class="text-2xl font-bold text-purple-600" id="stat-engaged">—</div>
+        <div class="text-xs text-gray-500">Engaged</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tab Navigation -->
+  <div class="max-w-7xl mx-auto px-4 pt-4">
+    <div class="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit" id="tab-nav">
+      <button class="tab-btn active px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="campaigns">
+        🎯 Campaigns
+      </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="prospects">
+        👥 Prospects
+      </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="upload">
+        📤 Upload Leads
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="max-w-7xl mx-auto px-4 py-4">
+
+    <!-- ═══════════════ CAMPAIGNS TAB ═══════════════ -->
+    <div id="tab-campaigns" class="tab-panel">
+      <div class="space-y-6">
+
+        <!-- Create Campaign -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Create New Campaign</h2>
+          <form id="create-campaign-form" class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-1">
+              <label class="text-sm font-medium text-gray-700">Campaign Name</label>
+              <input type="text" name="name" required placeholder="e.g., GA Business Owners - Life" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none" />
+            </div>
+            <div class="grid gap-1">
+              <label class="text-sm font-medium text-gray-700">Objective</label>
+              <select name="objective" required class="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none">
+                <option value="">Select objective…</option>
+                <option value="life">Life Insurance</option>
+                <option value="t65">Turning 65 (Medicare + Life)</option>
+                <option value="health">Health Insurance</option>
+                <option value="key_person">Key Person Coverage</option>
+                <option value="final_expense">Final Expense</option>
+              </select>
+            </div>
+            <div class="sm:col-span-2 grid gap-1">
+              <label class="text-sm font-medium text-gray-700">Target Description</label>
+              <textarea name="description" rows="2" placeholder="Describe who you're targeting… e.g., 'Small business owners in Atlanta with 5-20 employees who may need key-person or buy-sell coverage'" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none"></textarea>
+            </div>
+            <div class="grid gap-1">
+              <label class="text-sm font-medium text-gray-700">Target States</label>
+              <input type="text" name="states" placeholder="GA, FL, TX (comma separated)" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none" />
+            </div>
+            <div class="grid gap-1">
+              <label class="text-sm font-medium text-gray-700">Daily Send Limit</label>
+              <input type="number" name="daily_limit" value="50" min="1" max="200" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none" />
+            </div>
+            <div class="sm:col-span-2">
+              <button type="submit" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 text-sm font-semibold transition-colors">
+                Create Campaign
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Apollo Prompt Display (shown after campaign creation) -->
+        <div id="apollo-prompt-section" class="hidden bg-white rounded-xl border border-blue-200 p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-blue-900">Apollo AI Search Prompt</h3>
+            <button id="copy-prompt-btn" class="text-xs text-blue-600 hover:text-blue-800 font-medium">📋 Copy</button>
+          </div>
+          <p class="text-xs text-blue-700 mb-3">Use this prompt in Apollo's AI search to find leads, then upload the exported CSV below.</p>
+          <pre id="apollo-prompt-text" class="bg-blue-50 rounded-lg p-4 text-sm text-blue-900 whitespace-pre-wrap font-mono border border-blue-100"></pre>
+          <div class="mt-3 flex gap-2">
+            <button id="mark-sourcing-btn" class="text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1.5 rounded-md font-medium transition-colors">
+              ✓ Mark as Sourcing
+            </button>
+          </div>
+        </div>
+
+        <!-- Campaign List -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Your Campaigns</h2>
+          <div id="campaign-list" class="space-y-3">
+            <p class="text-sm text-gray-400 py-8 text-center">Loading campaigns…</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ PROSPECTS TAB ═══════════════ -->
+    <div id="tab-prospects" class="tab-panel hidden">
+      <div class="bg-white rounded-xl border border-gray-200 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-900">Sales Prospects</h2>
+          <div class="flex gap-2">
+            <select id="prospect-filter-campaign" class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs bg-white">
+              <option value="">All campaigns</option>
+              <option value="unassigned">Unassigned pool</option>
+            </select>
+            <select id="prospect-filter-status" class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs bg-white">
+              <option value="">All statuses</option>
+              <option value="new">New</option>
+              <option value="approved">Approved</option>
+              <option value="sent">Sent</option>
+            </select>
+          </div>
+        </div>
+        <div id="prospects-table" class="overflow-x-auto">
+          <p class="text-sm text-gray-400 py-8 text-center">Select filters to view prospects</p>
+        </div>
+        <div id="prospects-pagination" class="flex items-center justify-between mt-4 pt-3 border-t border-gray-100"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ UPLOAD TAB ═══════════════ -->
+    <div id="tab-upload" class="tab-panel hidden">
+      <div class="bg-white rounded-xl border border-gray-200 p-5">
+        <h2 class="text-lg font-semibold text-gray-900 mb-2">Upload Apollo Leads</h2>
+        <p class="text-sm text-gray-600 mb-4">
+          Paste CSV data from Apollo export. Expected columns: <code class="text-xs bg-gray-100 px-1.5 py-0.5 rounded">First Name, Last Name, Email, Title, Company, City, State, LinkedIn Url</code>
+        </p>
+
+        <form id="upload-form" class="space-y-4">
+          <div class="grid gap-1">
+            <label class="text-sm font-medium text-gray-700">Assign to Campaign (optional)</label>
+            <select id="upload-campaign-select" name="campaign_id" class="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none">
+              <option value="">Unassigned (prospect pool)</option>
+            </select>
+          </div>
+          <div class="grid gap-1">
+            <label class="text-sm font-medium text-gray-700">CSV Data</label>
+            <textarea id="csv-input" name="csv" rows="10" required placeholder="First Name,Last Name,Email,Title,Company,City,State,LinkedIn Url&#10;John,Smith,john@acme.com,CEO,Acme Corp,Atlanta,GA,https://linkedin.com/in/johnsmith" class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none"></textarea>
+          </div>
+          <div id="csv-preview" class="hidden">
+            <p class="text-sm font-medium text-gray-700 mb-2">Preview (<span id="csv-count">0</span> leads):</p>
+            <div class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+              <table class="w-full text-xs">
+                <thead class="bg-gray-50 sticky top-0">
+                  <tr><th class="px-3 py-1.5 text-left">Name</th><th class="px-3 py-1.5 text-left">Email</th><th class="px-3 py-1.5 text-left">Title</th><th class="px-3 py-1.5 text-left">Company</th><th class="px-3 py-1.5 text-left">State</th></tr>
+                </thead>
+                <tbody id="csv-preview-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <button type="button" id="preview-csv-btn" class="rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 text-sm font-medium transition-colors">
+              Preview
+            </button>
+            <button type="submit" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 text-sm font-semibold transition-colors">
+              Upload Leads
+            </button>
+          </div>
+        </form>
+        <div id="upload-result" class="hidden mt-4 p-3 rounded-lg text-sm"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+  .tab-btn.active {
+    background: white;
+    color: #111827;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  }
+  .tab-btn:not(.active) {
+    color: #6b7280;
+  }
+  .tab-btn:not(.active):hover {
+    color: #374151;
+  }
+</style>
+
+<script>
+  // ─── Tab switching ───────────────────────────────────────────────
+
+  const tabNav = document.getElementById('tab-nav')!;
+  const tabPanels = document.querySelectorAll<HTMLElement>('.tab-panel');
+
+  tabNav.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('.tab-btn') as HTMLElement | null;
+    if (!btn) return;
+    const tab = btn.dataset.tab!;
+
+    tabNav.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    tabPanels.forEach(p => {
+      p.classList.toggle('hidden', p.id !== `tab-${tab}`);
+    });
+
+    if (tab === 'prospects') loadProspects();
+  });
+
+  // ─── State ───────────────────────────────────────────────────────
+
+  let campaigns: any[] = [];
+  let lastCreatedCampaignId: string | null = null;
+
+  // ─── Load campaigns ──────────────────────────────────────────────
+
+  async function loadCampaigns() {
+    try {
+      const res = await fetch('/api/sales-campaigns');
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      campaigns = data.campaigns || [];
+
+      // Update stats
+      const poolEl = document.getElementById('stat-pool')!;
+      const activeCampaigns = campaigns.filter((c: any) => c.status === 'active');
+      const readyCount = Object.values(data.prospectCounts || {}).reduce((sum: number, c: any) => sum + (c.new || 0), 0) as number;
+      const sentCount = Object.values(data.prospectCounts || {}).reduce((sum: number, c: any) => sum + (c.sent || 0), 0) as number;
+
+      poolEl.textContent = String(data.poolCount || 0);
+      document.getElementById('stat-campaigns')!.textContent = String(activeCampaigns.length);
+      document.getElementById('stat-ready')!.textContent = String(readyCount);
+      document.getElementById('stat-sent')!.textContent = String(sentCount);
+      document.getElementById('stat-engaged')!.textContent = '—'; // TODO: track engagements
+
+      // Render campaign list
+      renderCampaignList(campaigns, data.prospectCounts || {});
+
+      // Populate campaign selects
+      populateCampaignSelects(campaigns);
+    } catch (err) {
+      console.error('Load campaigns failed:', err);
+    }
+  }
+
+  function renderCampaignList(campaigns: any[], counts: Record<string, any>) {
+    const container = document.getElementById('campaign-list')!;
+    if (campaigns.length === 0) {
+      container.innerHTML = '<p class="text-sm text-gray-400 py-8 text-center">No campaigns yet. Create one above to get started.</p>';
+      return;
+    }
+
+    const statusColors: Record<string, string> = {
+      draft: 'bg-gray-100 text-gray-700',
+      sourcing: 'bg-blue-100 text-blue-700',
+      ready: 'bg-amber-100 text-amber-700',
+      active: 'bg-green-100 text-green-700',
+      paused: 'bg-orange-100 text-orange-700',
+      completed: 'bg-purple-100 text-purple-700',
+    };
+
+    const objectiveLabels: Record<string, string> = {
+      life: '🛡️ Life Insurance',
+      t65: '🎂 Turning 65',
+      health: '🏥 Health',
+      key_person: '🔑 Key Person',
+      final_expense: '⚰️ Final Expense',
+    };
+
+    container.innerHTML = campaigns.map((c: any) => {
+      const count = counts[c.id] || { total: 0, sent: 0, new: 0 };
+      const statusClass = statusColors[c.status] || 'bg-gray-100 text-gray-700';
+      const objectiveLabel = objectiveLabels[c.objective] || c.objective;
+      const states = (c.states || []).join(', ') || '—';
+
+      return `
+        <div class="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors" data-campaign-id="${c.id}">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <h3 class="font-semibold text-gray-900 text-sm truncate">${esc(c.name)}</h3>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-medium ${statusClass}">${c.status}</span>
+              </div>
+              <p class="text-xs text-gray-500">${objectiveLabel} · ${states}</p>
+              ${c.description ? `<p class="text-xs text-gray-400 mt-1 line-clamp-1">${esc(c.description)}</p>` : ''}
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-sm font-bold text-gray-900">${count.total}</div>
+              <div class="text-[10px] text-gray-400">prospects</div>
+              <div class="text-xs text-green-600 font-medium">${count.sent} sent</div>
+            </div>
+          </div>
+          <div class="mt-3 flex gap-2 flex-wrap">
+            ${c.status === 'draft' ? `<button class="campaign-action text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded font-medium" data-action="show-prompt" data-id="${c.id}">View Apollo Prompt</button>` : ''}
+            ${c.status === 'ready' ? `<button class="campaign-action text-xs bg-green-50 hover:bg-green-100 text-green-700 px-2.5 py-1 rounded font-medium" data-action="activate" data-id="${c.id}">Activate</button>` : ''}
+            ${c.status === 'active' ? `<button class="campaign-action text-xs bg-orange-50 hover:bg-orange-100 text-orange-700 px-2.5 py-1 rounded font-medium" data-action="pause" data-id="${c.id}">Pause</button>` : ''}
+            ${c.status === 'paused' ? `<button class="campaign-action text-xs bg-green-50 hover:bg-green-100 text-green-700 px-2.5 py-1 rounded font-medium" data-action="activate" data-id="${c.id}">Resume</button>` : ''}
+            ${['draft', 'sourcing', 'ready'].includes(c.status) ? `<button class="campaign-action text-xs bg-gray-50 hover:bg-gray-100 text-gray-700 px-2.5 py-1 rounded font-medium" data-action="assign" data-id="${c.id}">Assign Prospects</button>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Event delegation for campaign actions
+    container.querySelectorAll('.campaign-action').forEach(btn => {
+      btn.addEventListener('click', handleCampaignAction);
+    });
+  }
+
+  async function handleCampaignAction(e: Event) {
+    const btn = e.currentTarget as HTMLElement;
+    const action = btn.dataset.action!;
+    const id = btn.dataset.id!;
+
+    if (action === 'show-prompt') {
+      const campaign = campaigns.find((c: any) => c.id === id);
+      if (campaign?.apollo_prompt) {
+        showApolloPrompt(campaign.apollo_prompt, id);
+      }
+      return;
+    }
+
+    if (action === 'assign') {
+      const limit = prompt('How many prospects to assign from the pool?', '50');
+      if (!limit) return;
+      try {
+        const res = await fetch('/api/sales-campaigns', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'assign_prospects', id, limit: parseInt(limit, 10) }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          alert(`Assigned ${data.assigned} prospects to campaign`);
+          loadCampaigns();
+        } else {
+          alert(data.error || 'Failed');
+        }
+      } catch { alert('Network error'); }
+      return;
+    }
+
+    // activate, pause, complete
+    try {
+      const res = await fetch('/api/sales-campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, id }),
+      });
+      if (res.ok) loadCampaigns();
+      else alert('Action failed');
+    } catch { alert('Network error'); }
+  }
+
+  function showApolloPrompt(promptText: string, campaignId: string) {
+    const section = document.getElementById('apollo-prompt-section')!;
+    const pre = document.getElementById('apollo-prompt-text')!;
+    section.classList.remove('hidden');
+    pre.textContent = promptText;
+    lastCreatedCampaignId = campaignId;
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function populateCampaignSelects(campaigns: any[]) {
+    const selects = [
+      document.getElementById('upload-campaign-select'),
+      document.getElementById('prospect-filter-campaign'),
+    ];
+    for (const sel of selects) {
+      if (!sel) continue;
+      // Keep first option(s), remove dynamic ones
+      const options = sel.querySelectorAll('option[data-dynamic]');
+      options.forEach(o => o.remove());
+      for (const c of campaigns) {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.name} (${c.status})`;
+        opt.dataset.dynamic = '1';
+        sel.appendChild(opt);
+      }
+    }
+  }
+
+  // ─── Create campaign ─────────────────────────────────────────────
+
+  const createForm = document.getElementById('create-campaign-form') as HTMLFormElement;
+  createForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(createForm);
+    const name = String(fd.get('name') || '').trim();
+    const objective = String(fd.get('objective') || '');
+    const description = String(fd.get('description') || '').trim();
+    const statesRaw = String(fd.get('states') || '').trim();
+    const states = statesRaw ? statesRaw.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean) : [];
+    const daily_limit = parseInt(String(fd.get('daily_limit') || '50'), 10);
+
+    if (!name || !objective) { alert('Name and objective required'); return; }
+
+    try {
+      const res = await fetch('/api/sales-campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', name, objective, description, states, daily_limit }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Create failed'); return; }
+
+      createForm.reset();
+      lastCreatedCampaignId = data.campaign?.id || null;
+
+      // Show the Apollo prompt
+      if (data.apolloPrompt) {
+        showApolloPrompt(data.apolloPrompt, data.campaign.id);
+      }
+
+      loadCampaigns();
+    } catch { alert('Network error'); }
+  });
+
+  // ─── Copy prompt ─────────────────────────────────────────────────
+
+  document.getElementById('copy-prompt-btn')!.addEventListener('click', () => {
+    const text = document.getElementById('apollo-prompt-text')!.textContent || '';
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copy-prompt-btn')!;
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => { btn.textContent = '📋 Copy'; }, 2000);
+    });
+  });
+
+  document.getElementById('mark-sourcing-btn')!.addEventListener('click', async () => {
+    if (!lastCreatedCampaignId) return;
+    await fetch('/api/sales-campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update', id: lastCreatedCampaignId, status: 'sourcing' }),
+    });
+    // Hide prompt section
+    document.getElementById('apollo-prompt-section')!.classList.add('hidden');
+    loadCampaigns();
+  });
+
+  // ─── CSV Upload ──────────────────────────────────────────────────
+
+  let parsedProspects: any[] = [];
+
+  document.getElementById('preview-csv-btn')!.addEventListener('click', () => {
+    const csv = (document.getElementById('csv-input') as HTMLTextAreaElement).value.trim();
+    if (!csv) { alert('Paste CSV data first'); return; }
+    parsedProspects = parseCSV(csv);
+    renderCSVPreview(parsedProspects);
+  });
+
+  function parseCSV(csv: string): any[] {
+    const lines = csv.split('\n').map(l => l.trim()).filter(Boolean);
+    if (lines.length < 2) return [];
+
+    const header = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z_]/g, '_'));
+    const results: any[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i]);
+      const row: Record<string, string> = {};
+      header.forEach((h, idx) => { row[h] = (values[idx] || '').trim(); });
+
+      // Map common Apollo export columns
+      const firstName = row.first_name || row.firstname || '';
+      const lastName = row.last_name || row.lastname || '';
+      const name = `${firstName} ${lastName}`.trim();
+      const email = row.email || row.email_address || '';
+
+      if (!name || !email) continue;
+
+      results.push({
+        name,
+        email,
+        title: row.title || row.job_title || '',
+        company: row.company || row.company_name || row.organization || '',
+        city: row.city || '',
+        state: row.state || row.state_code || '',
+        linkedinUrl: row.linkedin_url || row.person_linkedin_url || row.linkedin || '',
+      });
+    }
+    return results;
+  }
+
+  function parseCSVLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if (ch === ',' && !inQuotes) {
+        result.push(current); current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current);
+    return result;
+  }
+
+  function renderCSVPreview(prospects: any[]) {
+    const preview = document.getElementById('csv-preview')!;
+    const tbody = document.getElementById('csv-preview-body')!;
+    const count = document.getElementById('csv-count')!;
+
+    if (prospects.length === 0) {
+      preview.classList.add('hidden');
+      alert('No valid rows found. Ensure CSV has name + email columns.');
+      return;
+    }
+
+    count.textContent = String(prospects.length);
+    tbody.innerHTML = prospects.slice(0, 20).map(p => `
+      <tr class="border-t border-gray-100">
+        <td class="px-3 py-1.5">${esc(p.name)}</td>
+        <td class="px-3 py-1.5 text-gray-500">${esc(p.email)}</td>
+        <td class="px-3 py-1.5 text-gray-500">${esc(p.title)}</td>
+        <td class="px-3 py-1.5 text-gray-500">${esc(p.company)}</td>
+        <td class="px-3 py-1.5 text-gray-500">${esc(p.state)}</td>
+      </tr>
+    `).join('') + (prospects.length > 20 ? `<tr><td colspan="5" class="px-3 py-2 text-center text-gray-400 text-xs">…and ${prospects.length - 20} more</td></tr>` : '');
+
+    preview.classList.remove('hidden');
+  }
+
+  const uploadForm = document.getElementById('upload-form') as HTMLFormElement;
+  uploadForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (parsedProspects.length === 0) {
+      // Try parsing now
+      const csv = (document.getElementById('csv-input') as HTMLTextAreaElement).value.trim();
+      parsedProspects = parseCSV(csv);
+    }
+    if (parsedProspects.length === 0) { alert('No valid prospects to upload'); return; }
+
+    const campaignId = (document.getElementById('upload-campaign-select') as HTMLSelectElement).value || undefined;
+    const resultEl = document.getElementById('upload-result')!;
+
+    try {
+      const res = await fetch('/api/sales-prospects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospects: parsedProspects, campaign_id: campaignId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        resultEl.className = 'mt-4 p-3 rounded-lg text-sm bg-green-50 border border-green-200 text-green-800';
+        resultEl.textContent = `✓ Imported ${data.imported} leads${campaignId ? ' and assigned to campaign' : ' to prospect pool'}`;
+        resultEl.classList.remove('hidden');
+        parsedProspects = [];
+        (document.getElementById('csv-input') as HTMLTextAreaElement).value = '';
+        document.getElementById('csv-preview')!.classList.add('hidden');
+        loadCampaigns();
+      } else {
+        resultEl.className = 'mt-4 p-3 rounded-lg text-sm bg-red-50 border border-red-200 text-red-800';
+        resultEl.textContent = `✗ ${data.error || 'Upload failed'}`;
+        resultEl.classList.remove('hidden');
+      }
+    } catch {
+      resultEl.className = 'mt-4 p-3 rounded-lg text-sm bg-red-50 border border-red-200 text-red-800';
+      resultEl.textContent = '✗ Network error';
+      resultEl.classList.remove('hidden');
+    }
+  });
+
+  // ─── Prospects ───────────────────────────────────────────────────
+
+  let currentPage = 1;
+
+  async function loadProspects(page = 1) {
+    currentPage = page;
+    const campaignId = (document.getElementById('prospect-filter-campaign') as HTMLSelectElement).value;
+    const status = (document.getElementById('prospect-filter-status') as HTMLSelectElement).value;
+
+    const params = new URLSearchParams({ page: String(page), limit: '25' });
+    if (campaignId) params.set('campaign_id', campaignId);
+    if (status) params.set('status', status);
+
+    try {
+      const res = await fetch(`/api/sales-prospects?${params}`);
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      renderProspectsTable(data.prospects, data.total, data.page, data.limit);
+    } catch (err) {
+      document.getElementById('prospects-table')!.innerHTML = '<p class="text-sm text-red-500 py-4 text-center">Failed to load prospects</p>';
+    }
+  }
+
+  function renderProspectsTable(prospects: any[], total: number, page: number, limit: number) {
+    const container = document.getElementById('prospects-table')!;
+    if (prospects.length === 0) {
+      container.innerHTML = '<p class="text-sm text-gray-400 py-8 text-center">No prospects match these filters</p>';
+      document.getElementById('prospects-pagination')!.innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = `
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Name</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Title / Company</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">State</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Status</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500">Added</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          ${prospects.map((p: any) => {
+            const props = p.properties || {};
+            const title = props.apollo_title || '';
+            const company = props.apollo_org || p.current_agency || '';
+            const statusColors: Record<string, string> = { new: 'text-gray-600', approved: 'text-blue-600', sent: 'text-green-600' };
+            const date = p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+            return `
+              <tr class="hover:bg-gray-50">
+                <td class="px-3 py-2">
+                  <div class="font-medium text-gray-900">${esc(p.name)}</div>
+                  <div class="text-xs text-gray-400">${esc(p.email || '')}</div>
+                </td>
+                <td class="px-3 py-2 text-gray-600 text-xs">${esc(title)}${title && company ? ' at ' : ''}${esc(company)}</td>
+                <td class="px-3 py-2 text-gray-600 text-xs">${esc(p.state || '—')}</td>
+                <td class="px-3 py-2"><span class="text-xs font-medium ${statusColors[p.status] || 'text-gray-500'}">${p.status}</span></td>
+                <td class="px-3 py-2 text-xs text-gray-400">${date}</td>
+              </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    // Pagination
+    const totalPages = Math.ceil(total / limit);
+    const pagination = document.getElementById('prospects-pagination')!;
+    pagination.innerHTML = `
+      <span class="text-xs text-gray-500">${total} total · page ${page}/${totalPages}</span>
+      <div class="flex gap-1">
+        ${page > 1 ? `<button class="page-btn text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200" data-page="${page - 1}">← Prev</button>` : ''}
+        ${page < totalPages ? `<button class="page-btn text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200" data-page="${page + 1}">Next →</button>` : ''}
+      </div>
+    `;
+    pagination.querySelectorAll('.page-btn').forEach(btn => {
+      btn.addEventListener('click', () => loadProspects(parseInt((btn as HTMLElement).dataset.page!, 10)));
+    });
+  }
+
+  // Filter change handlers
+  document.getElementById('prospect-filter-campaign')!.addEventListener('change', () => loadProspects(1));
+  document.getElementById('prospect-filter-status')!.addEventListener('change', () => loadProspects(1));
+
+  // ─── Utilities ───────────────────────────────────────────────────
+
+  function esc(s: string): string {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  // ─── Init ────────────────────────────────────────────────────────
+
+  loadCampaigns();
+</script>
+
+</Base>
