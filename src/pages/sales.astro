@@ -370,6 +370,18 @@ if (!session) {
       const objectiveLabel = objectiveLabels[c.objective] || c.objective;
       const states = (c.states || []).join(', ') || '—';
 
+      // Next-step hint based on state
+      let hint = '';
+      if (c.status === 'draft' && count.total === 0) {
+        hint = '<p class="text-xs text-amber-600 mt-2">⏳ Assign prospects from the pool or import a list to get started.</p>';
+      } else if (c.status === 'draft' && count.total > 0) {
+        hint = `<p class="text-xs text-amber-600 mt-2">✓ ${count.total} prospects assigned. Activate this campaign to begin sending emails.</p>`;
+      } else if (c.status === 'active') {
+        hint = `<p class="text-xs text-green-600 mt-2">🟢 Live — the outreach worker will send up to ${c.daily_limit || 50}/day from this campaign.</p>`;
+      } else if (c.status === 'paused') {
+        hint = '<p class="text-xs text-orange-600 mt-2">⏸ Paused — no emails are being sent. Resume to continue.</p>';
+      }
+
       return `
         <div class="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors" data-campaign-id="${c.id}">
           <div class="flex items-start justify-between gap-3">
@@ -380,6 +392,7 @@ if (!session) {
               </div>
               <p class="text-xs text-gray-500">${objectiveLabel} · ${states}</p>
               ${c.description ? `<p class="text-xs text-gray-400 mt-1 line-clamp-1">${esc(c.description)}</p>` : ''}
+              ${hint}
             </div>
             <div class="text-right flex-shrink-0">
               <div class="text-sm font-bold text-gray-900">${count.total}</div>
@@ -389,10 +402,10 @@ if (!session) {
           </div>
           <div class="mt-3 flex gap-2 flex-wrap">
             ${c.status === 'draft' ? `<button class="campaign-action text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 rounded font-medium" data-action="show-prompt" data-id="${c.id}">View Apollo Prompt</button>` : ''}
-            ${c.status === 'ready' ? `<button class="campaign-action text-xs bg-green-50 hover:bg-green-100 text-green-700 px-2.5 py-1 rounded font-medium" data-action="activate" data-id="${c.id}">Activate</button>` : ''}
+            ${(c.status === 'draft' || c.status === 'ready') && count.total > 0 ? `<button class="campaign-action text-xs bg-green-50 hover:bg-green-100 text-green-700 px-2.5 py-1 rounded font-medium" data-action="activate" data-id="${c.id}">▶ Activate</button>` : ''}
             ${c.status === 'active' ? `<button class="campaign-action text-xs bg-orange-50 hover:bg-orange-100 text-orange-700 px-2.5 py-1 rounded font-medium" data-action="pause" data-id="${c.id}">Pause</button>` : ''}
             ${c.status === 'paused' ? `<button class="campaign-action text-xs bg-green-50 hover:bg-green-100 text-green-700 px-2.5 py-1 rounded font-medium" data-action="activate" data-id="${c.id}">Resume</button>` : ''}
-            ${['draft', 'sourcing', 'ready'].includes(c.status) ? `<button class="campaign-action text-xs bg-gray-50 hover:bg-gray-100 text-gray-700 px-2.5 py-1 rounded font-medium" data-action="assign" data-id="${c.id}">Assign Prospects</button>` : ''}
+            ${['draft', 'sourcing', 'ready', 'active'].includes(c.status) ? `<button class="campaign-action text-xs bg-gray-50 hover:bg-gray-100 text-gray-700 px-2.5 py-1 rounded font-medium" data-action="assign" data-id="${c.id}">Assign Prospects</button>` : ''}
           </div>
         </div>
       `;
@@ -459,14 +472,21 @@ if (!session) {
     }
 
     // activate, pause, complete
+    if (action === 'activate') {
+      const campaign = campaigns.find((c: any) => c.id === id);
+      const cName = campaign?.name || 'this campaign';
+      if (!confirm(`Activate "${cName}"?\n\nThe outreach worker will begin sending emails to assigned prospects (up to ${campaign?.daily_limit || 50}/day). Make sure RECRUITMENT_SENDS_ENABLED=true in the worker env.`)) return;
+    }
     try {
       const res = await fetch('/api/sales-campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, id }),
       });
-      if (res.ok) loadCampaigns();
-      else alert('Action failed');
+      if (res.ok) {
+        if (action === 'activate') alert('Campaign activated! Emails will begin on the next worker run.');
+        loadCampaigns();
+      } else alert('Action failed');
     } catch { alert('Network error'); }
   }
 
