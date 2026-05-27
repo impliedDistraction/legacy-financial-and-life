@@ -83,9 +83,34 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
     const senderEmail = emailMatch?.[1]?.toLowerCase().trim();
     if (!senderEmail) return;
 
-    // Build reply preview (truncate to 500 chars)
-    const rawText = typeof data.text === 'string' ? data.text : '';
-    const subject = typeof data.subject === 'string' ? data.subject : '';
+    // The email.received webhook only includes metadata (no body).
+    // Fetch the full email content from the Resend Received Emails API.
+    const emailId = typeof data.email_id === 'string' ? data.email_id : '';
+    let rawText = '';
+    let subject = typeof data.subject === 'string' ? data.subject : '';
+
+    if (emailId && RESEND_API_KEY) {
+      try {
+        const emailRes = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
+          headers: { Authorization: `Bearer ${RESEND_API_KEY}` },
+        });
+        if (emailRes.ok) {
+          const emailData = await emailRes.json();
+          rawText = typeof emailData.text === 'string' ? emailData.text : '';
+          // Fall back to HTML with tags stripped if no plain text
+          if (!rawText && typeof emailData.html === 'string') {
+            rawText = emailData.html.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ');
+          }
+          // Use subject from full email if webhook didn't include it
+          if (!subject && typeof emailData.subject === 'string') {
+            subject = emailData.subject;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch received email body:', err);
+      }
+    }
+
     const replyPreview = rawText.replace(/\s+/g, ' ').trim().slice(0, 500);
     const now = new Date().toISOString();
 

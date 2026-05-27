@@ -62,9 +62,9 @@ export const GET: APIRoute = async ({ request }) => {
       }
     }
 
-    // Also count unassigned pool
+    // Also count unassigned pool (exclude opted_out — matches assign logic)
     const poolRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}?source=eq.apollo_sales_search&sales_campaign_id=is.null&select=id&limit=0`,
+      `${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}?source=eq.apollo_sales_search&sales_campaign_id=is.null&status=neq.opted_out&select=id&limit=0`,
       { headers: { ...supaHeaders(), Prefer: 'count=exact' } }
     );
     const poolCount = poolRes.ok
@@ -194,31 +194,47 @@ export const POST: APIRoute = async ({ request }) => {
       const limit = Math.min(Number(body.limit) || 50, 500);
       if (!id) return jsonRes({ error: 'Campaign id required' }, 400);
 
-      // Fetch unassigned sales leads
+      // Get actual pool count first for validation
+      const countRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}?source=eq.apollo_sales_search&sales_campaign_id=is.null&status=neq.opted_out&select=id&limit=0`,
+        { headers: { ...supaHeaders(), Prefer: 'count=exact' } }
+      );
+      const poolCount = countRes.ok
+        ? parseInt(countRes.headers.get('content-range')?.split('/')[1] || '0', 10)
+        : 0;
+
+      if (poolCount === 0) {
+        return jsonRes({ assigned: 0, poolCount: 0, message: 'No assignable prospects in pool' });
+      }
+
+      // Cap requested limit to actual pool size
+      const effectiveLimit = Math.min(limit, poolCount);
+
+      // Fetch unassigned sales leads (all statuses except opted_out)
       const fetchRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}?source=eq.apollo_sales_search&sales_campaign_id=is.null&status=in.(new,approved)&limit=${limit}&order=created_at.asc&select=id`,
+        `${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}?source=eq.apollo_sales_search&sales_campaign_id=is.null&status=neq.opted_out&limit=${effectiveLimit}&order=created_at.asc&select=id`,
         { headers: supaHeaders() }
       );
       if (!fetchRes.ok) throw new Error('Failed to fetch unassigned prospects');
       const prospects: Array<{ id: string }> = await fetchRes.json();
 
       if (prospects.length === 0) {
-        return jsonRes({ assigned: 0, message: 'No unassigned prospects in pool' });
+        return jsonRes({ assigned: 0, poolCount, message: 'No assignable prospects in pool' });
       }
 
-      // Batch assign
+      // Batch assign — also reset status to 'new' so they enter the campaign fresh
       const ids = prospects.map(p => p.id);
       const patchRes = await fetch(
         `${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}?id=in.(${ids.join(',')})`,
         {
           method: 'PATCH',
           headers: { ...supaHeaders(), Prefer: 'return=minimal' },
-          body: JSON.stringify({ sales_campaign_id: id }),
+          body: JSON.stringify({ sales_campaign_id: id, status: 'new', updated_at: new Date().toISOString() }),
         }
       );
       if (!patchRes.ok) throw new Error(`Assign failed: ${patchRes.status}`);
 
-      return jsonRes({ assigned: ids.length });
+      return jsonRes({ assigned: ids.length, poolCount: poolCount - ids.length });
     }
 
     if (action === 'recover_rejected') {

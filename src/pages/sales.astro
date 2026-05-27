@@ -418,17 +418,38 @@ if (!session) {
     }
 
     if (action === 'assign') {
-      const limit = prompt('How many prospects to assign from the pool?', '50');
-      if (!limit) return;
+      // Get current pool count from the stats display
+      const poolCountEl = document.getElementById('stat-pool');
+      const currentPool = parseInt(poolCountEl?.textContent || '0', 10);
+      if (currentPool === 0) {
+        alert('No prospects in the unassigned pool. Import a list first.');
+        return;
+      }
+      const defaultCount = Math.min(currentPool, 50);
+      const input = prompt(`How many prospects to assign from the pool? (${currentPool} available)`, String(defaultCount));
+      if (!input) return;
+      const limit = parseInt(input, 10);
+      if (isNaN(limit) || limit <= 0) {
+        alert('Please enter a valid number greater than 0.');
+        return;
+      }
+      if (limit > currentPool) {
+        const proceed = confirm(`You requested ${limit} but only ${currentPool} are in the pool. Assign all ${currentPool}?`);
+        if (!proceed) return;
+      }
       try {
         const res = await fetch('/api/sales-campaigns', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'assign_prospects', id, limit: parseInt(limit, 10) }),
+          body: JSON.stringify({ action: 'assign_prospects', id, limit }),
         });
         const data = await res.json();
         if (res.ok) {
-          alert(`Assigned ${data.assigned} prospects to campaign`);
+          if (data.assigned === 0) {
+            alert(data.message || 'No prospects could be assigned. The pool may be empty or all prospects are opted out.');
+          } else {
+            alert(`Assigned ${data.assigned} prospects to campaign`);
+          }
           loadCampaigns();
         } else {
           alert(data.error || 'Failed');
