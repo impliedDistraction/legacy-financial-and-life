@@ -80,8 +80,11 @@ if (!session) {
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="prospects">
         👥 Prospects
       </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="apollo">
+        🚀 Apollo Lists
+      </button>
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="upload">
-        📤 Upload Leads
+        📤 Upload CSV
       </button>
     </div>
   </div>
@@ -182,6 +185,43 @@ if (!session) {
       </div>
     </div>
 
+    <!-- ═══════════════ APOLLO LISTS TAB ═══════════════ -->
+    <div id="tab-apollo" class="tab-panel hidden">
+      <div class="bg-white rounded-xl border border-gray-200 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Import from Apollo</h2>
+            <p class="text-sm text-gray-500 mt-1">Select a saved list from Apollo and import contacts directly — no CSV export needed.</p>
+          </div>
+          <button id="refresh-apollo-lists" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md font-medium transition-colors">
+            🔄 Refresh Lists
+          </button>
+        </div>
+
+        <!-- List selector -->
+        <div class="grid gap-4 sm:grid-cols-2 mb-4">
+          <div class="grid gap-1">
+            <label class="text-sm font-medium text-gray-700">Apollo List</label>
+            <select id="apollo-list-select" class="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none">
+              <option value="">Loading lists…</option>
+            </select>
+          </div>
+          <div class="grid gap-1">
+            <label class="text-sm font-medium text-gray-700">Assign to Campaign</label>
+            <select id="apollo-import-campaign" class="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none">
+              <option value="">Unassigned (prospect pool)</option>
+            </select>
+          </div>
+        </div>
+
+        <button id="import-apollo-list-btn" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          Import Contacts
+        </button>
+
+        <div id="apollo-import-result" class="hidden mt-4 p-3 rounded-lg text-sm"></div>
+      </div>
+    </div>
+
     <!-- ═══════════════ UPLOAD TAB ═══════════════ -->
     <div id="tab-upload" class="tab-panel hidden">
       <div class="bg-white rounded-xl border border-gray-200 p-5">
@@ -260,6 +300,7 @@ if (!session) {
     });
 
     if (tab === 'prospects') loadProspects();
+    if (tab === 'apollo' && apolloLists.length === 0) loadApolloLists();
   });
 
   // ─── State ───────────────────────────────────────────────────────
@@ -420,6 +461,7 @@ if (!session) {
     const selects = [
       document.getElementById('upload-campaign-select'),
       document.getElementById('prospect-filter-campaign'),
+      document.getElementById('apollo-import-campaign'),
     ];
     for (const sel of selects) {
       if (!sel) continue;
@@ -707,6 +749,105 @@ if (!session) {
   // Filter change handlers
   document.getElementById('prospect-filter-campaign')!.addEventListener('change', () => loadProspects(1));
   document.getElementById('prospect-filter-status')!.addEventListener('change', () => loadProspects(1));
+
+  // ─── Apollo Lists ─────────────────────────────────────────────────
+
+  let apolloLists: any[] = [];
+
+  async function loadApolloLists() {
+    const select = document.getElementById('apollo-list-select') as HTMLSelectElement;
+    const importBtn = document.getElementById('import-apollo-list-btn') as HTMLButtonElement;
+
+    select.innerHTML = '<option value="">Loading…</option>';
+    importBtn.disabled = true;
+
+    try {
+      const res = await fetch('/api/apollo-lists');
+      if (!res.ok) {
+        const data = await res.json();
+        select.innerHTML = `<option value="">${data.error || 'Failed to load'}</option>`;
+        return;
+      }
+      const data = await res.json();
+      apolloLists = data.lists || [];
+
+      if (apolloLists.length === 0) {
+        select.innerHTML = '<option value="">No saved lists found in Apollo</option>';
+        return;
+      }
+
+      select.innerHTML = '<option value="">Select a list…</option>' +
+        apolloLists.map((l: any) => `<option value="${l.id}">${esc(l.name)} (${l.cached_count} contacts)</option>`).join('');
+
+      // Populate campaign select for Apollo import
+      const campaignSelect = document.getElementById('apollo-import-campaign') as HTMLSelectElement;
+      const dynamicOpts = campaignSelect.querySelectorAll('option[data-dynamic]');
+      dynamicOpts.forEach(o => o.remove());
+      for (const c of campaigns) {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.name} (${c.status})`;
+        opt.dataset.dynamic = '1';
+        campaignSelect.appendChild(opt);
+      }
+    } catch {
+      select.innerHTML = '<option value="">Network error</option>';
+    }
+  }
+
+  // Enable import button when a list is selected
+  document.getElementById('apollo-list-select')!.addEventListener('change', (e) => {
+    const select = e.target as HTMLSelectElement;
+    const btn = document.getElementById('import-apollo-list-btn') as HTMLButtonElement;
+    btn.disabled = !select.value;
+  });
+
+  // Import button handler
+  document.getElementById('import-apollo-list-btn')!.addEventListener('click', async () => {
+    const listId = (document.getElementById('apollo-list-select') as HTMLSelectElement).value;
+    if (!listId) return;
+
+    const campaignId = (document.getElementById('apollo-import-campaign') as HTMLSelectElement).value || undefined;
+    const btn = document.getElementById('import-apollo-list-btn') as HTMLButtonElement;
+    const resultEl = document.getElementById('apollo-import-result')!;
+
+    btn.disabled = true;
+    btn.textContent = 'Importing…';
+
+    try {
+      const res = await fetch('/api/apollo-lists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ list_id: listId, campaign_id: campaignId }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        resultEl.className = 'mt-4 p-3 rounded-lg text-sm bg-green-50 border border-green-200 text-green-800';
+        let msg = `✓ Imported ${data.imported} contacts`;
+        if (data.skipped_no_email > 0) msg += ` (${data.skipped_no_email} skipped — no email)`;
+        if (campaignId) msg += ' and assigned to campaign';
+        else msg += ' to prospect pool';
+        resultEl.textContent = msg;
+        resultEl.classList.remove('hidden');
+        loadCampaigns();
+      } else {
+        resultEl.className = 'mt-4 p-3 rounded-lg text-sm bg-red-50 border border-red-200 text-red-800';
+        resultEl.textContent = `✗ ${data.error || 'Import failed'}`;
+        resultEl.classList.remove('hidden');
+      }
+    } catch {
+      resultEl.className = 'mt-4 p-3 rounded-lg text-sm bg-red-50 border border-red-200 text-red-800';
+      resultEl.textContent = '✗ Network error';
+      resultEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Import Contacts';
+    }
+  });
+
+  // Refresh button
+  document.getElementById('refresh-apollo-lists')!.addEventListener('click', loadApolloLists);
 
   // ─── Utilities ───────────────────────────────────────────────────
 
