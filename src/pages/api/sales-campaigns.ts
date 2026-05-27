@@ -107,7 +107,7 @@ export const POST: APIRoute = async ({ request }) => {
         return jsonRes({ error: 'Name and objective are required' }, 400);
       }
 
-      const validObjectives = ['t65', 'health', 'life', 'key_person', 'final_expense'];
+      const validObjectives = ['t65', 'health', 'life', 'life_and_health', 'key_person', 'final_expense'];
       if (!validObjectives.includes(objective)) {
         return jsonRes({ error: `Objective must be one of: ${validObjectives.join(', ')}` }, 400);
       }
@@ -221,6 +221,43 @@ export const POST: APIRoute = async ({ request }) => {
       return jsonRes({ assigned: ids.length });
     }
 
+    if (action === 'recover_rejected') {
+      // Reset rejected sales prospects so they can be re-queued for a new campaign
+      const id = String(body.id || '');
+      const limit = Math.min(Number(body.limit) || 100, 500);
+      if (!id) return jsonRes({ error: 'Campaign id required' }, 400);
+
+      // Find rejected sales leads not opted-out
+      const fetchRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}?source=eq.apollo_sales_search&status=eq.rejected&sent_at=is.null&limit=${limit}&order=created_at.asc&select=id`,
+        { headers: supaHeaders() }
+      );
+      if (!fetchRes.ok) throw new Error('Failed to fetch rejected prospects');
+      const prospects: Array<{ id: string }> = await fetchRes.json();
+
+      if (prospects.length === 0) {
+        return jsonRes({ recovered: 0, message: 'No rejected prospects available to recover' });
+      }
+
+      // Reset status to 'new' and assign to the campaign
+      const ids = prospects.map(p => p.id);
+      const patchRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}?id=in.(${ids.join(',')})`,
+        {
+          method: 'PATCH',
+          headers: { ...supaHeaders(), Prefer: 'return=minimal' },
+          body: JSON.stringify({
+            status: 'new',
+            sales_campaign_id: id,
+            updated_at: new Date().toISOString(),
+          }),
+        }
+      );
+      if (!patchRes.ok) throw new Error(`Recover failed: ${patchRes.status}`);
+
+      return jsonRes({ recovered: ids.length });
+    }
+
     return jsonRes({ error: `Unknown action: ${action}` }, 400);
   } catch (err) {
     console.error('sales-campaigns POST error:', err);
@@ -234,9 +271,10 @@ function generateApolloPrompt(objective: string, description: string, states: st
   const stateStr = states.length ? states.join(', ') : 'Georgia, Florida, Texas';
 
   const objectiveDescriptions: Record<string, string> = {
-    t65: `Find professionals and business owners turning 65 in the next 12 months who need Medicare supplement and life insurance guidance. Target people in senior management or ownership roles at small-to-midsize companies in ${stateStr}.`,
+    t65: `Find professionals and business owners turning 65 in the next 12 months who need Medicare supplement and life insurance guidance. Target people in senior management or ownership roles at small-to-midsize companies in ${stateStr}. NOTE: Medicare-specific solicitation rules apply — do not promise specific Medicare plan benefits in outreach.`,
     health: `Find small business owners and self-employed professionals who likely need individual health insurance coverage. Focus on founders, owners, and freelancers in ${stateStr} who may not have group coverage.`,
     life: `Find business owners, executives, and high-earning professionals who need life insurance for family protection, key-person coverage, or buy-sell agreements. Target owners and C-suite at companies with 1-100 employees in ${stateStr}.`,
+    life_and_health: `Find business owners and professionals who could benefit from both life insurance and health coverage review. Target founders, owners, and executives at small companies (1-50 employees) in ${stateStr} who may need key-person life insurance AND individual/small-group health plans. Focus on cross-sale potential — people likely underinsured in both areas.`,
     key_person: `Find companies with 10-100 employees whose leadership likely needs key-person life insurance. Target CEOs, founders, and managing partners at growing businesses in ${stateStr}.`,
     final_expense: `Find individuals or professionals approaching retirement age who may need affordable final expense or burial coverage. Focus on small business owners and independent professionals in ${stateStr}.`,
   };
