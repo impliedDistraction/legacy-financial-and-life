@@ -2995,6 +2995,7 @@ if (!session) {
                   ${(props.email_opened_at || p.email_opened_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.email_opened_at || p.email_opened_at)}</span><span class="text-green-600">👁️ Email opened</span></div>` : ''}
                   ${(props.email_clicked_at || p.email_clicked_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.email_clicked_at || p.email_clicked_at)}</span><span class="text-purple-600">🔗 Link clicked${props.email_clicked_url ? ': ' + escapeHtml(props.email_clicked_url.replace(/^https?:\/\/[^/]+/, '')) : ''}</span></div>` : ''}
                   ${props.join_page_visited_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.join_page_visited_at)}</span><span class="text-cyan-600">🌐 Visited /join page${props.join_page_visit_count > 1 ? ' (' + props.join_page_visit_count + ' visits)' : ''}</span></div>` : ''}
+                  ${props.last_calendly_click_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.last_calendly_click_at)}</span><span class="text-blue-600">📅 Clicked Book Call${Array.isArray(props.calendly_clicks) && props.calendly_clicks.length > 1 ? ' (' + props.calendly_clicks.length + ' times)' : ''}</span></div>` : ''}
                   ${(p.replied_at || props.replied_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.replied_at || props.replied_at)}</span><span class="text-indigo-600">💬 Replied</span></div>` : ''}
                   ${props.call_made_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.call_made_at)}</span><span class="text-amber-600">📞 Call: ${escapeHtml(props.call_outcome || 'unknown')}</span></div>` : ''}
                 </div>
@@ -3028,11 +3029,12 @@ if (!session) {
               </div>
 
               <!-- Call Context (for warm leads) -->
-              ${props.join_page_visited_at || props.email_clicked_at || props.text_consent || p.call_opener ? `
+              ${props.join_page_visited_at || props.email_clicked_at || props.text_consent || props.last_calendly_click_at || p.call_opener ? `
               <div class="bg-amber-50 rounded-lg p-3 border border-amber-100">
                 <p class="text-xs font-bold text-amber-800 mb-1.5">📋 Call Context</p>
                 <ul class="text-xs text-amber-700 space-y-0.5 mb-2">
                   ${props.join_page_visited_at ? `<li>• Visited /join page ${(() => { const d = new Date(props.join_page_visited_at); return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); })()}${props.join_page_visit_count > 1 ? ' (' + props.join_page_visit_count + ' times)' : ''}</li>` : ''}
+                  ${props.last_calendly_click_at ? `<li>• 📅 Clicked "Book Call" ${(() => { const d = new Date(props.last_calendly_click_at); return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); })()}${Array.isArray(props.calendly_clicks) && props.calendly_clicks.length > 1 ? ' (' + props.calendly_clicks.length + ' times — may have seen no availability)' : ''}</li>` : ''}
                   ${props.email_clicked_at && !props.email_click_bot_detected ? '<li>• Clicked the email CTA link (real click, not bot)</li>' : ''}
                   ${props.email_clicked_at && props.email_click_bot_detected ? '<li>• Link was scanned (likely email security scanner)</li>' : ''}
                   ${props.text_consent ? '<li>• ✅ Gave TCPA text consent</li>' : ''}
@@ -3242,7 +3244,7 @@ if (!session) {
       if (props.email_clicked_at) reached.push('clicked');
       if (props.join_page_visited_at) reached.push('visited');
       if (props.chat_session_id || chatLogs[p.id]?.length > 0) reached.push('chatted');
-      if (p.interaction_stage === 'interested' || props.text_consent) reached.push('interested');
+      if (p.interaction_stage === 'interested' || props.text_consent || props.last_calendly_click_at) reached.push('interested');
       if (props.email_replied_at || p.interaction_stage === 'replied') reached.push('replied');
       if (p.status === 'scheduled') reached.push('scheduled');
       if (p.status === 'converted') reached.push('converted');
@@ -3369,6 +3371,7 @@ if (!session) {
         if (props.email_opened_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.email_opened_at)}</span><span class="text-green-600">👁️ Opened</span></div>`);
         if (props.email_clicked_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.email_clicked_at)}</span><span class="text-purple-600">🔗 Clicked${props.email_click_bot_detected ? ' (bot?)' : ''}</span></div>`);
         if (props.join_page_visited_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.join_page_visited_at)}</span><span class="text-cyan-600">🌐 Visited /join${props.join_page_visit_count > 1 ? ' (' + props.join_page_visit_count + 'x)' : ''}</span></div>`);
+        if (props.last_calendly_click_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.last_calendly_click_at)}</span><span class="text-brand-600">📅 Clicked Book Call${Array.isArray(props.calendly_clicks) && props.calendly_clicks.length > 1 ? ' (' + props.calendly_clicks.length + 'x)' : ''}</span></div>`);
         if (props.email_replied_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.email_replied_at)}</span><span class="text-indigo-600">💬 Replied</span></div>`);
         if (props.call_made_at) timelineItems.push(`<div class="flex gap-2"><span class="text-gray-400 w-32 flex-shrink-0">${fmtDateShort(props.call_made_at)}</span><span class="text-amber-600">📞 Called</span></div>`);
 

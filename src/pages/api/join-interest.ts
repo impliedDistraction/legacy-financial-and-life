@@ -80,12 +80,56 @@ export const POST: APIRoute = async ({ request }) => {
 
   try {
     const body = await request.json();
-    const { name, email, phone, state, textConsent, referralConsent, prospectId } = body;
+    const { name, email, phone, state, textConsent, referralConsent, prospectId, calendlyClickOnly } = body;
 
     // Read the A/B variant from cookie for tracking
     const cookieHeader = request.headers.get('cookie') || '';
     const variantMatch = cookieHeader.match(/lfl_join_variant=([ABC])/);
     const joinVariant = variantMatch ? variantMatch[1] : 'A';
+
+    // Handle Calendly link click tracking (lightweight — no form fields needed)
+    if (calendlyClickOnly && prospectId && typeof prospectId === 'string' && prospectId.length > 10) {
+      const headers = {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      };
+      const now = new Date().toISOString();
+
+      const fetchRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(prospectId)}&select=properties,interaction_stage&limit=1`,
+        { headers }
+      );
+      if (fetchRes.ok) {
+        const [existing] = await fetchRes.json();
+        if (existing) {
+          const props = existing.properties || {};
+          const clicks = Array.isArray(props.calendly_clicks) ? props.calendly_clicks : [];
+          clicks.push({ at: now, variant: joinVariant });
+
+          // Only promote if still in early stage (don't demote 'interested' or 'booked')
+          const earlyStages = new Set(['new', 'clicked_cta', 'visited_page']);
+          const currentStage = existing.interaction_stage || 'new';
+          const update: Record<string, unknown> = {
+            last_interaction_at: now,
+            properties: { ...props, calendly_clicks: clicks, last_calendly_click_at: now },
+            updated_at: now,
+          };
+          if (earlyStages.has(currentStage)) {
+            update.interaction_stage = 'interested';
+          }
+
+          await fetch(
+            `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(prospectId)}`,
+            { method: 'PATCH', headers: { ...headers, Prefer: 'return=minimal' }, body: JSON.stringify(update) }
+          );
+        }
+      }
+      return new Response(JSON.stringify({ success: true, tracked: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     // When prospectId is present, the form only collects consent (no name/email/phone required)
     if (!prospectId && (!name || !email || !phone)) {

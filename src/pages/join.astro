@@ -521,6 +521,65 @@ if (isNewAssignment) {
 </script>
 
 <script>
+  // ─── Calendly Link Click Tracking + Availability Check ───────────
+  // Tracks when prospects click any Calendly scheduling link, and checks
+  // whether time slots are actually available (warns if not).
+  (function() {
+    const ctx = document.getElementById('prospect-context');
+    const pid = ctx?.dataset.pid || '';
+    const variant = ctx?.dataset.variant || 'A';
+
+    // Track all Calendly link clicks
+    document.querySelectorAll('a[href*="calendly.com/bethandtim-legacyf-l"]').forEach(link => {
+      link.addEventListener('click', () => {
+        // Fire analytics event
+        try {
+          const va = (window as any).va;
+          if (typeof va === 'function') va('event', { name: 'calendly_link_clicked', variant });
+        } catch {}
+
+        // Record click to backend (promotes interaction_stage if early)
+        if (pid && pid.length > 10) {
+          fetch('/api/join-interest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prospectId: pid,
+              name: '', email: '', phone: '', state: '',
+              textConsent: false, referralConsent: false,
+              calendlyClickOnly: true,
+            }),
+            keepalive: true,
+          }).catch(() => {});
+        }
+      });
+    });
+
+    // Check availability and show warning if no slots
+    if (pid && pid.length > 10) {
+      fetch('/api/schedule-slots?days=7&max=1')
+        .then(r => r.json())
+        .then(data => {
+          const hasSlots = data.available !== false && Array.isArray(data.slots) && data.slots.length > 0;
+          if (!hasSlots) {
+            // Add "Request a callback" fallback to the schedule CTA
+            const scheduleCta = document.getElementById('scheduleCta');
+            if (scheduleCta) {
+              const fallback = document.createElement('div');
+              fallback.className = 'mt-3 pt-3 border-t border-brand-100';
+              fallback.innerHTML = `
+                <p class="text-xs text-brand-700 mb-2">No open slots right now? Submit the form below and Tim will call you directly.</p>
+              `;
+              scheduleCta.appendChild(fallback);
+            }
+          }
+        })
+        .catch(() => {}); // non-critical
+    }
+  })();
+</script>
+
+<script>
   // ─── Chat Widget ─────────────────────────────────────────────────
   const chatToggle = document.getElementById('chat-toggle') as HTMLButtonElement;
   const chatPanel = document.getElementById('chat-panel') as HTMLDivElement;
