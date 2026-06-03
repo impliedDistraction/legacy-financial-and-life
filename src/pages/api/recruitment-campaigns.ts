@@ -172,14 +172,19 @@ export const POST: APIRoute = async ({ request }) => {
       if (!id) return jsonRes({ error: 'id required' }, 400);
 
       const newStatus = action === 'stop' ? 'completed' : action === 'pause' ? 'paused' : 'active';
+      const patchBody: Record<string, unknown> = {
+        status: newStatus,
+        next_run_at: action === 'resume' ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      };
+      // Reset auto-pause counter on resume so it doesn't immediately re-pause
+      if (action === 'resume') {
+        patchBody.consecutive_zero_runs = 0;
+      }
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { ...supaHeaders(), Prefer: 'return=representation' },
-        body: JSON.stringify({
-          status: newStatus,
-          next_run_at: action === 'resume' ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString(),
-        }),
+        body: JSON.stringify(patchBody),
       });
       if (!res.ok) throw new Error(`${action} failed: ${res.status}`);
       const [updated] = await res.json();
