@@ -57,6 +57,26 @@ export const GET: APIRoute = async ({ request }) => {
     // Only return people/contacts lists (not companies)
     const peopleLists = lists.filter(l => l.modality === 'contacts');
 
+    // Check which lists are cached locally
+    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      const cacheRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/apollo_list_cache?select=list_id,contact_count,fetched_at`,
+        { headers: supaHeaders() },
+      );
+      if (cacheRes.ok) {
+        const cached: Array<{ list_id: string; contact_count: number; fetched_at: string }> = await cacheRes.json();
+        const cacheMap = new Map(cached.map(c => [c.list_id, c]));
+        for (const list of peopleLists) {
+          const c = cacheMap.get(list.id);
+          if (c) {
+            (list as any).cached = true;
+            (list as any).cached_contacts = c.contact_count;
+            (list as any).cached_at = c.fetched_at;
+          }
+        }
+      }
+    }
+
     return jsonRes({ lists: peopleLists });
   } catch (err) {
     console.error('apollo-lists GET error:', err);
@@ -87,65 +107,91 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const campaignId = body.campaign_id ? String(body.campaign_id).trim() : null;
-  const MAX_CONTACTS = 3000; // Supports up to 3000-contact lists
-  const BATCH_SIZE = 200; // Insert in batches to avoid payload limits
+  const MAX_CONTACTS = 3000;
+  const BATCH_SIZE = 200;
 
   try {
-    // Paginate through all contacts in the list (100 per page max)
+    // ─── Step 1: Check cache first, else fetch from Apollo ───────────
     let allContacts: Array<Record<string, unknown>> = [];
-    let page = 1;
-    const perPage = 100;
-    let totalEntries = 0;
 
-    do {
-      const res = await fetch('https://api.apollo.io/api/v1/contacts/search', {
-        method: 'POST',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Content-Type': 'application/json',
-          'x-api-key': APOLLO_API_KEY,
-        },
-        body: JSON.stringify({
-          contact_label_ids: [listId],
-          per_page: perPage,
-          page,
-        }),
-      });
+    const cacheRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/apollo_list_cache?list_id=eq.${listId}&select=contacts,fetched_at`,
+      { headers: supaHeaders() },
+    );
+    const cacheData = cacheRes.ok ? await cacheRes.json() : [];
+    const cached = cacheData[0];
 
-      if (!res.ok) {
-        const text = await res.text();
-        if (res.status === 429) {
-          // Rate limited — return what we have so far or retry hint
-          if (allContacts.length > 0) break;
-          return jsonRes({ error: `Apollo rate limit hit. Try again in a minute.` }, 429);
+    if (cached?.contacts?.length > 0) {
+      // Use cached data (skip Apollo API entirely)
+      allContacts = cached.contacts;
+    } else {
+      // Fetch from Apollo and cache the result
+      let page = 1;
+      const perPage = 100;
+      let totalEntries = 0;
+
+      do {
+        const res = await fetch('https://api.apollo.io/api/v1/contacts/search', {
+          method: 'POST',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Content-Type': 'application/json',
+            'x-api-key': APOLLO_API_KEY,
+          },
+          body: JSON.stringify({
+            contact_label_ids: [listId],
+            per_page: perPage,
+            page,
+          }),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          if (res.status === 429) {
+            if (allContacts.length > 0) break;
+            return jsonRes({ error: 'Apollo rate limit hit. Try again in a minute.' }, 429);
+          }
+          return jsonRes({ error: `Apollo API error ${res.status}: ${text.slice(0, 200)}` }, 502);
         }
-        return jsonRes({ error: `Apollo API error ${res.status}: ${text.slice(0, 200)}` }, 502);
-      }
 
-      const data = await res.json();
-      const contacts = data.contacts || [];
-      totalEntries = data.pagination?.total_entries || contacts.length;
-      allContacts = allContacts.concat(contacts);
-      page++;
+        const data = await res.json();
+        const contacts = data.contacts || [];
+        totalEntries = data.pagination?.total_entries || contacts.length;
+        allContacts = allContacts.concat(contacts);
+        page++;
 
-      // Small delay to avoid Apollo rate limits
-      if (allContacts.length < totalEntries && allContacts.length < MAX_CONTACTS) {
-        await new Promise(r => setTimeout(r, 150));
+        // Throttle to avoid Apollo rate limits
+        if (allContacts.length < totalEntries && allContacts.length < MAX_CONTACTS) {
+          await new Promise(r => setTimeout(r, 150));
+        }
+      } while (allContacts.length < totalEntries && allContacts.length < MAX_CONTACTS);
+
+      // Persist to cache (upsert by list_id)
+      if (allContacts.length > 0) {
+        await fetch(`${SUPABASE_URL}/rest/v1/apollo_list_cache`, {
+          method: 'POST',
+          headers: { ...supaHeaders(), Prefer: 'return=minimal,resolution=merge-duplicates' },
+          body: JSON.stringify({
+            list_id: listId,
+            list_name: allContacts[0]?.label_ids ? listId : listId, // name populated by GET
+            contact_count: allContacts.length,
+            contacts: allContacts,
+            fetched_at: new Date().toISOString(),
+          }),
+        }).catch(() => {}); // non-critical — import proceeds even if cache write fails
       }
-    } while (allContacts.length < totalEntries && allContacts.length < MAX_CONTACTS);
+    }
 
     if (allContacts.length === 0) {
       return jsonRes({ error: 'No contacts found in this list' }, 404);
     }
 
-    // Transform Apollo contacts to our prospect format
+    // ─── Step 2: Transform contacts to prospect format ──────────────
     const rows = allContacts.map(c => {
-      // Apollo returns both `name` (full) and `first_name`/`last_name` separately
       const name = String(c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || '').trim().slice(0, 200);
       const email = String(c.email || '').trim().slice(0, 254).toLowerCase();
       if (!name || !email) return null;
 
-      // Map full state name to abbreviation if needed
       const stateRaw = String(c.state || '').trim();
       const stateAbbr = stateRaw.length === 2 ? stateRaw.toUpperCase() : stateToAbbr(stateRaw);
 
@@ -176,37 +222,67 @@ export const POST: APIRoute = async ({ request }) => {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-    }).filter(Boolean);
+    }).filter(Boolean) as Array<Record<string, unknown>>;
 
     if (rows.length === 0) {
       return jsonRes({ error: 'No contacts with valid name + email found in list' }, 400);
     }
 
-    // Insert in batches to avoid payload size limits
+    // ─── Step 3: Deduplicate against existing active prospects ───────
+    // Fetch all existing active emails to avoid unique constraint violation
+    const existingEmails = new Set<string>();
+    let offset = 0;
+    const dedupLimit = 1000;
+    while (true) {
+      const dedupRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}?select=email&email=not.is.null&status=not.in.(rejected,opted_out,follow_up_exhausted,converted)&limit=${dedupLimit}&offset=${offset}`,
+        { headers: supaHeaders() },
+      );
+      if (!dedupRes.ok) break;
+      const emails: Array<{ email: string }> = await dedupRes.json();
+      if (emails.length === 0) break;
+      for (const e of emails) {
+        if (e.email) existingEmails.add(e.email.toLowerCase());
+      }
+      if (emails.length < dedupLimit) break;
+      offset += dedupLimit;
+    }
+
+    const newRows = rows.filter(r => !existingEmails.has(String(r.email)));
+    const skippedDuplicates = rows.length - newRows.length;
+
+    if (newRows.length === 0) {
+      return jsonRes({
+        imported: 0,
+        total_in_list: allContacts.length,
+        skipped_duplicates: skippedDuplicates,
+        campaign_id: campaignId,
+        message: 'All contacts already exist in the system.',
+      });
+    }
+
+    // ─── Step 4: Insert in batches ──────────────────────────────────
     let totalInserted = 0;
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const batch = rows.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < newRows.length; i += BATCH_SIZE) {
+      const batch = newRows.slice(i, i + BATCH_SIZE);
       const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}`, {
         method: 'POST',
-        headers: {
-          ...supaHeaders(),
-          Prefer: 'return=minimal',
-        },
+        headers: { ...supaHeaders(), Prefer: 'return=minimal' },
         body: JSON.stringify(batch),
       });
 
       if (!insertRes.ok) {
         const err = await insertRes.text();
-        // Return partial progress info on failure
         return jsonRes({
           error: `Database insert failed on batch ${Math.floor(i / BATCH_SIZE) + 1}: ${err.slice(0, 300)}`,
           partial_imported: totalInserted,
+          skipped_duplicates: skippedDuplicates,
         }, 500);
       }
       totalInserted += batch.length;
     }
 
-    // Update campaign status to 'ready' if it was in 'sourcing' or 'draft'
+    // ─── Step 5: Update campaign status ─────────────────────────────
     if (campaignId) {
       await fetch(`${SUPABASE_URL}/rest/v1/sales_campaigns?id=eq.${campaignId}&status=in.(draft,sourcing)`, {
         method: 'PATCH',
@@ -217,9 +293,10 @@ export const POST: APIRoute = async ({ request }) => {
 
     return jsonRes({
       imported: totalInserted,
-      total_in_list: totalEntries,
+      total_in_list: allContacts.length,
       campaign_id: campaignId,
       skipped_no_email: allContacts.length - rows.length,
+      skipped_duplicates: skippedDuplicates,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -830,7 +830,7 @@ if (!session) {
       }
 
       select.innerHTML = '<option value="">Select a list…</option>' +
-        apolloLists.map((l: any) => `<option value="${l.id}">${esc(l.name)} (${l.cached_count} contacts)</option>`).join('');
+        apolloLists.map((l: any) => `<option value="${l.id}">${esc(l.name)} (${l.cached_count} contacts)${l.cached ? ' ✓ cached' : ''}</option>`).join('');
 
       // Populate campaign select for Apollo import
       const campaignSelect = document.getElementById('apollo-import-campaign') as HTMLSelectElement;
@@ -878,9 +878,11 @@ if (!session) {
       if (res.ok) {
         resultEl.className = 'mt-4 p-3 rounded-lg text-sm bg-green-50 border border-green-200 text-green-800';
         let msg = `✓ Imported ${data.imported} contacts`;
+        if (data.skipped_duplicates > 0) msg += ` (${data.skipped_duplicates} already existed)`;
         if (data.skipped_no_email > 0) msg += ` (${data.skipped_no_email} skipped — no email)`;
-        if (campaignId) msg += ' and assigned to campaign';
-        else msg += ' to prospect pool';
+        if (data.imported === 0 && data.message) msg = `ℹ️ ${data.message}`;
+        if (campaignId) msg += data.imported > 0 ? ' and assigned to campaign' : '';
+        else if (data.imported > 0) msg += ' to prospect pool';
         resultEl.textContent = msg;
         resultEl.classList.remove('hidden');
         loadCampaigns();
