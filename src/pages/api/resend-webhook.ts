@@ -218,7 +218,9 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
   const headers = (data.headers || []) as Array<{ name: string; value: string }>;
   const prospectId = headers.find(h => h.name.toLowerCase() === 'x-legacy-prospect-id')?.value;
   const template = headers.find(h => h.name.toLowerCase() === 'x-legacy-template')?.value;
-  if (!prospectId || template !== 'recruitment') return;
+  // Track all outbound templates that include prospect IDs
+  const TRACKED_TEMPLATES = ['recruitment', 'recruitment-auto-invite', 'recruitment-warm-visitor', 'recruitment-info-pack', 'sales_quote', 'survey'];
+  if (!prospectId || !template || !TRACKED_TEMPLATES.includes(template)) return;
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   let propsPatch: Record<string, unknown> = {};
@@ -259,7 +261,7 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
 
     // Classify click intent (only promote interaction_stage for non-bot clicks)
     if (clickedUrl) {
-      if (/\/join\b/.test(clickedUrl)) {
+      if (/\/join\b|planenroll\.com|calendly\.com|\/free-quote\b/.test(clickedUrl)) {
         if (!isBot) {
           update._promote_stage = 'clicked_cta';
         } else {
