@@ -436,7 +436,17 @@ if (!session) {
       const poolCountEl = document.getElementById('stat-pool');
       const currentPool = parseInt(poolCountEl?.textContent || '0', 10);
       if (currentPool === 0) {
-        alert('No prospects in the unassigned pool. Import a list first.');
+        // Switch to Apollo Lists tab to guide the user
+        const apolloBtn = tabNav.querySelector('[data-tab="apollo"]') as HTMLElement;
+        if (apolloBtn) {
+          apolloBtn.click();
+          const resultEl = document.getElementById('apollo-import-result')!;
+          resultEl.className = 'mt-4 p-3 rounded-lg text-sm bg-blue-50 border border-blue-200 text-blue-800';
+          resultEl.textContent = '💡 Import contacts from an Apollo list first, then assign them to your campaign.';
+          resultEl.classList.remove('hidden');
+        } else {
+          alert('No prospects in the unassigned pool. Import a list first via the Apollo Lists tab.');
+        }
         return;
       }
       const defaultCount = Math.min(currentPool, 50);
@@ -855,7 +865,7 @@ if (!session) {
     const resultEl = document.getElementById('apollo-import-result')!;
 
     btn.disabled = true;
-    btn.textContent = 'Importing…';
+    btn.textContent = 'Importing… (this may take 30-60s for large lists)';
 
     try {
       const res = await fetch('/api/apollo-lists', {

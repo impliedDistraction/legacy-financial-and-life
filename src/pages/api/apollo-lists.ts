@@ -87,6 +87,8 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   const campaignId = body.campaign_id ? String(body.campaign_id).trim() : null;
+  const MAX_CONTACTS = 3000; // Supports up to 3000-contact lists
+  const BATCH_SIZE = 200; // Insert in batches to avoid payload limits
 
   try {
     // Paginate through all contacts in the list (100 per page max)
@@ -112,7 +114,12 @@ export const POST: APIRoute = async ({ request }) => {
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`Apollo contacts API ${res.status}: ${text.slice(0, 200)}`);
+        if (res.status === 429) {
+          // Rate limited — return what we have so far or retry hint
+          if (allContacts.length > 0) break;
+          return jsonRes({ error: `Apollo rate limit hit. Try again in a minute.` }, 429);
+        }
+        return jsonRes({ error: `Apollo API error ${res.status}: ${text.slice(0, 200)}` }, 502);
       }
 
       const data = await res.json();
@@ -121,9 +128,11 @@ export const POST: APIRoute = async ({ request }) => {
       allContacts = allContacts.concat(contacts);
       page++;
 
-      // Safety: don't fetch more than 500 contacts in one import
-      if (allContacts.length >= 500) break;
-    } while (allContacts.length < totalEntries && allContacts.length < 500);
+      // Small delay to avoid Apollo rate limits
+      if (allContacts.length < totalEntries && allContacts.length < MAX_CONTACTS) {
+        await new Promise(r => setTimeout(r, 150));
+      }
+    } while (allContacts.length < totalEntries && allContacts.length < MAX_CONTACTS);
 
     if (allContacts.length === 0) {
       return jsonRes({ error: 'No contacts found in this list' }, 404);
@@ -131,7 +140,8 @@ export const POST: APIRoute = async ({ request }) => {
 
     // Transform Apollo contacts to our prospect format
     const rows = allContacts.map(c => {
-      const name = String(c.name || '').trim().slice(0, 200);
+      // Apollo returns both `name` (full) and `first_name`/`last_name` separately
+      const name = String(c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim() || '').trim().slice(0, 200);
       const email = String(c.email || '').trim().slice(0, 254).toLowerCase();
       if (!name || !email) return null;
 
@@ -169,22 +179,31 @@ export const POST: APIRoute = async ({ request }) => {
     }).filter(Boolean);
 
     if (rows.length === 0) {
-      return jsonRes({ error: 'No contacts with valid name + email' }, 400);
+      return jsonRes({ error: 'No contacts with valid name + email found in list' }, 400);
     }
 
-    // Upsert — skip duplicates on email
-    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}`, {
-      method: 'POST',
-      headers: {
-        ...supaHeaders(),
-        Prefer: 'return=minimal,resolution=ignore-duplicates',
-      },
-      body: JSON.stringify(rows),
-    });
+    // Insert in batches to avoid payload size limits
+    let totalInserted = 0;
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}`, {
+        method: 'POST',
+        headers: {
+          ...supaHeaders(),
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify(batch),
+      });
 
-    if (!insertRes.ok) {
-      const err = await insertRes.text();
-      throw new Error(`Insert failed: ${insertRes.status} — ${err}`);
+      if (!insertRes.ok) {
+        const err = await insertRes.text();
+        // Return partial progress info on failure
+        return jsonRes({
+          error: `Database insert failed on batch ${Math.floor(i / BATCH_SIZE) + 1}: ${err.slice(0, 300)}`,
+          partial_imported: totalInserted,
+        }, 500);
+      }
+      totalInserted += batch.length;
     }
 
     // Update campaign status to 'ready' if it was in 'sourcing' or 'draft'
@@ -197,14 +216,15 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     return jsonRes({
-      imported: rows.length,
+      imported: totalInserted,
       total_in_list: totalEntries,
       campaign_id: campaignId,
       skipped_no_email: allContacts.length - rows.length,
     });
   } catch (err) {
-    console.error('apollo-lists POST error:', err);
-    return jsonRes({ error: 'Failed to import contacts' }, 500);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('apollo-lists POST error:', msg);
+    return jsonRes({ error: `Import failed: ${msg.slice(0, 300)}` }, 500);
   }
 };
 
