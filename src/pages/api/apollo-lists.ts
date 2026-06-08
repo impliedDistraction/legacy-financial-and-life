@@ -228,61 +228,60 @@ export const POST: APIRoute = async ({ request }) => {
       return jsonRes({ error: 'No contacts with valid name + email found in list' }, 400);
     }
 
-    // ─── Step 3: Deduplicate against existing active prospects ───────
-    // Fetch all existing active emails to avoid unique constraint violation
-    const existingEmails = new Set<string>();
-    let offset = 0;
-    const dedupLimit = 1000;
-    while (true) {
-      const dedupRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}?select=email&email=not.is.null&status=not.in.(rejected,opted_out,follow_up_exhausted,converted)&limit=${dedupLimit}&offset=${offset}`,
-        { headers: supaHeaders() },
-      );
-      if (!dedupRes.ok) break;
-      const emails: Array<{ email: string }> = await dedupRes.json();
-      if (emails.length === 0) break;
-      for (const e of emails) {
-        if (e.email) existingEmails.add(e.email.toLowerCase());
-      }
-      if (emails.length < dedupLimit) break;
-      offset += dedupLimit;
-    }
-
-    const newRows = rows.filter(r => !existingEmails.has(String(r.email)));
-    const skippedDuplicates = rows.length - newRows.length;
-
-    if (newRows.length === 0) {
-      return jsonRes({
-        imported: 0,
-        total_in_list: allContacts.length,
-        skipped_duplicates: skippedDuplicates,
-        campaign_id: campaignId,
-        message: 'All contacts already exist in the system.',
-      });
-    }
-
-    // ─── Step 4: Insert in batches ──────────────────────────────────
+    // ─── Step 3: Insert via RPC (ON CONFLICT DO NOTHING) ────────────
+    // Uses import_prospects_bulk() which handles the partial unique index
+    // on lower(email) that PostgREST's Prefer header cannot handle.
     let totalInserted = 0;
-    for (let i = 0; i < newRows.length; i += BATCH_SIZE) {
-      const batch = newRows.slice(i, i + BATCH_SIZE);
-      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}`, {
+    let totalSkipped = 0;
+
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+
+      const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/import_prospects_bulk`, {
         method: 'POST',
-        headers: { ...supaHeaders(), Prefer: 'return=minimal' },
-        body: JSON.stringify(batch),
+        headers: supaHeaders(),
+        body: JSON.stringify({ rows: batch }),
       });
 
-      if (!insertRes.ok) {
-        const err = await insertRes.text();
-        return jsonRes({
-          error: `Database insert failed on batch ${Math.floor(i / BATCH_SIZE) + 1}: ${err.slice(0, 300)}`,
-          partial_imported: totalInserted,
-          skipped_duplicates: skippedDuplicates,
-        }, 500);
+      if (!rpcRes.ok) {
+        const err = await rpcRes.text();
+        // If RPC doesn't exist yet, fall back to direct insert with best-effort dedup
+        if (err.includes('import_prospects_bulk') || err.includes('PGRST202')) {
+          // Fallback: direct insert, skip entire batch on constraint error
+          const fallbackRes = await fetch(`${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}`, {
+            method: 'POST',
+            headers: { ...supaHeaders(), Prefer: 'return=minimal' },
+            body: JSON.stringify(batch),
+          });
+          if (fallbackRes.ok) {
+            totalInserted += batch.length;
+          } else {
+            // Constraint error — insert one by one
+            for (const row of batch) {
+              const singleRes = await fetch(`${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}`, {
+                method: 'POST',
+                headers: { ...supaHeaders(), Prefer: 'return=minimal' },
+                body: JSON.stringify([row]),
+              });
+              if (singleRes.ok) totalInserted++;
+              else totalSkipped++;
+            }
+          }
+        } else {
+          return jsonRes({
+            error: `Database insert failed on batch ${Math.floor(i / BATCH_SIZE) + 1}: ${err.slice(0, 300)}`,
+            partial_imported: totalInserted,
+          }, 500);
+        }
+        continue;
       }
-      totalInserted += batch.length;
+
+      const result = await rpcRes.json();
+      totalInserted += result.inserted || 0;
+      totalSkipped += result.skipped || 0;
     }
 
-    // ─── Step 5: Update campaign status ─────────────────────────────
+    // ─── Step 4: Update campaign status ─────────────────────────────
     if (campaignId) {
       await fetch(`${SUPABASE_URL}/rest/v1/sales_campaigns?id=eq.${campaignId}&status=in.(draft,sourcing)`, {
         method: 'PATCH',
@@ -296,7 +295,7 @@ export const POST: APIRoute = async ({ request }) => {
       total_in_list: allContacts.length,
       campaign_id: campaignId,
       skipped_no_email: allContacts.length - rows.length,
-      skipped_duplicates: skippedDuplicates,
+      skipped_duplicates: totalSkipped,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
