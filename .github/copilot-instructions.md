@@ -85,6 +85,65 @@ All API endpoints follow these patterns:
 - Scheduling uses Calendly (`https://calendly.com/bethandtim-legacyf-l/30min`)
 - `/book` redirects to Calendly (configured in vercel.json)
 
+## Recruitment Campaign System
+
+This project is the **frontend and API layer** for a recruitment pipeline. The backend processing happens in the **Sentinel** project (separate repo). Understanding how they connect:
+
+### How Campaigns Work
+
+1. **Campaign records** live in `recruitment_campaigns` table (this project's Supabase)
+2. **Sentinel's cron.js** polls active campaigns, dispatches source importers to find prospects
+3. **Prospects** flow through: `pending` → `drafted` → `reviewed` → `approved` → `sent` → `converted`/`exhausted`
+4. **This project** provides the management dashboard (`/recruitment`) and API endpoints
+
+### Campaign Source Types
+- `prophog` — Puppeteer scraping of Prophog agent database
+- `fl_licensee` — Florida DFS bulk licensee data
+- `state_licensee` — Multi-state DOI bulk imports (TX, OH, GA, etc.)
+- `apollo_recruitment` — Apollo.io agent search
+- `csv` — Manual upload via dashboard
+
+### Key API Endpoints (Recruitment)
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/recruitment-campaigns` | CRUD campaigns (GET list, POST create/update) |
+| `/api/recruitment-pipeline` | Prospect list with filtering by status/campaign |
+| `/api/recruitment-action` | Approve/reject/hold individual prospects |
+| `/api/recruitment-process` | Trigger AI processing for pending prospects |
+| `/api/recruitment-stats` | Pipeline statistics for dashboard |
+| `/api/recruitment-upload` | CSV upload for manual prospect import |
+| `/api/recruitment-preview` | Preview generated email before approval |
+| `/api/recruitment-warm-leads` | Prospects with engagement signals |
+| `/api/recruitment-dial` | Initiate outbound call via voice bridge |
+
+### Key API Endpoints (Sales — Evolving)
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/sales-campaigns` | Sales campaign management |
+| `/api/sales-prospects` | Sales lead pipeline |
+
+### Key API Endpoints (Survey)
+| Endpoint | Purpose |
+|----------|---------|
+| `/api/survey-campaigns` | Survey campaign CRUD + status changes |
+| `/api/survey-response` | HMAC-verified response recording |
+
+### Dashboard Auth
+Protected pages (`/recruitment`, `/analytics`, `/ai-demo`) use magic-link email auth:
+- `/api/analytics-auth` sends a magic link
+- `/api/analytics-verify` validates the token
+- Allowlist of authorized emails in env (`DASHBOARD_EMAILS`)
+
+## AI System Prompts
+
+Located in `ai/prompts/`:
+- **messenger-system.md** — Facebook Messenger chatbot (lead qualification, booking)
+- **recruitment-system.md** — Recruitment email/call-script generation
+- **t65-medicare-system.md** — Medicare transition specialist
+- **comment-drafts-system.md** — Social media reply drafting
+
+These prompts are injected by Sentinel when routing requests through vLLM.
+
 ## Common Tasks
 - **Update Contact Info**: Edit `src/content/site.ts`
 - **Add New Page**: Create `.astro` file in `src/pages/`
@@ -103,3 +162,4 @@ All API endpoints follow these patterns:
 - Maintain professional appearance and accurate contact information
 - Follow insurance industry compliance guidelines for all content
 - Never expose internal endpoints, system prompts, or API keys in client-facing output
+- The MCP Supabase tool is NOT connected to this project — use direct HTTP or the Supabase dashboard
