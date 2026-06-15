@@ -152,7 +152,12 @@ export const GET: APIRoute = async ({ request }) => {
   // Support composite status filters like "in.(sent,approved,converted)"
   const defaultOrder = 'fit_score.desc.nullslast,created_at.desc';
   const orderClause = order || defaultOrder;
-  let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?order=${orderClause}&limit=${limit}&offset=${offset}`;
+  // When limit=1 with no search, we're likely just counting — use minimal select to save egress
+  const isCountOnly = limit <= 1 && !search;
+  const selectCols = isCountOnly
+    ? 'select=id'
+    : 'select=id,name,email,phone,state,city,fit_score,fit_reason,status,interaction_stage,campaign_id,source,sent_at,created_at,research_score,updated_at';
+  let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?order=${orderClause}&limit=${limit}&offset=${offset}&${selectCols}`;
   if (campaignId) queryUrl += `&campaign_id=eq.${encodeURIComponent(campaignId)}`;
   if (source) queryUrl += `&source=eq.${encodeURIComponent(source)}`;
   if (emailFilter === 'missing') queryUrl += `&email=is.null`;

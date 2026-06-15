@@ -57,7 +57,7 @@ export const GET: APIRoute = async ({ request }) => {
   try {
     // Fetch all campaigns ordered by most recent activity
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${TABLE}?order=updated_at.desc&limit=50`,
+      `${SUPABASE_URL}/rest/v1/${TABLE}?order=updated_at.desc&limit=50&select=id,name,source_type,status,search_state,send_limit,require_review,auto_relaunch,next_campaign_id,reply_to,sign_off,credit_budget,credits_used,schedule_interval_minutes,created_at,updated_at`,
       { headers: supaHeaders() }
     );
     if (!res.ok) throw new Error(`Supabase ${res.status}`);
