@@ -20,14 +20,12 @@
       ]
     }
   ],
-  "redirects": [
+  "redirects": [],
+  "rewrites": [
     {
       "source": "/book",
-      "destination": "https://calendly.com/bethandtim-legacyf-l/30min",
-      "statusCode": 302
-    }
-  ],
-  "rewrites": [
+      "destination": "/api/book-redirect"
+    },
     {
       "source": "/.well-known/vercel/flags",
       "destination": "/api/vercel-flags"
