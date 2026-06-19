@@ -37,7 +37,7 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const res = await fetch(`${VOICE_BRIDGE_URL}/dial/sales`, {
+    const res = await fetch(`${VOICE_BRIDGE_URL}/dial/recruitment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone, prospectId, prospectName, prospectContext, transferNumber, testMode: !!testMode }),
