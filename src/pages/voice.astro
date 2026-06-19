@@ -89,6 +89,33 @@ if (!session) {
       <p id="dial-success" class="mt-2 text-xs text-green-600 hidden"></p>
     </div>
 
+    <!-- Dialog Tree Flowchart -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <button id="tree-toggle" class="w-full p-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors rounded-xl">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-semibold text-gray-900">🌳 Call Script Flow</span>
+          <span class="text-xs text-gray-400">How the AI agent qualifies prospects</span>
+        </div>
+        <svg id="tree-chevron" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+      <div id="tree-content" class="hidden border-t border-gray-100">
+        <div id="tree-loading" class="p-6 text-center">
+          <p class="text-xs text-gray-400">Loading call flow...</p>
+        </div>
+        <div id="tree-chart" class="p-4 overflow-x-auto"></div>
+        <div id="tree-detail" class="hidden px-4 pb-4">
+          <div class="bg-gray-50 rounded-lg p-3">
+            <h4 id="detail-title" class="text-sm font-medium text-gray-900 mb-1"></h4>
+            <p id="detail-speak" class="text-xs text-gray-600 italic mb-2"></p>
+            <div id="detail-edges" class="space-y-1"></div>
+            <div id="detail-slots" class="mt-2"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Active Calls -->
     <div id="active-calls-section" class="hidden">
       <h2 class="text-sm font-semibold text-gray-900 mb-3">🔴 Active Calls</h2>
@@ -426,6 +453,243 @@ if (!session) {
 
   startPolling();
   loadRecentCalls();
+
+  // ─── Dialog Tree Flowchart ───
+  const treeToggle = document.getElementById('tree-toggle');
+  const treeContent = document.getElementById('tree-content');
+  const treeChevron = document.getElementById('tree-chevron');
+  let treeLoaded = false;
+  let treeData: any = null;
+
+  treeToggle?.addEventListener('click', () => {
+    const isHidden = treeContent!.classList.contains('hidden');
+    treeContent!.classList.toggle('hidden');
+    treeChevron!.style.transform = isHidden ? 'rotate(180deg)' : '';
+    if (isHidden && !treeLoaded) {
+      loadDialogTree();
+    }
+  });
+
+  async function loadDialogTree() {
+    try {
+      const res = await fetch('/api/voice-dialog-tree');
+      if (!res.ok) throw new Error('Failed to load');
+      treeData = await res.json();
+      treeLoaded = true;
+      renderFlowchart(treeData);
+    } catch (err: any) {
+      document.getElementById('tree-loading')!.innerHTML =
+        `<p class="text-xs text-red-500">Could not load dialog tree: ${err.message}</p>`;
+    }
+  }
+
+  function renderFlowchart(data: any) {
+    const { nodes, edges } = data;
+    document.getElementById('tree-loading')!.classList.add('hidden');
+    const chart = document.getElementById('tree-chart')!;
+
+    // Build an interactive SVG flowchart
+    const nodeMap = new Map<string, any>(nodes.map((n: any) => [n.id, n]));
+
+    // Determine layout order using topological sort from greeting nodes
+    const order: string[] = [];
+    const visited = new Set<string>();
+
+    function visit(id: string) {
+      if (visited.has(id)) return;
+      visited.add(id);
+      order.push(id);
+      for (const e of edges) {
+        if (e.from === id && !visited.has(e.to)) visit(e.to);
+      }
+    }
+    // Start from greeting nodes
+    if (nodeMap.has('greeting_with_name')) visit('greeting_with_name');
+    if (nodeMap.has('greeting_no_name')) visit('greeting_no_name');
+    // Visit any remaining unvisited nodes
+    for (const n of nodes) {
+      if (!visited.has(n.id)) visit(n.id);
+    }
+
+    // Node dimensions and layout
+    const NODE_W = 180;
+    const NODE_H = 54;
+    const GAP_X = 40;
+    const GAP_Y = 28;
+    const COLS = 3;
+
+    // Position nodes in a grid
+    const positions = new Map<string, { x: number; y: number }>();
+    // Group: greetings side-by-side on row 0, then questions flow down
+    const mainFlow = ['greeting_with_name', 'greeting_no_name', 'identity_check', 'wellbeing', 'consent',
+      'ask_age', 'ask_beneficiary', 'ask_decision_maker', 'ask_zip', 'ask_bank', 'ask_coverage', 'transfer'];
+    const sideNodes = order.filter(id => !mainFlow.includes(id) && id !== '__hangup__');
+
+    // Main flow: single column, centered
+    let y = 0;
+    const mainX = (NODE_W + GAP_X); // center column
+    // Greeting row: two side by side
+    if (nodeMap.has('greeting_with_name')) {
+      positions.set('greeting_with_name', { x: mainX - (NODE_W + GAP_X) / 2, y });
+    }
+    if (nodeMap.has('greeting_no_name')) {
+      positions.set('greeting_no_name', { x: mainX + (NODE_W + GAP_X) / 2, y });
+    }
+    y += NODE_H + GAP_Y;
+
+    for (const id of mainFlow) {
+      if (id === 'greeting_with_name' || id === 'greeting_no_name') continue;
+      if (!nodeMap.has(id)) continue;
+      positions.set(id, { x: mainX, y });
+      y += NODE_H + GAP_Y;
+    }
+
+    // Hangup node
+    positions.set('__hangup__', { x: mainX + NODE_W + GAP_X + 60, y: 3 * (NODE_H + GAP_Y) });
+
+    // Side nodes
+    let sideY = 0;
+    const sideX = mainX * 2 + NODE_W + GAP_X;
+    for (const id of sideNodes) {
+      positions.set(id, { x: sideX, y: sideY });
+      sideY += NODE_H + GAP_Y;
+    }
+
+    // Compute SVG size
+    let maxX = 0, maxY = 0;
+    for (const pos of positions.values()) {
+      maxX = Math.max(maxX, pos.x + NODE_W);
+      maxY = Math.max(maxY, pos.y + NODE_H);
+    }
+    const svgW = maxX + 40;
+    const svgH = maxY + 40;
+
+    // Build SVG
+    let svg = `<svg viewBox="0 0 ${svgW} ${svgH}" width="${Math.min(svgW, 900)}" xmlns="http://www.w3.org/2000/svg" style="font-family: system-ui, sans-serif;">`;
+
+    // Marker for arrowheads
+    svg += `<defs>
+      <marker id="arrow" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 4 L 0 8 z" fill="#94a3b8"/>
+      </marker>
+      <marker id="arrow-red" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 4 L 0 8 z" fill="#f87171"/>
+      </marker>
+      <marker id="arrow-green" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 4 L 0 8 z" fill="#22c55e"/>
+      </marker>
+    </defs>`;
+
+    // Draw edges first (behind nodes)
+    for (const e of edges) {
+      const from = positions.get(e.from);
+      const to = positions.get(e.to);
+      if (!from || !to) continue;
+
+      const x1 = from.x + NODE_W / 2;
+      const y1 = from.y + NODE_H;
+      const x2 = to.x + NODE_W / 2;
+      const y2 = to.y;
+
+      const color = e.type === 'fallback' ? '#f87171' : e.type === 'action' ? '#f87171' : '#94a3b8';
+      const marker = e.type === 'fallback' || e.type === 'action' ? 'url(#arrow-red)' : 'url(#arrow)';
+      const dash = e.type === 'fallback' ? 'stroke-dasharray="4 3"' : '';
+
+      // Curved path for non-straight connections
+      if (Math.abs(x1 - x2) < 5) {
+        svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2 - 2}" stroke="${color}" stroke-width="1.5" marker-end="${marker}" ${dash}/>`;
+      } else {
+        const midY = (y1 + y2) / 2;
+        svg += `<path d="M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2 - 2}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="${marker}" ${dash}/>`;
+      }
+    }
+
+    // Draw nodes
+    for (const [id, pos] of positions) {
+      const node = nodeMap.get(id);
+      if (!node) continue;
+
+      const isTerminal = node.isTerminal;
+      const hasSlots = node.slots && node.slots.length > 0;
+      const fill = isTerminal ? (node.action === 'transfer' ? '#dcfce7' : '#fee2e2')
+        : hasSlots ? '#eff6ff' : '#ffffff';
+      const border = isTerminal ? (node.action === 'transfer' ? '#22c55e' : '#f87171')
+        : hasSlots ? '#3b82f6' : '#d1d5db';
+      const radius = isTerminal ? 20 : 8;
+
+      svg += `<g class="tree-node" data-node-id="${id}" style="cursor:pointer">`;
+      svg += `<rect x="${pos.x}" y="${pos.y}" width="${NODE_W}" height="${NODE_H}" rx="${radius}" ry="${radius}" fill="${fill}" stroke="${border}" stroke-width="1.5"/>`;
+
+      // Label: node name
+      const label = id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace('Ask ', '❓ ');
+      const displayLabel = label.length > 22 ? label.slice(0, 20) + '…' : label;
+      svg += `<text x="${pos.x + NODE_W / 2}" y="${pos.y + 20}" text-anchor="middle" font-size="11" font-weight="600" fill="#1f2937">${displayLabel}</text>`;
+
+      // Subtitle: slots or action
+      if (hasSlots) {
+        svg += `<text x="${pos.x + NODE_W / 2}" y="${pos.y + 36}" text-anchor="middle" font-size="9" fill="#6b7280">📦 ${node.slots.join(', ')}</text>`;
+      } else if (node.action) {
+        const actionEmoji = node.action === 'transfer' ? '📲' : node.action === 'hangup' ? '📴' : '⚡';
+        svg += `<text x="${pos.x + NODE_W / 2}" y="${pos.y + 36}" text-anchor="middle" font-size="9" fill="#6b7280">${actionEmoji} ${node.action}</text>`;
+      } else {
+        const shortSpeak = (node.speak || '').slice(0, 28) + ((node.speak || '').length > 28 ? '…' : '');
+        svg += `<text x="${pos.x + NODE_W / 2}" y="${pos.y + 36}" text-anchor="middle" font-size="9" fill="#9ca3af">${escSvg(shortSpeak)}</text>`;
+      }
+
+      svg += `</g>`;
+    }
+
+    svg += `</svg>`;
+    chart.innerHTML = svg;
+
+    // Click handler for node details
+    chart.querySelectorAll('.tree-node').forEach(g => {
+      g.addEventListener('click', () => {
+        const nodeId = g.getAttribute('data-node-id')!;
+        showNodeDetail(nodeId);
+      });
+    });
+  }
+
+  function escSvg(text: string): string {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function showNodeDetail(nodeId: string) {
+    if (!treeData) return;
+    const node = treeData.nodes.find((n: any) => n.id === nodeId);
+    if (!node) return;
+
+    const detail = document.getElementById('tree-detail')!;
+    const title = document.getElementById('detail-title')!;
+    const speak = document.getElementById('detail-speak')!;
+    const edgesEl = document.getElementById('detail-edges')!;
+    const slotsEl = document.getElementById('detail-slots')!;
+
+    title.textContent = nodeId.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+    speak.textContent = node.speak ? `"${node.speak}"` : '(no speak text)';
+
+    // Find outgoing edges
+    const outEdges = treeData.edges.filter((e: any) => e.from === nodeId);
+    if (outEdges.length > 0) {
+      edgesEl.innerHTML = '<p class="text-xs font-medium text-gray-700 mb-1">Transitions:</p>' +
+        outEdges.map((e: any) => {
+          const color = e.type === 'fallback' ? 'text-red-600' : e.type === 'action' ? 'text-orange-600' : 'text-green-700';
+          return `<span class="inline-block text-xs px-1.5 py-0.5 rounded bg-gray-100 mr-1 mb-1 ${color}">${e.label} → ${e.to.replace(/_/g, ' ')}</span>`;
+        }).join('');
+    } else {
+      edgesEl.innerHTML = '<p class="text-xs text-gray-400">Terminal node (no outgoing edges)</p>';
+    }
+
+    if (node.slots && node.slots.length > 0) {
+      slotsEl.innerHTML = '<p class="text-xs font-medium text-gray-700">Extracts:</p>' +
+        node.slots.map((s: string) => `<span class="inline-block text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 mr-1">${s}</span>`).join('');
+    } else {
+      slotsEl.innerHTML = '';
+    }
+
+    detail.classList.remove('hidden');
+  }
 </script>
 
 </Base>
