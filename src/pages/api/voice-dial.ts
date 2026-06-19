@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { verifySessionCookie } from '../../lib/ai-demo-auth';
 
 const VOICE_BRIDGE_URL = import.meta.env.VOICE_BRIDGE_URL?.trim() || 'http://localhost:3380';
 
@@ -7,9 +8,16 @@ export const prerender = false;
 /**
  * POST /api/voice-dial
  * Proxy to the Sentinel voice bridge to initiate an outbound AI sales call.
- * Body: { phone, prospectName, prospectContext }
+ * Body: { phone, prospectName, prospectContext, testMode, transferNumber }
  */
 export const POST: APIRoute = async ({ request }) => {
+  const session = await verifySessionCookie(request.headers.get('cookie'));
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   try {
     const body = await request.json();
     const { phone, prospectName, prospectContext, testMode, transferNumber } = body;

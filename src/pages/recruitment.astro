@@ -611,6 +611,15 @@ if (!session) {
               <span class="text-xs text-gray-500 ml-auto" id="hot-leads-count"></span>
             </div>
             <p class="text-xs text-gray-500 mb-3">Sorted by engagement depth &amp; recency. Leads cool over time — act on hot ones before they go cold.</p>
+            <div class="flex items-center gap-3 mb-3 bg-white/60 rounded-lg px-3 py-2 border border-amber-100">
+              <label class="text-xs font-medium text-gray-600 whitespace-nowrap">Transfer to:</label>
+              <input type="tel" id="ai-call-transfer" placeholder="Beth's phone #"
+                class="flex-1 max-w-[180px] px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-brand-500 focus:border-brand-500" />
+              <label class="flex items-center gap-1 cursor-pointer">
+                <input type="checkbox" id="ai-call-test-mode" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" checked />
+                <span class="text-xs text-gray-500">Test mode</span>
+              </label>
+            </div>
             <div id="hot-leads-list" class="space-y-2"></div>
           </div>
         </div>
@@ -3418,10 +3427,23 @@ if (!session) {
         const state = el.dataset.state || '';
         const email = el.dataset.email || '';
 
-        if (!confirm(`Start an AI recruitment call to ${name} at ${phone}?`)) return;
+        const transferInput = document.getElementById('ai-call-transfer') as HTMLInputElement;
+        const testModeCheck = document.getElementById('ai-call-test-mode') as HTMLInputElement;
+        const transferNumber = transferInput?.value.trim() || '';
+        const testMode = testModeCheck?.checked ?? true;
+
+        if (!transferNumber) {
+          alert('Enter a transfer phone number in the "Transfer to" field above the hot leads.');
+          transferInput?.focus();
+          return;
+        }
+
+        if (!confirm(`Start an AI call to ${name} at ${phone}?${testMode ? ' (TEST MODE — no real transfer)' : ''}`)) return;
 
         el.disabled = true;
         el.textContent = '⏳ Dialing...';
+        // Save transfer number for reuse
+        localStorage.setItem('voice_transfer_number', transferNumber);
 
         try {
           const res = await fetch('/api/recruitment-dial', {
@@ -3432,6 +3454,8 @@ if (!session) {
               prospectId,
               prospectName: name,
               prospectContext: `Name: ${name}. State: ${state}. Email: ${email}. Licensed insurance agent being recruited to Legacy Financial & Life.`,
+              transferNumber,
+              testMode,
             }),
           });
           const data = await res.json();
@@ -3911,6 +3935,11 @@ if (!session) {
 
   // Initial load
   refreshStats();
+
+  // Restore saved AI call transfer number
+  const savedTransfer = localStorage.getItem('voice_transfer_number');
+  const aiCallTransfer = document.getElementById('ai-call-transfer') as HTMLInputElement;
+  if (savedTransfer && aiCallTransfer) aiCallTransfer.value = savedTransfer;
 
   // Clickable stats → navigate to relevant tab + filter
   document.querySelectorAll('[data-stat-tab]').forEach(el => {

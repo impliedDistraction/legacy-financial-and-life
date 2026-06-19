@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { verifySessionCookie } from '../../lib/ai-demo-auth';
 
 const VOICE_BRIDGE_URL = import.meta.env.VOICE_BRIDGE_URL?.trim() || 'http://localhost:3380';
 
@@ -8,7 +9,14 @@ export const prerender = false;
  * GET /api/voice-transcript?sessionId=xxx
  * Returns live transcript for an active call session.
  */
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ request, url }) => {
+  const session = await verifySessionCookie(request.headers.get('cookie'));
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
   const sessionId = url.searchParams.get('sessionId');
   if (!sessionId) {
     return new Response(JSON.stringify({ error: 'sessionId required' }), {
