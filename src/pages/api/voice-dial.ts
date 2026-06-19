@@ -12,7 +12,7 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request }) => {
   try {
     const body = await request.json();
-    const { phone, prospectName, prospectContext, testMode } = body;
+    const { phone, prospectName, prospectContext, testMode, transferNumber } = body;
 
     if (!phone || typeof phone !== 'string') {
       return new Response(JSON.stringify({ error: 'Phone number required' }), {
@@ -21,10 +21,17 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    if (!transferNumber || typeof transferNumber !== 'string') {
+      return new Response(JSON.stringify({ error: 'Transfer number required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     const res = await fetch(`${VOICE_BRIDGE_URL}/dial/sales`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, prospectName, prospectContext, testMode: !!testMode }),
+      body: JSON.stringify({ phone, prospectName, prospectContext, testMode: !!testMode, transferNumber }),
     });
 
     const data = await res.json();

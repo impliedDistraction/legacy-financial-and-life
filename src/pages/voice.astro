@@ -67,6 +67,12 @@ if (!session) {
           <input type="text" id="context-input" placeholder="e.g. Interested in final expense"
             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500" />
         </div>
+        <div class="min-w-[160px]">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Transfer To <span class="text-red-400">*</span></label>
+          <input type="tel" id="transfer-input" placeholder="(555) 867-5309"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+            required />
+        </div>
         <button type="submit" id="dial-btn"
           class="px-5 py-2 bg-brand-600 text-white text-sm font-medium rounded-lg hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
           🔊 Call Now
@@ -139,6 +145,7 @@ if (!session) {
   const phoneInput = document.getElementById('phone-input') as HTMLInputElement;
   const nameInput = document.getElementById('name-input') as HTMLInputElement;
   const contextInput = document.getElementById('context-input') as HTMLInputElement;
+  const transferInput = document.getElementById('transfer-input') as HTMLInputElement;
   const dialBtn = document.getElementById('dial-btn') as HTMLButtonElement;
   const dialError = document.getElementById('dial-error');
   const dialSuccess = document.getElementById('dial-success');
@@ -151,9 +158,11 @@ if (!session) {
     const phone = phoneInput.value.trim();
     const prospectName = nameInput.value.trim();
     const prospectContext = contextInput.value.trim();
+    const transferNumber = transferInput.value.trim();
     const testMode = (document.getElementById('test-mode') as HTMLInputElement)?.checked;
 
     if (!phone) { dialError!.textContent = 'Enter a phone number'; dialError!.classList.remove('hidden'); return; }
+    if (!transferNumber) { dialError!.textContent = 'Enter a transfer number (Beth\'s phone)'; dialError!.classList.remove('hidden'); return; }
 
     dialBtn.disabled = true;
     dialBtn.textContent = '⏳ Dialing...';
@@ -162,7 +171,7 @@ if (!session) {
       const res = await fetch('/api/voice-dial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, prospectName, prospectContext, testMode }),
+        body: JSON.stringify({ phone, prospectName, prospectContext, testMode, transferNumber }),
       });
       const data = await res.json();
 
@@ -175,6 +184,8 @@ if (!session) {
         phoneInput.value = '';
         nameInput.value = '';
         contextInput.value = '';
+        // Remember transfer number for next call
+        localStorage.setItem('voice_transfer_number', transferNumber);
         // Start polling for active sessions
         startPolling();
       }
@@ -409,6 +420,10 @@ if (!session) {
   }
 
   // ─── Init ───
+  // Restore saved transfer number
+  const savedTransfer = localStorage.getItem('voice_transfer_number');
+  if (savedTransfer) transferInput.value = savedTransfer;
+
   startPolling();
   loadRecentCalls();
 </script>
