@@ -1,0 +1,400 @@
+---
+/**
+ * /agent-portal — Agent seat & transfer console.
+ *
+ * Allows seated agents to:
+ * 1. Toggle online/offline status ("I'm available")
+ * 2. See live call activity (SSE feed from voice bridge)
+ * 3. Receive incoming transfer notifications with prospect context
+ * 4. View call history and performance stats
+ *
+ * Auth: same magic-link as /recruitment (ai-demo-auth).
+ * Agents must be in carrier_agents table with matching email.
+ */
+import Base from '../layouts/Base.astro';
+import '../styles/tailwind.css';
+import { verifySessionCookie } from '../lib/ai-demo-auth';
+
+export const prerender = false;
+
+const session = await verifySessionCookie(Astro.request.headers.get('cookie'));
+if (!session) {
+  return Astro.redirect('/ai-demo-login?redirect=/agent-portal', 302);
+}
+
+const userEmail = session.email;
+---
+<Base title="Agent Console — Legacy Financial & Life" description="Live call transfer console for agents">
+
+<div class="bg-gray-50 min-h-screen" id="agent-app" data-email={userEmail}>
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-30">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-sm font-bold text-gray-900">Agent Console</h1>
+          <p class="text-xs text-gray-500" id="agent-name-display">Loading...</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="connection-status" class="flex items-center gap-1.5 text-xs text-gray-500">
+          <span id="conn-dot" class="w-2 h-2 bg-gray-300 rounded-full inline-block"></span>
+          <span id="conn-text">Connecting...</span>
+        </span>
+        <a href="/recruitment" class="text-xs text-brand-600 hover:text-brand-700 font-medium">← Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- Seat Toggle + Status Card -->
+    <div class="bg-white rounded-xl shadow-sm border p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">Your Status</h2>
+          <p class="text-sm text-gray-500 mt-1" id="seat-status-text">You're offline — toggle to receive transfers</p>
+        </div>
+        <button
+          id="seat-toggle"
+          class="relative inline-flex h-10 w-20 items-center rounded-full transition-colors duration-200 bg-gray-300"
+          aria-pressed="false"
+          disabled
+        >
+          <span class="sr-only">Toggle availability</span>
+          <span id="seat-toggle-knob" class="inline-block h-8 w-8 rounded-full bg-white shadow-md transform transition-transform duration-200 translate-x-1"></span>
+        </button>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="grid grid-cols-3 gap-4 mt-6 pt-4 border-t">
+        <div class="text-center">
+          <p class="text-2xl font-bold text-brand-600" id="stat-seated">0</p>
+          <p class="text-xs text-gray-500">Agents Online</p>
+        </div>
+        <div class="text-center">
+          <p class="text-2xl font-bold text-green-600" id="stat-active-calls">0</p>
+          <p class="text-xs text-gray-500">Active Calls</p>
+        </div>
+        <div class="text-center">
+          <p class="text-2xl font-bold text-amber-600" id="stat-transfers">0</p>
+          <p class="text-xs text-gray-500">Your Transfers Today</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incoming Transfer Alert (hidden by default) -->
+    <div id="transfer-alert" class="hidden bg-green-50 border-2 border-green-400 rounded-xl shadow-lg p-6 animate-pulse">
+      <div class="flex items-start gap-4">
+        <div class="flex-shrink-0">
+          <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="flex-1">
+          <h3 class="text-lg font-bold text-green-800">📞 Incoming Transfer!</h3>
+          <p class="text-sm text-green-700 mt-1" id="transfer-prospect-info">Loading prospect details...</p>
+          <div id="transfer-slots" class="mt-2 flex flex-wrap gap-2"></div>
+          <p class="text-xs text-green-600 mt-2">Your phone is ringing — answer to connect with this prospect.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Activity Feed -->
+    <div class="bg-white rounded-xl shadow-sm border">
+      <div class="px-6 py-4 border-b flex items-center justify-between">
+        <h2 class="text-base font-semibold text-gray-900">Live Activity</h2>
+        <span class="text-xs text-gray-400" id="feed-count">0 events</span>
+      </div>
+      <div id="activity-feed" class="divide-y max-h-96 overflow-y-auto">
+        <div class="px-6 py-8 text-center text-sm text-gray-400">
+          Waiting for call activity...
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Calls (loaded from Supabase) -->
+    <div class="bg-white rounded-xl shadow-sm border">
+      <div class="px-6 py-4 border-b">
+        <h2 class="text-base font-semibold text-gray-900">Your Recent Calls</h2>
+      </div>
+      <div id="recent-calls" class="divide-y">
+        <div class="px-6 py-4 text-center text-sm text-gray-400">Loading...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function() {
+  // ─── Config ───
+  const app = document.getElementById('agent-app');
+  const userEmail = app?.dataset.email || '';
+
+  let agentId: string | null = null;
+  let isSeated = false;
+  let eventSource = null;
+  let feedEvents = [];
+  const MAX_FEED_EVENTS = 50;
+
+  // ─── DOM refs ───
+  const seatToggle = document.getElementById('seat-toggle') as HTMLButtonElement | null;
+  const seatKnob = document.getElementById('seat-toggle-knob');
+  const seatStatusText = document.getElementById('seat-status-text');
+  const agentNameDisplay = document.getElementById('agent-name-display');
+  const connDot = document.getElementById('conn-dot');
+  const connText = document.getElementById('conn-text');
+  const statSeated = document.getElementById('stat-seated');
+  const statActiveCalls = document.getElementById('stat-active-calls');
+  const statTransfers = document.getElementById('stat-transfers');
+  const transferAlert = document.getElementById('transfer-alert');
+  const transferProspectInfo = document.getElementById('transfer-prospect-info');
+  const transferSlots = document.getElementById('transfer-slots');
+  const activityFeed = document.getElementById('activity-feed');
+  const feedCount = document.getElementById('feed-count');
+
+  // ─── Init: look up agent by email ───
+  async function init() {
+    try {
+      const res = await fetch('/api/agent-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail }),
+      });
+      if (!res.ok) {
+        agentNameDisplay.textContent = 'Agent not found';
+        seatStatusText.textContent = 'Your email is not registered as an agent. Contact admin.';
+        return;
+      }
+      const data = await res.json();
+      agentId = data.id;
+      agentNameDisplay.textContent = `${data.agent_name} (${data.role})`;      if (seatToggle) seatToggle.disabled = false;
+      isSeated = data.is_seated;
+      updateSeatUI();
+
+      // Connect SSE
+      connectSSE();
+
+      // Load recent calls
+      loadRecentCalls();
+    } catch (err) {
+      agentNameDisplay.textContent = 'Error loading agent data';
+      console.error('Agent init failed:', err);
+    }
+  }
+
+  // ─── Seat Toggle ───
+  seatToggle?.addEventListener('click', async () => {
+    if (!agentId || !seatToggle) return;
+    seatToggle.disabled = true;
+
+    try {
+      const res = await fetch('/api/agent-seat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId, seated: !isSeated }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        isSeated = data.seated;
+        if (data.seatedAgents != null && statSeated) statSeated.textContent = String(data.seatedAgents);
+        updateSeatUI();
+      }
+    } catch (err) {
+      console.error('Seat toggle failed:', err);
+    } finally {
+      if (seatToggle) seatToggle.disabled = false;
+    }
+  });
+
+  function updateSeatUI() {
+    if (isSeated) {
+      seatToggle.classList.remove('bg-gray-300');
+      seatToggle.classList.add('bg-green-500');
+      seatToggle.setAttribute('aria-pressed', 'true');
+      seatKnob.classList.remove('translate-x-1');
+      seatKnob.classList.add('translate-x-11');
+      seatStatusText.textContent = "You're online — you'll receive transfers when calls qualify.";
+      seatStatusText.classList.remove('text-gray-500');
+      seatStatusText.classList.add('text-green-700');
+    } else {
+      seatToggle.classList.remove('bg-green-500');
+      seatToggle.classList.add('bg-gray-300');
+      seatToggle.setAttribute('aria-pressed', 'false');
+      seatKnob.classList.remove('translate-x-11');
+      seatKnob.classList.add('translate-x-1');
+      seatStatusText.textContent = "You're offline — toggle to receive transfers.";
+      seatStatusText.classList.remove('text-green-700');
+      seatStatusText.classList.add('text-gray-500');
+    }
+  }
+
+  // ─── SSE Connection ───
+  function connectSSE() {
+    if (!agentId) return;
+    if (eventSource) eventSource.close();
+
+    // Proxy through our API to avoid CORS issues with direct bridge connection
+    eventSource = new EventSource(`/api/agent-events?agentId=${agentId}`);
+
+    eventSource.onopen = () => {
+      connDot.classList.remove('bg-gray-300', 'bg-red-400');
+      connDot.classList.add('bg-green-400');
+      connText.textContent = 'Connected';
+    };
+
+    eventSource.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data);
+        handleEvent(event);
+      } catch {}
+    };
+
+    eventSource.onerror = () => {
+      connDot.classList.remove('bg-green-400');
+      connDot.classList.add('bg-red-400');
+      connText.textContent = 'Reconnecting...';
+    };
+  }
+
+  // ─── Event Handlers ───
+  function handleEvent(event) {
+    switch (event.type) {
+      case 'connected':
+        if (statSeated) statSeated.textContent = String(event.seatedAgents || 0);
+        if (statActiveCalls) statActiveCalls.textContent = String(event.activeCalls || 0);
+        break;
+
+      case 'seat_change':
+        if (statSeated) statSeated.textContent = String(event.seatedAgents || 0);
+        addFeedItem(`🪑 Agent ${event.seated ? 'came online' : 'went offline'}`, 'neutral');
+        break;
+
+      case 'call_started':
+        if (statActiveCalls) statActiveCalls.textContent = String((parseInt(statActiveCalls.textContent || '0') || 0) + 1);
+        const label = event.isTestCall ? '🧪 Test call' : '📞 Call';
+        addFeedItem(`${label} started (${event.mode}) — ${event.prospect?.name || 'Unknown'}`, 'info');
+        break;
+
+      case 'call_progress':
+        addFeedItem(`🌳 ${event.callId}: node=${event.node}, turn ${event.turn}`, 'progress');
+        break;
+
+      case 'transfer_incoming':
+        showTransferAlert(event);
+        addFeedItem(`🔔 TRANSFER INCOMING: ${event.prospect?.name || 'Unknown'}`, 'alert');
+        break;
+
+      case 'transfer_started':
+        addFeedItem(`📲 Transfer to ${event.agentName} (${event.mode})`, 'info');
+        break;
+
+      case 'call_ended':
+        if (statActiveCalls) statActiveCalls.textContent = String(Math.max(0, (parseInt(statActiveCalls.textContent || '1') || 1) - 1));
+        addFeedItem(`📴 Call ended: ${event.outcome} (${event.duration_s}s, ${event.turns} turns)`, event.outcome === 'hangup' ? 'neutral' : 'success');
+        break;
+
+      case 'stats_update':
+        if (event.seatedAgents != null && statSeated) statSeated.textContent = String(event.seatedAgents);
+        if (event.todayTransfers != null && statTransfers) statTransfers.textContent = String(event.todayTransfers);
+        break;
+    }
+  }
+
+  function showTransferAlert(event) {
+    transferAlert.classList.remove('hidden');
+    const p = event.prospect || {};
+    transferProspectInfo.textContent = `${p.name || 'Unknown prospect'} — qualified via ${event.mode || 'AI'} call`;
+    transferSlots.innerHTML = '';
+    for (const [key, val] of Object.entries(p)) {
+      if (key === 'name' || !val) continue;
+      const badge = document.createElement('span');
+      badge.className = 'inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800';
+      badge.textContent = `${key}: ${val}`;
+      transferSlots.appendChild(badge);
+    }
+    // Auto-hide after 30s
+    setTimeout(() => { transferAlert.classList.add('hidden'); }, 30000);
+  }
+
+  function addFeedItem(text, type) {
+    const now = new Date().toLocaleTimeString();
+    feedEvents.unshift({ text, type, time: now });
+    if (feedEvents.length > MAX_FEED_EVENTS) feedEvents.pop();
+    renderFeed();
+  }
+
+  function renderFeed() {
+    if (feedEvents.length === 0) {
+      activityFeed.innerHTML = '<div class="px-6 py-8 text-center text-sm text-gray-400">Waiting for call activity...</div>';
+      feedCount.textContent = '0 events';
+      return;
+    }
+    const colorMap = { info: 'text-blue-600', success: 'text-green-600', alert: 'text-amber-600 font-bold', progress: 'text-gray-500', neutral: 'text-gray-400' };
+    activityFeed.innerHTML = feedEvents.map(e => `
+      <div class="px-6 py-3 flex items-center justify-between">
+        <span class="text-sm ${colorMap[e.type] || 'text-gray-600'}">${escapeHtml(e.text)}</span>
+        <span class="text-xs text-gray-400 flex-shrink-0 ml-4">${e.time}</span>
+      </div>
+    `).join('');
+    feedCount.textContent = `${feedEvents.length} events`;
+  }
+
+  // ─── Recent Calls ───
+  async function loadRecentCalls() {
+    if (!agentId) return;
+    try {
+      const res = await fetch(`/api/agent-calls?agentId=${agentId}&limit=10`);
+      if (!res.ok) return;
+      const calls = await res.json();
+      const container = document.getElementById('recent-calls');
+      if (!calls.length) {
+        container.innerHTML = '<div class="px-6 py-4 text-center text-sm text-gray-400">No calls yet</div>';
+        return;
+      }
+      container.innerHTML = calls.map(c => `
+        <div class="px-6 py-3 flex items-center justify-between">
+          <div>
+            <span class="text-sm font-medium text-gray-900">${escapeHtml(c.prospect_name || c.caller_number || 'Unknown')}</span>
+            <span class="text-xs text-gray-500 ml-2">${c.mode} · ${c.duration_s}s · ${c.turns} turns</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+              c.outcome === 'transferred' || c.outcome === 'booked' ? 'bg-green-100 text-green-800' :
+              c.outcome === 'qualified' ? 'bg-blue-100 text-blue-800' :
+              'bg-gray-100 text-gray-600'
+            }">${c.outcome || 'unknown'}</span>
+            <span class="text-xs text-gray-400">${new Date(c.call_ts).toLocaleString()}</span>
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      console.error('Failed to load recent calls:', err);
+    }
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ─── Cleanup on page leave ───
+  window.addEventListener('beforeunload', () => {
+    if (eventSource) eventSource.close();
+  });
+
+  // ─── Start ───
+  init();
+})();
+</script>
+
+</Base>
