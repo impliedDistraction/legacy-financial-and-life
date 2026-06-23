@@ -49,6 +49,8 @@ const userEmail = session.email;
         <button id="btn-save" class="px-3 py-1 bg-brand-600 text-white text-xs font-medium rounded hover:bg-brand-700 disabled:opacity-50" disabled>Save</button>
         <button id="btn-test" class="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700">Deploy</button>
         <button id="btn-render-tts" class="px-3 py-1 bg-purple-600 text-white text-xs font-medium rounded hover:bg-purple-700" title="Pre-render TTS audio for all nodes">🔊 Render</button>
+        <div class="h-4 w-px bg-gray-600"></div>
+        <button id="btn-help" class="w-6 h-6 flex items-center justify-center bg-gray-700 border border-gray-600 rounded-full text-xs text-gray-300 hover:bg-gray-600 hover:text-white" title="Show tutorial">?</button>
       </div>
     </div>
   </header>
@@ -204,6 +206,206 @@ const userEmail = session.email;
   </div>
 </div>
 
+<!-- Tutorial Modal -->
+<div id="tutorial-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm hidden">
+  <div class="bg-gray-800 border border-gray-600 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-hidden flex flex-col">
+    <!-- Header -->
+    <div class="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🌳</span>
+        <h2 class="text-lg font-bold text-white">Dialog Tree Editor</h2>
+      </div>
+      <button id="tutorial-close" class="text-gray-400 hover:text-white text-xl leading-none">&times;</button>
+    </div>
+    
+    <!-- Steps -->
+    <div class="flex-1 overflow-y-auto px-6 py-4">
+      <div id="tutorial-steps">
+        <!-- Step 1 -->
+        <div class="tutorial-step" data-step="0">
+          <h3 class="text-base font-semibold text-brand-300 mb-3">What is this?</h3>
+          <p class="text-sm text-gray-300 mb-3">
+            This editor lets you visually design <strong class="text-white">call scripts</strong> that the AI voice system follows during outbound calls. Each tree is a flowchart of what the AI says, what it listens for, and where to go next.
+          </p>
+          <div class="bg-gray-900 rounded-lg p-4 text-sm text-gray-300 space-y-2 border border-gray-700">
+            <div class="flex items-start gap-2"><span class="text-green-400 font-bold">1.</span> <span><strong class="text-white">Design</strong> your call flow in this editor</span></div>
+            <div class="flex items-start gap-2"><span class="text-green-400 font-bold">2.</span> <span><strong class="text-white">Save</strong> stores it to the database</span></div>
+            <div class="flex items-start gap-2"><span class="text-green-400 font-bold">3.</span> <span><strong class="text-green-300">Deploy</strong> pushes it live to the voice bridge</span></div>
+            <div class="flex items-start gap-2"><span class="text-green-400 font-bold">4.</span> <span>Next call from <strong class="text-white">/voice</strong> uses the new script</span></div>
+          </div>
+          <p class="text-xs text-gray-500 mt-3 italic">
+            The voice bridge (Sentinel) reads these trees to know what to say, what responses to expect, and how to route the call. No restart needed — Deploy hot-reloads instantly.
+          </p>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="tutorial-step hidden" data-step="1">
+          <h3 class="text-base font-semibold text-brand-300 mb-3">Understanding Nodes</h3>
+          <p class="text-sm text-gray-300 mb-3">
+            Each <strong class="text-white">node</strong> is a step in the call. The AI speaks the node's text, then waits for a response.
+          </p>
+          <div class="space-y-3">
+            <div class="bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="w-3 h-3 rounded bg-blue-600 inline-block"></span>
+                <span class="text-sm font-medium text-white">Question Nodes</span>
+              </div>
+              <p class="text-xs text-gray-400">Have edges (expected responses). The AI speaks, then listens and matches the caller's response to an edge to decide what's next.</p>
+            </div>
+            <div class="bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="w-3 h-3 rounded bg-green-600 inline-block"></span>
+                <span class="text-sm font-medium text-white">Transfer Nodes</span>
+              </div>
+              <p class="text-xs text-gray-400">End the AI portion and live-transfer to a human agent. This is the "happy path" goal.</p>
+            </div>
+            <div class="bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="w-3 h-3 rounded bg-red-600 inline-block"></span>
+                <span class="text-sm font-medium text-white">Hangup Nodes</span>
+              </div>
+              <p class="text-xs text-gray-400">End the call politely. Opt-out, wrong person, DNC requests all lead here.</p>
+            </div>
+            <div class="bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="w-3 h-3 rounded bg-gray-600 inline-block"></span>
+                <span class="text-sm font-medium text-white">Greeting Nodes</span>
+              </div>
+              <p class="text-xs text-gray-400">Starting points. Use "Direct Next" to auto-advance without waiting for a response (e.g., greeting → first question).</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="tutorial-step hidden" data-step="2">
+          <h3 class="text-base font-semibold text-brand-300 mb-3">Edges &amp; Matching</h3>
+          <p class="text-sm text-gray-300 mb-3">
+            <strong class="text-white">Edges</strong> are the possible responses the AI listens for at each node. Each edge has:
+          </p>
+          <div class="bg-gray-900 rounded-lg p-4 text-sm space-y-3 border border-gray-700">
+            <div>
+              <span class="text-purple-300 font-medium">Match (regex)</span>
+              <p class="text-xs text-gray-400 mt-0.5">Regular expression to detect the caller's intent. Example: <code class="bg-gray-800 px-1 rounded text-green-300">\b(yes|yeah|sure|okay)\b</code></p>
+            </div>
+            <div>
+              <span class="text-purple-300 font-medium">Speak</span>
+              <p class="text-xs text-gray-400 mt-0.5">What the AI says when this edge matches (before moving to the next node).</p>
+            </div>
+            <div>
+              <span class="text-purple-300 font-medium">→ Next</span>
+              <p class="text-xs text-gray-400 mt-0.5">Which node to go to after matching.</p>
+            </div>
+            <div>
+              <span class="text-purple-300 font-medium">_fallback</span>
+              <p class="text-xs text-gray-400 mt-0.5">Special edge — triggered when nothing else matches. Usually re-asks the question. Every question node needs one.</p>
+            </div>
+          </div>
+          <div class="mt-3 bg-blue-900/30 border border-blue-700 rounded-lg p-3">
+            <p class="text-xs text-blue-200"><strong>Tip:</strong> You can also use built-in matchers like <code class="bg-gray-800 px-1 rounded">isAffirmative</code>, <code class="bg-gray-800 px-1 rounded">isNegative</code> in the match field instead of raw regex.</p>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="tutorial-step hidden" data-step="3">
+          <h3 class="text-base font-semibold text-brand-300 mb-3">Conversational Mode</h3>
+          <p class="text-sm text-gray-300 mb-3">
+            Real calls aren't robotic. People say "How are you?" or "What company is this?" mid-flow. <strong class="text-white">Conversational mode</strong> handles these off-script moments gracefully per node.
+          </p>
+          <div class="space-y-2 text-sm">
+            <div class="bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <span class="text-yellow-300 font-medium">Friendly</span>
+              <p class="text-xs text-gray-400">Engages with the off-topic comment for up to N turns, then gently redirects. Best for consent/greeting nodes.</p>
+            </div>
+            <div class="bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <span class="text-yellow-300 font-medium">Brief</span>
+              <p class="text-xs text-gray-400">Quick acknowledgment ("That's great!") then immediately re-asks. Best for data-collection nodes.</p>
+            </div>
+            <div class="bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <span class="text-yellow-300 font-medium">Redirect</span>
+              <p class="text-xs text-gray-400">Ignores off-topic and repeats the question. Use sparingly — can feel rude.</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 mt-3"><strong>Back-on-Track Phrases:</strong> Natural transitions like "Anyway —" or "So —" that the AI uses before re-asking the question.</p>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="tutorial-step hidden" data-step="4">
+          <h3 class="text-base font-semibold text-brand-300 mb-3">Compliance Guardrails</h3>
+          <p class="text-sm text-gray-300 mb-3">
+            The left panel shows real-time compliance checks. All four must pass before a tree should go live:
+          </p>
+          <div class="space-y-2 text-sm">
+            <div class="flex items-start gap-2 bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <span class="text-lg leading-none mt-0.5">✅</span>
+              <div><strong class="text-white">AI Disclosure</strong><p class="text-xs text-gray-400">The greeting or consent node must mention "AI" or "assistant". Required by FTC/FCC for AI-initiated calls.</p></div>
+            </div>
+            <div class="flex items-start gap-2 bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <span class="text-lg leading-none mt-0.5">✅</span>
+              <div><strong class="text-white">Opt-out Available</strong><p class="text-xs text-gray-400">A global "do not call" / opt-out edge must exist so the caller can exit at any time.</p></div>
+            </div>
+            <div class="flex items-start gap-2 bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <span class="text-lg leading-none mt-0.5">✅</span>
+              <div><strong class="text-white">No Deception</strong><p class="text-xs text-gray-400">Script must never claim to be a real person. "I'm an AI assistant" is fine; "I'm not a robot" is not.</p></div>
+            </div>
+            <div class="flex items-start gap-2 bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <span class="text-lg leading-none mt-0.5">✅</span>
+              <div><strong class="text-white">Has Terminal Paths</strong><p class="text-xs text-gray-400">Must have at least one hangup/transfer node. Calls can't loop forever.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="tutorial-step hidden" data-step="5">
+          <h3 class="text-base font-semibold text-brand-300 mb-3">Workflow Summary</h3>
+          <div class="bg-gray-900 rounded-lg p-4 border border-gray-700 mb-4">
+            <div class="space-y-3 text-sm">
+              <div class="flex items-center gap-3">
+                <span class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-sm font-bold text-brand-300">1</span>
+                <div><strong class="text-white">Select or create a tree</strong><p class="text-xs text-gray-400">Use the dropdown or "+ New" button. Load the active one from bridge to edit what's live.</p></div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-sm font-bold text-brand-300">2</span>
+                <div><strong class="text-white">Add &amp; configure nodes</strong><p class="text-xs text-gray-400">Click nodes to edit. Set speak text, edges, conversational behavior. Drag to rearrange.</p></div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-sm font-bold text-brand-300">3</span>
+                <div><strong class="text-white">Check compliance</strong><p class="text-xs text-gray-400">All four checks must pass (green). Fix any red items before deploying.</p></div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center text-sm font-bold text-brand-300">4</span>
+                <div><strong class="text-white">Save</strong><p class="text-xs text-gray-400">Persists the tree to the database. You can come back later to edit.</p></div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="w-8 h-8 bg-green-800 rounded-full flex items-center justify-center text-sm font-bold text-green-200">5</span>
+                <div><strong class="text-green-300">Deploy</strong><p class="text-xs text-gray-400">Pushes the saved tree to the live voice bridge. The next call from /voice will use this tree. No restart needed.</p></div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="w-8 h-8 bg-purple-800 rounded-full flex items-center justify-center text-sm font-bold text-purple-200">6</span>
+                <div><strong class="text-purple-300">Render TTS</strong> <span class="text-xs text-gray-500">(optional)</span><p class="text-xs text-gray-400">Pre-generates audio for every node. Makes calls start instantly instead of waiting for real-time synthesis.</p></div>
+              </div>
+            </div>
+          </div>
+          <div class="bg-amber-900/30 border border-amber-700 rounded-lg p-3">
+            <p class="text-xs text-amber-200"><strong>Note:</strong> The voice bridge (Sentinel) must be running for "Active (from bridge)" to load. If you see placeholder nodes like "Meta" or "Nodes", the bridge is offline — create a new tree or load a saved one instead.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="px-6 py-3 border-t border-gray-700 flex items-center justify-between bg-gray-800/50">
+      <div class="flex items-center gap-2">
+        <span id="tutorial-dots" class="flex gap-1"></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="tutorial-prev" class="px-3 py-1.5 bg-gray-700 text-gray-300 text-xs rounded hover:bg-gray-600 disabled:opacity-30" disabled>← Back</button>
+        <button id="tutorial-next" class="px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded hover:bg-brand-700">Next →</button>
+        <button id="tutorial-done" class="px-3 py-1.5 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700 hidden">Got it!</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
   // ═══════════════════════════════════════════════════════════════
@@ -222,6 +424,81 @@ const userEmail = session.email;
 
   const NODE_W = 200;
   const NODE_H = 64;
+
+  // ═══════════════════════════════════════════════════════════════
+  // TUTORIAL
+  // ═══════════════════════════════════════════════════════════════
+  const TUTORIAL_KEY = 'voice-editor-tutorial-seen';
+  let tutorialStep = 0;
+  const totalSteps = 6;
+
+  function initTutorial() {
+    const modal = document.getElementById('tutorial-modal')!;
+    const dots = document.getElementById('tutorial-dots')!;
+    
+    // Render dots
+    dots.innerHTML = Array.from({ length: totalSteps }, (_, i) =>
+      `<span class="w-2 h-2 rounded-full transition-colors ${i === 0 ? 'bg-brand-400' : 'bg-gray-600'}" data-dot="${i}"></span>`
+    ).join('');
+
+    // Show on first visit
+    if (!localStorage.getItem(TUTORIAL_KEY)) {
+      showTutorial();
+    }
+
+    // Help button
+    document.getElementById('btn-help')?.addEventListener('click', showTutorial);
+    document.getElementById('tutorial-close')?.addEventListener('click', closeTutorial);
+    document.getElementById('tutorial-done')?.addEventListener('click', closeTutorial);
+    document.getElementById('tutorial-next')?.addEventListener('click', () => goToStep(tutorialStep + 1));
+    document.getElementById('tutorial-prev')?.addEventListener('click', () => goToStep(tutorialStep - 1));
+
+    // Click outside to close
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeTutorial();
+    });
+  }
+
+  function showTutorial() {
+    tutorialStep = 0;
+    goToStep(0);
+    document.getElementById('tutorial-modal')!.classList.remove('hidden');
+  }
+
+  function closeTutorial() {
+    document.getElementById('tutorial-modal')!.classList.add('hidden');
+    localStorage.setItem(TUTORIAL_KEY, 'true');
+  }
+
+  function goToStep(step: number) {
+    tutorialStep = Math.max(0, Math.min(step, totalSteps - 1));
+    
+    // Show/hide steps
+    document.querySelectorAll('.tutorial-step').forEach((el, i) => {
+      (el as HTMLElement).classList.toggle('hidden', i !== tutorialStep);
+    });
+
+    // Update dots
+    document.querySelectorAll('[data-dot]').forEach((el, i) => {
+      el.className = `w-2 h-2 rounded-full transition-colors ${i === tutorialStep ? 'bg-brand-400' : 'bg-gray-600'}`;
+    });
+
+    // Update buttons
+    const prev = document.getElementById('tutorial-prev') as HTMLButtonElement;
+    const next = document.getElementById('tutorial-next') as HTMLButtonElement;
+    const done = document.getElementById('tutorial-done') as HTMLButtonElement;
+    
+    prev.disabled = tutorialStep === 0;
+    if (tutorialStep === totalSteps - 1) {
+      next.classList.add('hidden');
+      done.classList.remove('hidden');
+    } else {
+      next.classList.remove('hidden');
+      done.classList.add('hidden');
+    }
+  }
+
+  initTutorial();
 
   // ═══════════════════════════════════════════════════════════════
   // INIT
@@ -249,30 +526,47 @@ const userEmail = session.email;
 
   async function loadFromBridge() {
     try {
-      const res = await fetch('/api/voice-dialog-tree');
-      if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
-      // Convert from visualization format back to tree format
-      // Actually, let's just fetch the raw tree
+      // Try to get the raw tree JSON directly (preferred)
       const rawRes = await fetch('/api/voice-dialog-tree?raw=true');
       if (rawRes.ok) {
-        currentTree = await rawRes.json();
-      } else {
-        // Fall back: reconstruct from the graph data
-        currentTree = reconstructTreeFromGraph(data);
+        const data = await rawRes.json();
+        // Validate it's actually a tree (has _meta or at least one node with speak/edges)
+        if (data._meta || Object.values(data).some((v: any) => v && (v.speak || v.edges || v.next))) {
+          currentTree = data;
+          currentTreeId = '';
+          currentSlug = data._meta?.description?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'active-tree';
+          initEditor();
+          return;
+        }
       }
-      currentTreeId = '';
-      currentSlug = 'sales-qualifying-v3';
-      initEditor();
+
+      // Bridge offline — show empty state with guidance
+      console.warn('[editor] Voice bridge unreachable. Load a saved tree or create new.');
+      showBridgeOfflineState();
     } catch (err) {
       console.error('Failed to load tree:', err);
+      showBridgeOfflineState();
     }
   }
 
-  function reconstructTreeFromGraph(data: any) {
-    // The /api/voice-dialog-tree returns {meta, nodes, edges, globalEdges}
-    // For now just use what bridge provides
-    return data;
+  function showBridgeOfflineState() {
+    const nodesLayer = document.getElementById('nodes-layer')!;
+    nodesLayer.innerHTML = `
+      <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center max-w-sm">
+        <div class="text-4xl mb-3">📡</div>
+        <h3 class="text-lg font-semibold text-gray-300 mb-2">Voice Bridge Offline</h3>
+        <p class="text-sm text-gray-500 mb-4">Can't load the active tree from the bridge. The bridge (Sentinel) needs to be running.</p>
+        <div class="space-y-2">
+          <p class="text-xs text-gray-400">You can still:</p>
+          <button class="w-full px-4 py-2 bg-brand-600 text-white text-sm rounded hover:bg-brand-700" onclick="document.getElementById('btn-new-tree')?.click()">
+            Create a New Tree
+          </button>
+          <p class="text-xs text-gray-500">Or select a saved tree from the dropdown above.</p>
+        </div>
+      </div>
+    `;
+    // Clear the tree name to avoid confusion
+    (document.getElementById('tree-name') as HTMLInputElement).value = '';
   }
 
   // ═══════════════════════════════════════════════════════════════
