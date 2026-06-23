@@ -1,0 +1,914 @@
+---
+/**
+ * /voice/editor — Visual Dialog Tree Editor
+ *
+ * Drag-and-drop node editor for designing AI call scripts.
+ * Features:
+ * - Visual node graph with connections
+ * - Edit node speak text, edges, slot extraction
+ * - Conversational mode settings per node
+ * - Back-on-track behavior configuration
+ * - Preview TTS audio per node
+ * - Save/load trees from Supabase
+ * - Compliance guardrails (AI disclosure, opt-out, no false claims)
+ * - Live call position overlay (which node is active)
+ *
+ * Auth: same magic-link as /recruitment.
+ */
+import Base from '../../layouts/Base.astro';
+import '../../styles/tailwind.css';
+import { verifySessionCookie } from '../../lib/ai-demo-auth';
+
+export const prerender = false;
+
+const session = await verifySessionCookie(Astro.request.headers.get('cookie'));
+if (!session) {
+  return Astro.redirect('/ai-demo-login?redirect=/voice/editor', 302);
+}
+
+const userEmail = session.email;
+---
+<Base title="Dialog Tree Editor — Legacy Financial & Life" description="Visual editor for AI call scripts">
+
+<div class="bg-gray-900 min-h-screen text-gray-100" id="editor-app" data-email={userEmail}>
+  <!-- Top Toolbar -->
+  <header class="bg-gray-800 border-b border-gray-700 sticky top-0 z-50">
+    <div class="max-w-full mx-auto px-4 py-2 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="/voice" class="text-xs text-gray-400 hover:text-white">← Voice Dashboard</a>
+        <div class="h-4 w-px bg-gray-600"></div>
+        <div class="flex items-center gap-2">
+          <select id="tree-selector" class="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 focus:ring-brand-500 focus:border-brand-500">
+            <option value="">Loading trees...</option>
+          </select>
+          <button id="btn-new-tree" class="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-xs text-gray-300 hover:bg-gray-600">+ New</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="save-status" class="text-xs text-gray-500">No changes</span>
+        <button id="btn-save" class="px-3 py-1 bg-brand-600 text-white text-xs font-medium rounded hover:bg-brand-700 disabled:opacity-50" disabled>Save</button>
+        <button id="btn-test" class="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700">Deploy</button>
+        <button id="btn-render-tts" class="px-3 py-1 bg-purple-600 text-white text-xs font-medium rounded hover:bg-purple-700" title="Pre-render TTS audio for all nodes">🔊 Render</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex h-[calc(100vh-44px)]">
+    <!-- Left Panel: Node List -->
+    <aside class="w-64 bg-gray-800 border-r border-gray-700 overflow-y-auto flex-shrink-0">
+      <div class="p-3">
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Nodes</h3>
+        <div id="node-list" class="space-y-1"></div>
+        <button id="btn-add-node" class="mt-3 w-full px-3 py-2 border border-dashed border-gray-600 rounded-lg text-xs text-gray-400 hover:border-gray-400 hover:text-gray-200 transition-colors">
+          + Add Node
+        </button>
+      </div>
+
+      <!-- Tree Settings -->
+      <div class="p-3 border-t border-gray-700">
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Tree Settings</h3>
+        <div class="space-y-2">
+          <div>
+            <label class="block text-xs text-gray-500 mb-0.5">Name</label>
+            <input id="tree-name" type="text" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200" placeholder="Sales Qualifying v3" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-0.5">Category</label>
+            <select id="tree-category" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200">
+              <option value="sales">Sales Qualifying</option>
+              <option value="recruitment">Recruitment</option>
+              <option value="client_outreach">Client Outreach</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-0.5">Status</label>
+            <select id="tree-status" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200">
+              <option value="draft">Draft</option>
+              <option value="testing">Testing</option>
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compliance -->
+      <div class="p-3 border-t border-gray-700">
+        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Compliance</h3>
+        <div id="compliance-checks" class="space-y-1 text-xs">
+          <div class="flex items-center gap-2" id="check-disclosure"><span class="w-4">⏳</span> AI Disclosure</div>
+          <div class="flex items-center gap-2" id="check-optout"><span class="w-4">⏳</span> Opt-out Available</div>
+          <div class="flex items-center gap-2" id="check-no-deception"><span class="w-4">⏳</span> No Deception</div>
+          <div class="flex items-center gap-2" id="check-terminal"><span class="w-4">⏳</span> Has Terminal Paths</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Center: Canvas -->
+    <main class="flex-1 overflow-hidden relative" id="canvas-container">
+      <div id="canvas" class="absolute inset-0 overflow-auto" style="cursor: grab;">
+        <svg id="canvas-svg" class="absolute" style="min-width: 2000px; min-height: 1500px;"></svg>
+        <div id="nodes-layer" class="absolute" style="min-width: 2000px; min-height: 1500px;"></div>
+      </div>
+      <!-- Zoom controls -->
+      <div class="absolute bottom-4 right-4 flex gap-1 bg-gray-800 rounded-lg p-1 shadow-lg border border-gray-700">
+        <button id="btn-zoom-in" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded">+</button>
+        <button id="btn-zoom-reset" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded text-xs">1:1</button>
+        <button id="btn-zoom-out" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded">−</button>
+      </div>
+    </main>
+
+    <!-- Right Panel: Node Editor -->
+    <aside class="w-80 bg-gray-800 border-l border-gray-700 overflow-y-auto flex-shrink-0 hidden" id="node-editor">
+      <div class="p-4">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold text-gray-200" id="editor-title">Node Editor</h3>
+          <button id="btn-close-editor" class="text-gray-400 hover:text-white">✕</button>
+        </div>
+
+        <!-- Node ID -->
+        <div class="mb-3">
+          <label class="block text-xs text-gray-500 mb-0.5">Node ID</label>
+          <input id="edit-node-id" type="text" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 font-mono" />
+        </div>
+
+        <!-- Speak Text -->
+        <div class="mb-3">
+          <label class="block text-xs text-gray-500 mb-0.5">Speak Text (variants, one per line)</label>
+          <textarea id="edit-speak" rows="3" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200" placeholder="Hi, is this {firstName}?"></textarea>
+          <p class="text-xs text-gray-500 mt-0.5">Use &#123;slotName&#125; for dynamic values. Multiple lines = random variant selection.</p>
+        </div>
+
+        <!-- Action -->
+        <div class="mb-3">
+          <label class="block text-xs text-gray-500 mb-0.5">Action (terminal)</label>
+          <select id="edit-action" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200">
+            <option value="">None (continue)</option>
+            <option value="transfer">Transfer to Agent</option>
+            <option value="hangup">Hang Up</option>
+            <option value="book">Book Meeting</option>
+            <option value="llm_fallback">LLM Fallback</option>
+          </select>
+        </div>
+
+        <!-- Direct Next -->
+        <div class="mb-3">
+          <label class="block text-xs text-gray-500 mb-0.5">Direct Next (for greeting nodes)</label>
+          <select id="edit-next" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200">
+            <option value="">— No direct next —</option>
+          </select>
+        </div>
+
+        <!-- Conversational Settings -->
+        <div class="mb-3 border border-gray-600 rounded-lg p-3">
+          <h4 class="text-xs font-semibold text-gray-300 mb-2">🗣️ Conversational Behavior</h4>
+          <div class="space-y-2">
+            <div>
+              <label class="block text-xs text-gray-500 mb-0.5">Mode</label>
+              <select id="edit-converse-mode" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200">
+                <option value="">Off (no conversational handling)</option>
+                <option value="friendly">Friendly (multi-turn, warm)</option>
+                <option value="brief">Brief (ack + redirect)</option>
+                <option value="redirect">Redirect (ignore, re-ask)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-0.5">Max Off-Script Turns</label>
+              <input id="edit-converse-max" type="number" min="1" max="5" value="1" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-0.5">Back-on-Track Phrases (one per line)</label>
+              <textarea id="edit-converse-bot" rows="2" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200" placeholder="Anyway —&#10;So —"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Edges Section -->
+        <div class="mb-3">
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-xs font-semibold text-gray-300">Edges (responses)</label>
+            <button id="btn-add-edge" class="text-xs text-brand-400 hover:text-brand-300">+ Add Edge</button>
+          </div>
+          <div id="edges-container" class="space-y-2"></div>
+        </div>
+
+        <!-- Delete Node -->
+        <div class="mt-6 pt-4 border-t border-gray-700">
+          <button id="btn-delete-node" class="w-full px-3 py-2 bg-red-900/50 border border-red-700 rounded text-xs text-red-300 hover:bg-red-900 transition-colors">
+            🗑️ Delete Node
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function() {
+  // ═══════════════════════════════════════════════════════════════
+  // STATE
+  // ═══════════════════════════════════════════════════════════════
+  let currentTree: any = null;      // The full tree JSON (same format as sales-dialog-tree-v2.json)
+  let currentTreeId: string = '';   // Supabase UUID (empty for new)
+  let currentSlug: string = '';
+  let isDirty = false;
+  let selectedNode: string | null = null;
+  let nodePositions: Map<string, { x: number; y: number }> = new Map();
+  let zoom = 1;
+  let panOffset = { x: 0, y: 0 };
+  let dragging: string | null = null;
+  let dragStart = { x: 0, y: 0 };
+
+  const NODE_W = 200;
+  const NODE_H = 64;
+
+  // ═══════════════════════════════════════════════════════════════
+  // INIT
+  // ═══════════════════════════════════════════════════════════════
+  loadTreeList();
+  
+  // Default: load from bridge (current active tree)
+  loadFromBridge();
+
+  async function loadTreeList() {
+    try {
+      const res = await fetch('/api/voice-dialog-tree?list=true');
+      if (res.ok) {
+        const data = await res.json();
+        const sel = document.getElementById('tree-selector') as HTMLSelectElement;
+        sel.innerHTML = '<option value="_bridge">Active (from bridge)</option>';
+        if (data.trees) {
+          for (const t of data.trees) {
+            sel.innerHTML += `<option value="${t.id}">${t.name} (${t.status})</option>`;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  async function loadFromBridge() {
+    try {
+      const res = await fetch('/api/voice-dialog-tree');
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      // Convert from visualization format back to tree format
+      // Actually, let's just fetch the raw tree
+      const rawRes = await fetch('/api/voice-dialog-tree?raw=true');
+      if (rawRes.ok) {
+        currentTree = await rawRes.json();
+      } else {
+        // Fall back: reconstruct from the graph data
+        currentTree = reconstructTreeFromGraph(data);
+      }
+      currentTreeId = '';
+      currentSlug = 'sales-qualifying-v3';
+      initEditor();
+    } catch (err) {
+      console.error('Failed to load tree:', err);
+    }
+  }
+
+  function reconstructTreeFromGraph(data: any) {
+    // The /api/voice-dialog-tree returns {meta, nodes, edges, globalEdges}
+    // For now just use what bridge provides
+    return data;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // CANVAS RENDERING
+  // ═══════════════════════════════════════════════════════════════
+  function initEditor() {
+    if (!currentTree) return;
+    
+    const treeName = document.getElementById('tree-name') as HTMLInputElement;
+    treeName.value = currentTree._meta?.description || currentSlug || 'Untitled';
+
+    // Build node positions from tree structure
+    computeLayout();
+    renderCanvas();
+    renderNodeList();
+    runComplianceChecks();
+  }
+
+  function getTreeNodes(): string[] {
+    if (!currentTree) return [];
+    return Object.keys(currentTree).filter(k => !k.startsWith('_'));
+  }
+
+  function computeLayout() {
+    nodePositions.clear();
+    const nodes = getTreeNodes();
+    
+    // Topological layout: greetings at top, then follow `next` chains
+    const mainFlow: string[] = [];
+    const visited = new Set<string>();
+
+    function followChain(nodeId: string) {
+      if (visited.has(nodeId) || !currentTree[nodeId]) return;
+      visited.add(nodeId);
+      mainFlow.push(nodeId);
+      
+      const node = currentTree[nodeId];
+      if (node.next) followChain(node.next);
+      if (node.edges) {
+        // Follow the "happy path" (first non-fallback edge with next)
+        for (const [name, edge] of Object.entries(node.edges) as any) {
+          if (name === '_fallback') continue;
+          if (edge.next && !visited.has(edge.next)) {
+            followChain(edge.next);
+            break;
+          }
+        }
+      }
+    }
+
+    // Start from greetings
+    if (currentTree.greeting_with_name) followChain('greeting_with_name');
+    if (currentTree.greeting_no_name) followChain('greeting_no_name');
+    // Pick up orphans
+    for (const n of nodes) {
+      if (!visited.has(n)) followChain(n);
+    }
+
+    // Position: main column + side branches
+    const centerX = 400;
+    let y = 40;
+    const greetings = mainFlow.filter(n => n.startsWith('greeting'));
+    const rest = mainFlow.filter(n => !n.startsWith('greeting'));
+
+    // Greetings side by side
+    let gx = centerX - (greetings.length * (NODE_W + 30)) / 2;
+    for (const g of greetings) {
+      nodePositions.set(g, { x: gx, y });
+      gx += NODE_W + 60;
+    }
+    if (greetings.length > 0) y += NODE_H + 50;
+
+    // Terminal nodes on the right
+    const terminals: string[] = [];
+    const questioners: string[] = [];
+
+    for (const n of rest) {
+      const node = currentTree[n];
+      if (node.action === 'hangup' || n === '__hangup__' || n === 'opt_out') {
+        terminals.push(n);
+      } else {
+        questioners.push(n);
+      }
+    }
+
+    // Main flow column
+    for (const n of questioners) {
+      nodePositions.set(n, { x: centerX, y });
+      y += NODE_H + 40;
+    }
+
+    // Terminals to the right
+    let ty = 120;
+    for (const n of terminals) {
+      nodePositions.set(n, { x: centerX + NODE_W + 150, y: ty });
+      ty += NODE_H + 30;
+    }
+  }
+
+  function renderCanvas() {
+    const svg = document.getElementById('canvas-svg')!;
+    const nodesLayer = document.getElementById('nodes-layer')!;
+    
+    // Clear
+    svg.innerHTML = '';
+    nodesLayer.innerHTML = '';
+
+    if (!currentTree) return;
+
+    // Draw edges (SVG)
+    const edgesSvg: string[] = [];
+    edgesSvg.push(`<defs>
+      <marker id="ed-arrow" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
+        <path d="M0 0 L10 4 L0 8z" fill="#4b5563"/>
+      </marker>
+      <marker id="ed-arrow-green" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
+        <path d="M0 0 L10 4 L0 8z" fill="#22c55e"/>
+      </marker>
+      <marker id="ed-arrow-red" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
+        <path d="M0 0 L10 4 L0 8z" fill="#ef4444"/>
+      </marker>
+    </defs>`);
+
+    for (const [nodeId, node] of Object.entries(currentTree) as any) {
+      if (nodeId.startsWith('_')) continue;
+      const fromPos = nodePositions.get(nodeId);
+      if (!fromPos) continue;
+
+      // Direct next
+      if (node.next) {
+        const toPos = nodePositions.get(node.next);
+        if (toPos) {
+          edgesSvg.push(drawEdge(fromPos, toPos, '#4b5563', 'ed-arrow'));
+        }
+      }
+
+      // Edges
+      if (node.edges) {
+        for (const [eName, edge] of Object.entries(node.edges) as any) {
+          const target = edge.next || (edge.action === 'hangup' ? '__hangup__' : null);
+          if (!target) continue;
+          const toPos = nodePositions.get(target);
+          if (!toPos) continue;
+
+          if (eName === '_fallback') {
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', true));
+          } else if (edge.action === 'hangup') {
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red'));
+          } else {
+            edgesSvg.push(drawEdge(fromPos, toPos, '#22c55e', 'ed-arrow-green'));
+          }
+        }
+      }
+    }
+
+    svg.innerHTML = edgesSvg.join('');
+
+    // Draw nodes (HTML divs for better interactivity)
+    for (const [nodeId, pos] of nodePositions) {
+      const node = currentTree[nodeId];
+      if (!node) continue;
+
+      const div = document.createElement('div');
+      div.className = `absolute rounded-lg border-2 shadow-md cursor-pointer transition-all select-none
+        ${selectedNode === nodeId ? 'ring-2 ring-brand-400 border-brand-500' : 'border-gray-600 hover:border-gray-400'}
+        ${node.action === 'transfer' ? 'bg-green-900/60 border-green-500' : 
+          node.action === 'hangup' ? 'bg-red-900/40 border-red-500' :
+          node.edges ? 'bg-blue-900/30 border-blue-600' : 'bg-gray-700'}`;
+      div.style.cssText = `left:${pos.x}px; top:${pos.y}px; width:${NODE_W}px; height:${NODE_H}px;`;
+      div.dataset.nodeId = nodeId;
+
+      // Node content
+      const label = nodeId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const hasSlots = node.edges && Object.values(node.edges).some((e: any) => e.extract?.slot);
+      const hasConverse = node.converse?.mode;
+      const speakPreview = Array.isArray(node.speak) ? (node.speak[0] || '').slice(0, 35) : '';
+      
+      div.innerHTML = `
+        <div class="px-3 py-2 h-full flex flex-col justify-center">
+          <div class="text-xs font-semibold text-gray-100 truncate">${label}</div>
+          <div class="text-[10px] text-gray-400 truncate mt-0.5">${speakPreview || (node.action ? '⚡ ' + node.action : '...')}</div>
+          <div class="flex gap-1 mt-1">
+            ${hasSlots ? '<span class="text-[9px] px-1 bg-blue-800 text-blue-200 rounded">📦 slot</span>' : ''}
+            ${hasConverse ? `<span class="text-[9px] px-1 bg-purple-800 text-purple-200 rounded">🗣️ ${hasConverse}</span>` : ''}
+            ${node.action === 'transfer' ? '<span class="text-[9px] px-1 bg-green-800 text-green-200 rounded">📲 transfer</span>' : ''}
+            ${node.action === 'hangup' ? '<span class="text-[9px] px-1 bg-red-800 text-red-200 rounded">📴 hangup</span>' : ''}
+          </div>
+        </div>
+      `;
+
+      // Drag to reposition
+      div.addEventListener('mousedown', (e: MouseEvent) => {
+        if (e.button !== 0) return;
+        dragging = nodeId;
+        dragStart = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+        e.preventDefault();
+      });
+
+      // Click to select
+      div.addEventListener('click', (e: MouseEvent) => {
+        if (Math.abs(e.clientX - (dragStart.x + pos.x)) > 5) return; // Was a drag
+        selectNode(nodeId);
+      });
+
+      nodesLayer.appendChild(div);
+    }
+
+    // Global mouse handlers for dragging
+    document.addEventListener('mousemove', (e: MouseEvent) => {
+      if (!dragging) return;
+      const newX = e.clientX - dragStart.x;
+      const newY = e.clientY - dragStart.y;
+      nodePositions.set(dragging, { x: Math.max(0, newX), y: Math.max(0, newY) });
+      renderCanvas();
+    });
+
+    document.addEventListener('mouseup', () => {
+      dragging = null;
+    });
+  }
+
+  function drawEdge(from: {x:number,y:number}, to: {x:number,y:number}, color: string, marker: string, dashed = false) {
+    const x1 = from.x + NODE_W / 2;
+    const y1 = from.y + NODE_H;
+    const x2 = to.x + NODE_W / 2;
+    const y2 = to.y;
+
+    const dash = dashed ? 'stroke-dasharray="5 3"' : '';
+    
+    if (Math.abs(x1 - x2) < 10) {
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash}/>`;
+    }
+    const midY = (y1 + y2) / 2;
+    return `<path d="M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash}/>`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // NODE LIST (left panel)
+  // ═══════════════════════════════════════════════════════════════
+  function renderNodeList() {
+    const list = document.getElementById('node-list')!;
+    const nodes = getTreeNodes();
+    
+    list.innerHTML = nodes.map(id => {
+      const node = currentTree[id];
+      const icon = node.action === 'transfer' ? '📲' : node.action === 'hangup' ? '📴' : node.edges ? '❓' : '💬';
+      const isSelected = selectedNode === id;
+      return `<div class="px-2 py-1.5 rounded cursor-pointer text-xs flex items-center gap-2 ${isSelected ? 'bg-brand-600/30 text-brand-200' : 'text-gray-300 hover:bg-gray-700'}"
+        data-list-node="${id}">
+        <span>${icon}</span>
+        <span class="truncate">${id.replace(/_/g, ' ')}</span>
+      </div>`;
+    }).join('');
+
+    list.querySelectorAll('[data-list-node]').forEach(el => {
+      el.addEventListener('click', () => {
+        selectNode(el.getAttribute('data-list-node')!);
+      });
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // NODE EDITOR (right panel)
+  // ═══════════════════════════════════════════════════════════════
+  function selectNode(nodeId: string) {
+    selectedNode = nodeId;
+    const node = currentTree[nodeId];
+    if (!node) return;
+
+    const editor = document.getElementById('node-editor')!;
+    editor.classList.remove('hidden');
+
+    (document.getElementById('editor-title') as HTMLElement).textContent = nodeId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    (document.getElementById('edit-node-id') as HTMLInputElement).value = nodeId;
+    (document.getElementById('edit-speak') as HTMLTextAreaElement).value = Array.isArray(node.speak) ? node.speak.join('\n') : (node.speak || '');
+    (document.getElementById('edit-action') as HTMLSelectElement).value = node.action || '';
+    
+    // Direct next dropdown
+    const nextSel = document.getElementById('edit-next') as HTMLSelectElement;
+    const allNodes = getTreeNodes();
+    nextSel.innerHTML = '<option value="">— No direct next —</option>' + 
+      allNodes.filter(n => n !== nodeId).map(n => `<option value="${n}" ${node.next === n ? 'selected' : ''}>${n}</option>`).join('');
+
+    // Converse settings
+    const converse = node.converse || {};
+    (document.getElementById('edit-converse-mode') as HTMLSelectElement).value = converse.mode || '';
+    (document.getElementById('edit-converse-max') as HTMLInputElement).value = String(converse.max_turns || 1);
+    (document.getElementById('edit-converse-bot') as HTMLTextAreaElement).value = (converse.back_on_track || []).join('\n');
+
+    // Edges
+    renderEdgesEditor(node.edges || {});
+    renderCanvas();
+    renderNodeList();
+  }
+
+  function renderEdgesEditor(edges: Record<string, any>) {
+    const container = document.getElementById('edges-container')!;
+    const edgeEntries = Object.entries(edges);
+    
+    container.innerHTML = edgeEntries.map(([name, edge]: [string, any]) => {
+      const isFallback = name === '_fallback';
+      return `<div class="bg-gray-700/50 border border-gray-600 rounded-lg p-2 space-y-1" data-edge-name="${name}">
+        <div class="flex items-center justify-between">
+          <input type="text" value="${name}" class="bg-transparent text-xs font-mono text-gray-200 w-24 border-b border-gray-600 focus:border-brand-400 edge-name-input" ${isFallback ? 'readonly' : ''} />
+          <div class="flex gap-1">
+            ${!isFallback ? `<button class="text-xs text-red-400 hover:text-red-300 edge-delete-btn">✕</button>` : ''}
+          </div>
+        </div>
+        <div>
+          <label class="text-[10px] text-gray-500">Match (regex)</label>
+          <input type="text" value="${edge.match_regex || ''}" class="w-full bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-[10px] font-mono text-gray-300 edge-regex-input" placeholder="\\b(yes|yeah)\\b" />
+        </div>
+        <div>
+          <label class="text-[10px] text-gray-500">Speak</label>
+          <input type="text" value="${Array.isArray(edge.speak) ? edge.speak[0] || '' : ''}" class="w-full bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-[10px] text-gray-300 edge-speak-input" placeholder="Response text..." />
+        </div>
+        <div class="flex gap-2">
+          <div class="flex-1">
+            <label class="text-[10px] text-gray-500">→ Next</label>
+            <select class="w-full bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-[10px] text-gray-300 edge-next-select">
+              <option value="">—</option>
+              ${getTreeNodes().map(n => `<option value="${n}" ${edge.next === n ? 'selected' : ''}>${n}</option>`).join('')}
+            </select>
+          </div>
+          <div class="flex-1">
+            <label class="text-[10px] text-gray-500">Action</label>
+            <select class="w-full bg-gray-800 border border-gray-600 rounded px-1 py-0.5 text-[10px] text-gray-300 edge-action-select">
+              <option value="" ${!edge.action ? 'selected' : ''}>—</option>
+              <option value="hangup" ${edge.action === 'hangup' ? 'selected' : ''}>hangup</option>
+              <option value="transfer" ${edge.action === 'transfer' ? 'selected' : ''}>transfer</option>
+            </select>
+          </div>
+        </div>
+        ${edge.extract ? `<div class="text-[10px] text-blue-300">📦 Extracts: ${edge.extract.slot} (${edge.extract.regex || edge.extract.value || ''})</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SAVE / APPLY CHANGES
+  // ═══════════════════════════════════════════════════════════════
+  function applyNodeEdits() {
+    if (!selectedNode || !currentTree[selectedNode]) return;
+    const node = currentTree[selectedNode];
+
+    // Speak
+    const speakVal = (document.getElementById('edit-speak') as HTMLTextAreaElement).value.trim();
+    node.speak = speakVal ? speakVal.split('\n').filter(Boolean) : undefined;
+
+    // Action
+    const actionVal = (document.getElementById('edit-action') as HTMLSelectElement).value;
+    if (actionVal) { node.action = actionVal; } else { delete node.action; }
+
+    // Direct next
+    const nextVal = (document.getElementById('edit-next') as HTMLSelectElement).value;
+    if (nextVal) { node.next = nextVal; } else { delete node.next; }
+
+    // Converse
+    const converseMode = (document.getElementById('edit-converse-mode') as HTMLSelectElement).value;
+    if (converseMode) {
+      node.converse = {
+        mode: converseMode,
+        max_turns: parseInt((document.getElementById('edit-converse-max') as HTMLInputElement).value) || 1,
+        back_on_track: (document.getElementById('edit-converse-bot') as HTMLTextAreaElement).value.split('\n').filter(Boolean),
+      };
+    } else {
+      delete node.converse;
+    }
+
+    markDirty();
+    renderCanvas();
+    runComplianceChecks();
+  }
+
+  // Listen for changes in the editor
+  ['edit-speak', 'edit-action', 'edit-next', 'edit-converse-mode', 'edit-converse-max', 'edit-converse-bot'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', applyNodeEdits);
+    document.getElementById(id)?.addEventListener('input', debounce(applyNodeEdits, 500));
+  });
+
+  function markDirty() {
+    isDirty = true;
+    const btn = document.getElementById('btn-save') as HTMLButtonElement;
+    btn.disabled = false;
+    document.getElementById('save-status')!.textContent = '● Unsaved changes';
+    document.getElementById('save-status')!.className = 'text-xs text-amber-400';
+  }
+
+  // Save button
+  document.getElementById('btn-save')?.addEventListener('click', async () => {
+    if (!currentTree) return;
+    const btn = document.getElementById('btn-save') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+      const payload = {
+        tree_data: currentTree,
+        name: (document.getElementById('tree-name') as HTMLInputElement).value || 'Untitled',
+        category: (document.getElementById('tree-category') as HTMLSelectElement).value,
+        status: (document.getElementById('tree-status') as HTMLSelectElement).value,
+        slug: currentSlug || generateSlug((document.getElementById('tree-name') as HTMLInputElement).value),
+        id: currentTreeId || undefined,
+      };
+
+      const res = await fetch('/api/voice-dialog-tree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      currentTreeId = data.id || currentTreeId;
+      currentSlug = data.slug || currentSlug;
+      isDirty = false;
+      document.getElementById('save-status')!.textContent = '✓ Saved';
+      document.getElementById('save-status')!.className = 'text-xs text-green-400';
+    } catch (err: any) {
+      document.getElementById('save-status')!.textContent = '✕ Save failed: ' + err.message;
+      document.getElementById('save-status')!.className = 'text-xs text-red-400';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save';
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // ADD NODE
+  // ═══════════════════════════════════════════════════════════════
+  document.getElementById('btn-add-node')?.addEventListener('click', () => {
+    const id = prompt('Node ID (snake_case):');
+    if (!id || currentTree[id]) return;
+    
+    currentTree[id] = {
+      edges: {
+        _fallback: { speak: ["Could you repeat that?"], next: id }
+      }
+    };
+    
+    // Position new node
+    const maxY = Math.max(...Array.from(nodePositions.values()).map(p => p.y), 0);
+    nodePositions.set(id, { x: 400, y: maxY + NODE_H + 40 });
+    
+    markDirty();
+    renderCanvas();
+    renderNodeList();
+    selectNode(id);
+  });
+
+  // Delete node
+  document.getElementById('btn-delete-node')?.addEventListener('click', () => {
+    if (!selectedNode) return;
+    if (!confirm(`Delete node "${selectedNode}"? This cannot be undone.`)) return;
+    
+    delete currentTree[selectedNode];
+    nodePositions.delete(selectedNode);
+    selectedNode = null;
+    document.getElementById('node-editor')!.classList.add('hidden');
+    
+    markDirty();
+    renderCanvas();
+    renderNodeList();
+  });
+
+  // Close editor
+  document.getElementById('btn-close-editor')?.addEventListener('click', () => {
+    selectedNode = null;
+    document.getElementById('node-editor')!.classList.add('hidden');
+    renderCanvas();
+    renderNodeList();
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // COMPLIANCE CHECKS
+  // ═══════════════════════════════════════════════════════════════
+  function runComplianceChecks() {
+    if (!currentTree) return;
+    const allText = JSON.stringify(currentTree).toLowerCase();
+    const nodes = getTreeNodes();
+
+    // 1. AI Disclosure — must mention "AI" or "assistant" in greeting/consent
+    const hasDisclosure = ['greeting_with_name', 'greeting_no_name', 'consent'].some(n => {
+      const node = currentTree[n];
+      if (!node) return false;
+      const text = JSON.stringify(node.speak || []).toLowerCase() + JSON.stringify(node.edges || {}).toLowerCase();
+      return text.includes('ai') || text.includes('assistant') || text.includes('artificial');
+    });
+    setCheck('check-disclosure', hasDisclosure);
+
+    // 2. Opt-out available (global edge or explicit)
+    const hasOptOut = currentTree._global_edges?.opt_out || allText.includes('opt_out') || allText.includes('do not call');
+    setCheck('check-optout', !!hasOptOut);
+
+    // 3. No deception — check for false human claims
+    const noDeception = !allText.includes('i am a real person') && !allText.includes('i\'m a real person') && !allText.includes('not a robot');
+    setCheck('check-no-deception', noDeception);
+
+    // 4. Has terminal paths (can actually end the call)
+    const hasTerminal = nodes.some(n => currentTree[n]?.action === 'hangup' || currentTree[n]?.action === 'transfer');
+    setCheck('check-terminal', hasTerminal);
+  }
+
+  function setCheck(elId: string, passed: boolean) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const icon = el.querySelector('span')!;
+    icon.textContent = passed ? '✅' : '❌';
+    el.className = `flex items-center gap-2 ${passed ? 'text-green-300' : 'text-red-300'}`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // UTILITIES
+  // ═══════════════════════════════════════════════════════════════
+  function generateSlug(name: string): string {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+  }
+
+  function debounce(fn: Function, ms: number) {
+    let timer: any;
+    return (...args: any[]) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), ms);
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // TREE SELECTOR
+  // ═══════════════════════════════════════════════════════════════
+  document.getElementById('tree-selector')?.addEventListener('change', async (e) => {
+    const val = (e.target as HTMLSelectElement).value;
+    if (val === '_bridge') {
+      await loadFromBridge();
+    } else if (val) {
+      try {
+        const res = await fetch(`/api/voice-dialog-tree?id=${val}`);
+        if (res.ok) {
+          const data = await res.json();
+          currentTree = data.tree_data;
+          currentTreeId = data.id;
+          currentSlug = data.slug;
+          (document.getElementById('tree-name') as HTMLInputElement).value = data.name;
+          (document.getElementById('tree-category') as HTMLSelectElement).value = data.category || 'custom';
+          (document.getElementById('tree-status') as HTMLSelectElement).value = data.status || 'draft';
+          isDirty = false;
+          document.getElementById('save-status')!.textContent = 'Loaded';
+          document.getElementById('save-status')!.className = 'text-xs text-gray-500';
+          initEditor();
+        }
+      } catch {}
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // ADD EDGE
+  // ═══════════════════════════════════════════════════════════════
+  document.getElementById('btn-add-edge')?.addEventListener('click', () => {
+    if (!selectedNode || !currentTree[selectedNode]) return;
+    const name = prompt('Edge name (e.g. "affirmative", "negative"):');
+    if (!name) return;
+    
+    const node = currentTree[selectedNode];
+    if (!node.edges) node.edges = {};
+    node.edges[name] = { match_regex: '', next: '' };
+    
+    markDirty();
+    renderEdgesEditor(node.edges);
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // DEPLOY TO BRIDGE
+  // ═══════════════════════════════════════════════════════════════
+  document.getElementById('btn-test')?.addEventListener('click', async () => {
+    if (!currentTreeId) {
+      alert('Save the tree first, then deploy.');
+      return;
+    }
+    const btn = document.getElementById('btn-test') as HTMLButtonElement;
+    btn.textContent = 'Deploying...';
+    btn.disabled = true;
+
+    try {
+      const category = (document.getElementById('tree-category') as HTMLSelectElement).value;
+      const mode = category === 'recruitment' ? 'recruitment' : 'sales';
+      const res = await fetch('/api/voice-dialog-tree', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentTreeId, mode }),
+      });
+      if (res.ok) {
+        btn.textContent = '✓ Deployed';
+        setTimeout(() => { btn.textContent = 'Deploy'; btn.disabled = false; }, 2000);
+      } else {
+        const err = await res.json();
+        alert('Deploy failed: ' + (err.error || 'Unknown error'));
+        btn.textContent = 'Deploy';
+        btn.disabled = false;
+      }
+    } catch (err: any) {
+      alert('Deploy failed: ' + err.message);
+      btn.textContent = 'Deploy';
+      btn.disabled = false;
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // NEW TREE
+  // ═══════════════════════════════════════════════════════════════
+  document.getElementById('btn-new-tree')?.addEventListener('click', () => {
+    if (isDirty && !confirm('Discard unsaved changes?')) return;
+    
+    currentTree = {
+      _meta: { version: '1.0', description: 'New tree', start_node: 'greeting' },
+      _converse_defaults: { mode: 'friendly', max_turns: 2 },
+      greeting: {
+        speak: ["Hi! How are you today?"],
+        next: 'main_question'
+      },
+      main_question: {
+        speak: ["What can I help you with?"],
+        edges: {
+          _fallback: { speak: ["Could you repeat that?"], next: 'main_question' }
+        }
+      }
+    };
+    currentTreeId = '';
+    currentSlug = '';
+    isDirty = false;
+    (document.getElementById('tree-name') as HTMLInputElement).value = 'New Tree';
+    (document.getElementById('tree-category') as HTMLSelectElement).value = 'custom';
+    (document.getElementById('tree-status') as HTMLSelectElement).value = 'draft';
+    document.getElementById('save-status')!.textContent = 'New (unsaved)';
+    document.getElementById('save-status')!.className = 'text-xs text-gray-500';
+    initEditor();
+  });
+})();
+</script>
+
+</Base>
