@@ -64,6 +64,17 @@ const userEmail = session.email;
         <button id="btn-add-node" class="mt-3 w-full px-3 py-2 border border-dashed border-gray-600 rounded-lg text-xs text-gray-400 hover:border-gray-400 hover:text-gray-200 transition-colors">
           + Add Node
         </button>
+        <div class="flex gap-1 mt-1">
+          <button id="btn-add-group" class="flex-1 px-2 py-1.5 border border-dashed border-purple-700 rounded text-[10px] text-purple-400 hover:border-purple-500 hover:text-purple-300 transition-colors">
+            + Group
+          </button>
+          <button id="btn-import-nodes" class="flex-1 px-2 py-1.5 border border-dashed border-green-700 rounded text-[10px] text-green-400 hover:border-green-500 hover:text-green-300 transition-colors">
+            ↓ Import
+          </button>
+          <button id="btn-export-nodes" class="flex-1 px-2 py-1.5 border border-dashed border-blue-700 rounded text-[10px] text-blue-400 hover:border-blue-500 hover:text-blue-300 transition-colors">
+            ↑ Export
+          </button>
+        </div>
       </div>
 
       <!-- Tree Settings -->
@@ -135,6 +146,24 @@ const userEmail = session.email;
           <input id="edit-node-id" type="text" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 font-mono" />
         </div>
 
+        <!-- TTS Preview (what the agent will say) -->
+        <div class="mb-3 bg-gray-900/60 border border-gray-600 rounded-lg p-3" id="tts-preview-section">
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-xs font-semibold text-gray-300">Agent Says</label>
+            <div class="flex gap-1">
+              <button id="btn-tts-play" class="px-2 py-0.5 bg-purple-700 text-white text-[10px] rounded hover:bg-purple-600 disabled:opacity-40" title="Play TTS preview">▶ Play</button>
+              <button id="btn-tts-render" class="px-2 py-0.5 bg-gray-700 text-gray-300 text-[10px] rounded hover:bg-gray-600" title="Pre-render & cache this phrase">Cache</button>
+            </div>
+          </div>
+          <div id="tts-preview-text" class="text-sm text-gray-100 italic min-h-[2rem] leading-relaxed">—</div>
+          <div id="tts-preview-variants" class="mt-1 hidden">
+            <span class="text-[10px] text-gray-500">Variants:</span>
+            <div id="tts-variant-list" class="text-[10px] text-gray-400 space-y-0.5 mt-0.5"></div>
+          </div>
+          <audio id="tts-audio-player" class="w-full mt-2 hidden" controls></audio>
+          <div id="tts-status" class="text-[10px] text-gray-500 mt-1 hidden"></div>
+        </div>
+
         <!-- Speak Text -->
         <div class="mb-3">
           <label class="block text-xs text-gray-500 mb-0.5">Speak Text (variants, one per line)</label>
@@ -159,6 +188,14 @@ const userEmail = session.email;
           <label class="block text-xs text-gray-500 mb-0.5">Direct Next (for greeting nodes)</label>
           <select id="edit-next" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200">
             <option value="">— No direct next —</option>
+          </select>
+        </div>
+
+        <!-- Group Assignment -->
+        <div class="mb-3">
+          <label class="block text-xs text-gray-500 mb-0.5">Group</label>
+          <select id="edit-group" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200">
+            <option value="">— No group —</option>
           </select>
         </div>
 
@@ -753,6 +790,35 @@ const userEmail = session.email;
 
     if (!currentTree) return;
 
+    // Draw group containers (behind everything)
+    if (currentTree._groups) {
+      for (const [gName, group] of Object.entries(currentTree._groups) as any) {
+        const memberNodes = (group.nodes || []).filter((n: string) => nodePositions.has(n));
+        if (memberNodes.length === 0) continue;
+        
+        // Calculate bounding box
+        const positions = memberNodes.map((n: string) => nodePositions.get(n)!);
+        const padding = 20;
+        const minX = Math.min(...positions.map((p: any) => p.x)) - padding;
+        const minY = Math.min(...positions.map((p: any) => p.y)) - padding - 20; // extra for label
+        const maxX = Math.max(...positions.map((p: any) => p.x)) + NODE_W + padding;
+        const maxY = Math.max(...positions.map((p: any) => p.y)) + NODE_H + padding;
+
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'absolute rounded-xl border-2 border-dashed pointer-events-none';
+        groupDiv.style.cssText = `
+          left: ${minX}px; top: ${minY}px;
+          width: ${maxX - minX}px; height: ${maxY - minY}px;
+          border-color: ${group.color || '#7c3aed'}40;
+          background: ${group.color || '#7c3aed'}08;
+        `;
+        groupDiv.innerHTML = `<span class="absolute -top-0 left-3 px-1.5 py-0.5 text-[10px] font-semibold rounded pointer-events-auto cursor-pointer" 
+          style="color: ${group.color || '#7c3aed'}; background: ${group.color || '#7c3aed'}20;"
+          data-group-name="${gName}">${group.label || gName}</span>`;
+        nodesLayer.appendChild(groupDiv);
+      }
+    }
+
     // Draw edges (SVG)
     const edgesSvg: string[] = [];
     edgesSvg.push(`<defs>
@@ -927,6 +993,15 @@ const userEmail = session.email;
     nextSel.innerHTML = '<option value="">— No direct next —</option>' + 
       allNodes.filter(n => n !== nodeId).map(n => `<option value="${n}" ${node.next === n ? 'selected' : ''}>${n}</option>`).join('');
 
+    // Group assignment
+    const groupSel = document.getElementById('edit-group') as HTMLSelectElement;
+    const groups = currentTree._groups || {};
+    const currentGroup = Object.entries(groups).find(([_, g]: any) => (g.nodes || []).includes(nodeId));
+    groupSel.innerHTML = '<option value="">— No group —</option>' +
+      Object.entries(groups).map(([gName, g]: any) => 
+        `<option value="${gName}" ${currentGroup?.[0] === gName ? 'selected' : ''}>${g.label || gName}</option>`
+      ).join('');
+
     // Converse settings
     const converse = node.converse || {};
     (document.getElementById('edit-converse-mode') as HTMLSelectElement).value = converse.mode || '';
@@ -935,6 +1010,7 @@ const userEmail = session.email;
 
     // Edges
     renderEdgesEditor(node.edges || {});
+    updateTtsPreview();
     renderCanvas();
     renderNodeList();
   }
@@ -1001,6 +1077,19 @@ const userEmail = session.email;
     const nextVal = (document.getElementById('edit-next') as HTMLSelectElement).value;
     if (nextVal) { node.next = nextVal; } else { delete node.next; }
 
+    // Group assignment
+    const groupVal = (document.getElementById('edit-group') as HTMLSelectElement).value;
+    if (currentTree._groups) {
+      // Remove from all groups first
+      for (const g of Object.values(currentTree._groups) as any[]) {
+        g.nodes = (g.nodes || []).filter((n: string) => n !== selectedNode);
+      }
+      // Add to selected group
+      if (groupVal && currentTree._groups[groupVal]) {
+        currentTree._groups[groupVal].nodes.push(selectedNode);
+      }
+    }
+
     // Converse
     const converseMode = (document.getElementById('edit-converse-mode') as HTMLSelectElement).value;
     if (converseMode) {
@@ -1016,10 +1105,11 @@ const userEmail = session.email;
     markDirty();
     renderCanvas();
     runComplianceChecks();
+    updateTtsPreview();
   }
 
   // Listen for changes in the editor
-  ['edit-speak', 'edit-action', 'edit-next', 'edit-converse-mode', 'edit-converse-max', 'edit-converse-bot'].forEach(id => {
+  ['edit-speak', 'edit-action', 'edit-next', 'edit-group', 'edit-converse-mode', 'edit-converse-max', 'edit-converse-bot'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', applyNodeEdits);
     document.getElementById(id)?.addEventListener('input', debounce(applyNodeEdits, 500));
   });
@@ -1076,22 +1166,35 @@ const userEmail = session.email;
   // ═══════════════════════════════════════════════════════════════
   document.getElementById('btn-add-node')?.addEventListener('click', () => {
     const id = prompt('Node ID (snake_case):');
-    if (!id || currentTree[id]) return;
+    if (!id || !currentTree || currentTree[id]) return;
     
+    // Deselect current node first
+    selectedNode = null;
+    document.getElementById('node-editor')!.classList.add('hidden');
+
     currentTree[id] = {
+      speak: [""],
       edges: {
         _fallback: { speak: ["Could you repeat that?"], next: id }
       }
     };
     
-    // Position new node
-    const maxY = Math.max(...Array.from(nodePositions.values()).map(p => p.y), 0);
-    nodePositions.set(id, { x: 400, y: maxY + NODE_H + 40 });
+    // Position new node in viewport center (accounting for zoom and pan)
+    const canvas = document.getElementById('canvas')!;
+    const viewCenterX = (canvas.scrollLeft + canvas.clientWidth / 2) / zoom;
+    const viewCenterY = (canvas.scrollTop + canvas.clientHeight / 2) / zoom;
+    nodePositions.set(id, { x: viewCenterX - NODE_W / 2, y: viewCenterY - NODE_H / 2 });
     
     markDirty();
     renderCanvas();
     renderNodeList();
     selectNode(id);
+
+    // Scroll the new node into view
+    setTimeout(() => {
+      const nodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement;
+      if (nodeEl) nodeEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    }, 50);
   });
 
   // Delete node
@@ -1116,6 +1219,152 @@ const userEmail = session.email;
     renderCanvas();
     renderNodeList();
   });
+
+  // ESC to deselect
+  document.addEventListener('keydown', (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && selectedNode) {
+      selectedNode = null;
+      document.getElementById('node-editor')!.classList.add('hidden');
+      renderCanvas();
+      renderNodeList();
+    }
+  });
+
+  // Click canvas background to deselect
+  document.getElementById('canvas')?.addEventListener('click', (e: MouseEvent) => {
+    // Only deselect if clicking the canvas itself, not a node
+    const target = e.target as HTMLElement;
+    if (target.id === 'canvas' || target.id === 'canvas-svg' || target.id === 'nodes-layer') {
+      if (selectedNode) {
+        selectedNode = null;
+        document.getElementById('node-editor')!.classList.add('hidden');
+        renderCanvas();
+        renderNodeList();
+      }
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TTS PREVIEW
+  // ═══════════════════════════════════════════════════════════════
+  function updateTtsPreview() {
+    if (!selectedNode || !currentTree[selectedNode]) return;
+    const node = currentTree[selectedNode];
+    const speaks = Array.isArray(node.speak) ? node.speak.filter(Boolean) : [];
+    
+    const previewEl = document.getElementById('tts-preview-text')!;
+    const variantsSection = document.getElementById('tts-preview-variants')!;
+    const variantList = document.getElementById('tts-variant-list')!;
+    const audioEl = document.getElementById('tts-audio-player') as HTMLAudioElement;
+    
+    audioEl.classList.add('hidden');
+    audioEl.src = '';
+    document.getElementById('tts-status')!.classList.add('hidden');
+
+    if (speaks.length === 0) {
+      previewEl.textContent = '— No speak text configured —';
+      previewEl.className = 'text-sm text-gray-500 italic min-h-[2rem] leading-relaxed';
+      variantsSection.classList.add('hidden');
+    } else if (speaks.length === 1) {
+      previewEl.textContent = `"${speaks[0]}"`;
+      previewEl.className = 'text-sm text-gray-100 min-h-[2rem] leading-relaxed';
+      variantsSection.classList.add('hidden');
+    } else {
+      // Multiple variants — show first as primary, list others
+      previewEl.textContent = `"${speaks[0]}"`;
+      previewEl.className = 'text-sm text-gray-100 min-h-[2rem] leading-relaxed';
+      variantsSection.classList.remove('hidden');
+      variantList.innerHTML = speaks.slice(1).map((s, i) => 
+        `<div class="flex items-center gap-1">
+          <span class="text-gray-600">${i + 2}.</span>
+          <span class="truncate">"${s}"</span>
+          <button class="tts-play-variant text-purple-400 hover:text-purple-300 ml-auto flex-shrink-0" data-text="${s.replace(/"/g, '&quot;')}">▶</button>
+        </div>`
+      ).join('');
+    }
+  }
+
+  // Play TTS for current node's first speak variant
+  document.getElementById('btn-tts-play')?.addEventListener('click', async () => {
+    if (!selectedNode || !currentTree[selectedNode]) return;
+    const node = currentTree[selectedNode];
+    const speaks = Array.isArray(node.speak) ? node.speak.filter(Boolean) : [];
+    if (speaks.length === 0) return;
+    await playTtsForText(speaks[0]);
+  });
+
+  // Cache TTS for all variants of current node
+  document.getElementById('btn-tts-render')?.addEventListener('click', async () => {
+    if (!selectedNode || !currentTree[selectedNode]) return;
+    const node = currentTree[selectedNode];
+    const speaks = Array.isArray(node.speak) ? node.speak.filter(Boolean) : [];
+    if (speaks.length === 0) return;
+    
+    const statusEl = document.getElementById('tts-status')!;
+    statusEl.classList.remove('hidden');
+    statusEl.textContent = `Caching ${speaks.length} variant(s)...`;
+    
+    try {
+      const res = await fetch('/api/voice-tts-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts: speaks, cache: true }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        statusEl.textContent = `✓ Cached ${data.cached || speaks.length} phrase(s)`;
+        statusEl.className = 'text-[10px] text-green-400 mt-1';
+      } else {
+        statusEl.textContent = '✕ Cache failed';
+        statusEl.className = 'text-[10px] text-red-400 mt-1';
+      }
+    } catch {
+      statusEl.textContent = '✕ Bridge unreachable';
+      statusEl.className = 'text-[10px] text-red-400 mt-1';
+    }
+    setTimeout(() => statusEl.classList.add('hidden'), 4000);
+  });
+
+  // Play variant from the list
+  document.getElementById('tts-variant-list')?.addEventListener('click', (e: MouseEvent) => {
+    const btn = (e.target as HTMLElement).closest('.tts-play-variant') as HTMLElement;
+    if (btn) playTtsForText(btn.dataset.text || '');
+  });
+
+  async function playTtsForText(text: string) {
+    if (!text) return;
+    const audioEl = document.getElementById('tts-audio-player') as HTMLAudioElement;
+    const statusEl = document.getElementById('tts-status')!;
+    const playBtn = document.getElementById('btn-tts-play') as HTMLButtonElement;
+    
+    playBtn.disabled = true;
+    playBtn.textContent = '⏳';
+    statusEl.classList.remove('hidden');
+    statusEl.textContent = 'Generating audio...';
+    statusEl.className = 'text-[10px] text-gray-400 mt-1';
+
+    try {
+      const res = await fetch('/api/voice-tts-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      audioEl.src = url;
+      audioEl.classList.remove('hidden');
+      audioEl.play();
+      statusEl.classList.add('hidden');
+    } catch (err: any) {
+      statusEl.textContent = `✕ ${err.message || 'TTS failed'}`;
+      statusEl.className = 'text-[10px] text-red-400 mt-1';
+    } finally {
+      playBtn.disabled = false;
+      playBtn.textContent = '▶ Play';
+    }
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // COMPLIANCE CHECKS
@@ -1255,6 +1504,10 @@ const userEmail = session.email;
   document.getElementById('btn-new-tree')?.addEventListener('click', () => {
     if (isDirty && !confirm('Discard unsaved changes?')) return;
     
+    // Deselect current node
+    selectedNode = null;
+    document.getElementById('node-editor')!.classList.add('hidden');
+
     currentTree = {
       _meta: { version: '1.0', description: 'New tree', start_node: 'greeting' },
       _converse_defaults: { mode: 'friendly', max_turns: 2 },
@@ -1278,6 +1531,168 @@ const userEmail = session.email;
     document.getElementById('save-status')!.textContent = 'New (unsaved)';
     document.getElementById('save-status')!.className = 'text-xs text-gray-500';
     initEditor();
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // GROUPS (visual containers)
+  // ═══════════════════════════════════════════════════════════════
+  document.getElementById('btn-add-group')?.addEventListener('click', () => {
+    if (!currentTree) return;
+    const name = prompt('Group name (e.g. "qualification", "objection_handling"):');
+    if (!name) return;
+
+    // Groups are stored in _groups metadata
+    if (!currentTree._groups) currentTree._groups = {};
+    currentTree._groups[name] = {
+      label: name.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+      color: getNextGroupColor(),
+      nodes: [],
+      collapsed: false,
+    };
+
+    markDirty();
+    renderCanvas();
+    renderNodeList();
+  });
+
+  function getNextGroupColor(): string {
+    const colors = ['#7c3aed', '#0891b2', '#059669', '#d97706', '#dc2626', '#4f46e5'];
+    const used = Object.values(currentTree._groups || {}).map((g: any) => g.color);
+    return colors.find(c => !used.includes(c)) || colors[0];
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // IMPORT / EXPORT NODE PATHS
+  // ═══════════════════════════════════════════════════════════════
+  document.getElementById('btn-export-nodes')?.addEventListener('click', () => {
+    if (!currentTree || !selectedNode) {
+      alert('Select a node first, then export it and its downstream path.');
+      return;
+    }
+    
+    // Collect the selected node and all reachable nodes from it
+    const exported: Record<string, any> = {};
+    const queue = [selectedNode];
+    const visited = new Set<string>();
+
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      if (visited.has(id) || !currentTree[id]) continue;
+      visited.add(id);
+      exported[id] = JSON.parse(JSON.stringify(currentTree[id]));
+
+      const node = currentTree[id];
+      if (node.next && !visited.has(node.next)) queue.push(node.next);
+      if (node.edges) {
+        for (const edge of Object.values(node.edges) as any[]) {
+          if (edge.next && !visited.has(edge.next)) queue.push(edge.next);
+        }
+      }
+    }
+
+    // Check if selected group nodes should be included
+    if (currentTree._groups) {
+      for (const [gName, group] of Object.entries(currentTree._groups) as any) {
+        if ((group.nodes || []).includes(selectedNode)) {
+          exported._exportedGroup = { name: gName, ...group };
+        }
+      }
+    }
+
+    exported._exportMeta = {
+      source_tree: (document.getElementById('tree-name') as HTMLInputElement).value,
+      exported_at: new Date().toISOString(),
+      entry_node: selectedNode,
+      node_count: Object.keys(exported).filter(k => !k.startsWith('_')).length,
+    };
+
+    // Download as JSON file
+    const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nodes-${selectedNode}-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('btn-import-nodes')?.addEventListener('click', () => {
+    if (!currentTree) return;
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        const meta = data._exportMeta;
+        delete data._exportMeta;
+        const exportedGroup = data._exportedGroup;
+        delete data._exportedGroup;
+
+        // Get importable nodes (non-underscore keys)
+        const nodeKeys = Object.keys(data).filter(k => !k.startsWith('_'));
+        if (nodeKeys.length === 0) {
+          alert('No nodes found in file.');
+          return;
+        }
+
+        // Check for conflicts
+        const conflicts = nodeKeys.filter(k => currentTree[k]);
+        let prefix = '';
+        if (conflicts.length > 0) {
+          prefix = prompt(`${conflicts.length} node(s) conflict with existing nodes (${conflicts.slice(0, 3).join(', ')}). Enter a prefix to rename them, or cancel:`, 'imported_') || '';
+          if (!prefix) return;
+        }
+
+        // Import nodes
+        for (const key of nodeKeys) {
+          const newKey = prefix ? `${prefix}${key}` : key;
+          const node = data[key];
+          
+          // Remap next/edge references if prefixed
+          if (prefix) {
+            if (node.next && nodeKeys.includes(node.next)) node.next = `${prefix}${node.next}`;
+            if (node.edges) {
+              for (const edge of Object.values(node.edges) as any[]) {
+                if (edge.next && nodeKeys.includes(edge.next)) edge.next = `${prefix}${edge.next}`;
+              }
+            }
+          }
+
+          currentTree[newKey] = node;
+        }
+
+        // Import group if present
+        if (exportedGroup && exportedGroup.name) {
+          if (!currentTree._groups) currentTree._groups = {};
+          const gName = prefix ? `${prefix}${exportedGroup.name}` : exportedGroup.name;
+          currentTree._groups[gName] = {
+            label: exportedGroup.label,
+            color: exportedGroup.color || getNextGroupColor(),
+            nodes: (exportedGroup.nodes || []).map((n: string) => prefix ? `${prefix}${n}` : n),
+            collapsed: false,
+          };
+        }
+
+        markDirty();
+        computeLayout();
+        renderCanvas();
+        renderNodeList();
+        
+        const entryNode = prefix ? `${prefix}${meta?.entry_node || nodeKeys[0]}` : (meta?.entry_node || nodeKeys[0]);
+        if (currentTree[entryNode]) selectNode(entryNode);
+        
+        alert(`Imported ${nodeKeys.length} node(s) from "${meta?.source_tree || 'unknown'}".`);
+      } catch (err: any) {
+        alert('Import failed: ' + err.message);
+      }
+    });
+    input.click();
   });
 })();
 </script>
