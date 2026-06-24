@@ -975,34 +975,107 @@ const userEmail = session.email;
       `;
 
       // Drag to reposition
+      let mouseDownPos = { x: 0, y: 0 };
       div.addEventListener('mousedown', (e: MouseEvent) => {
         if (e.button !== 0) return;
+        const currentPos = nodePositions.get(nodeId)!;
         dragging = nodeId;
-        dragStart = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+        dragStart = { x: e.clientX - currentPos.x, y: e.clientY - currentPos.y };
+        mouseDownPos = { x: e.clientX, y: e.clientY };
         e.preventDefault();
       });
 
-      // Click to select
+      // Click to select (only if mouse didn't travel far = not a drag)
       div.addEventListener('click', (e: MouseEvent) => {
-        if (Math.abs(e.clientX - (dragStart.x + pos.x)) > 5) return; // Was a drag
+        const dist = Math.abs(e.clientX - mouseDownPos.x) + Math.abs(e.clientY - mouseDownPos.y);
+        if (dist > 5) return; // Was a drag
         selectNode(nodeId);
       });
 
       nodesLayer.appendChild(div);
     }
+  }
 
-    // Global mouse handlers for dragging
-    document.addEventListener('mousemove', (e: MouseEvent) => {
-      if (!dragging) return;
-      const newX = e.clientX - dragStart.x;
-      const newY = e.clientY - dragStart.y;
-      nodePositions.set(dragging, { x: Math.max(0, newX), y: Math.max(0, newY) });
-      renderCanvas();
-    });
+  // Global mouse handlers for dragging — registered ONCE outside renderCanvas
+  let dragRafPending = false;
+  document.addEventListener('mousemove', (e: MouseEvent) => {
+    if (!dragging) return;
+    const newX = e.clientX - dragStart.x;
+    const newY = e.clientY - dragStart.y;
+    nodePositions.set(dragging, { x: Math.max(0, newX), y: Math.max(0, newY) });
+    
+    // Throttle: update only the dragged node's position directly (no full re-render)
+    const draggedEl = document.querySelector(`[data-node-id="${dragging}"]`) as HTMLElement;
+    if (draggedEl) {
+      draggedEl.style.left = `${Math.max(0, newX)}px`;
+      draggedEl.style.top = `${Math.max(0, newY)}px`;
+    }
+    
+    // Debounce SVG edge redraw with rAF
+    if (!dragRafPending) {
+      dragRafPending = true;
+      requestAnimationFrame(() => {
+        dragRafPending = false;
+        redrawEdges();
+      });
+    }
+  });
 
-    document.addEventListener('mouseup', () => {
+  document.addEventListener('mouseup', () => {
+    if (dragging) {
       dragging = null;
-    });
+      // Final full render to sync state
+      renderCanvas();
+    }
+  });
+
+  // Lightweight edge-only redraw (no DOM recreation)
+  function redrawEdges() {
+    const svg = document.getElementById('canvas-svg')!;
+    const edgesSvg: string[] = [];
+    edgesSvg.push(`<defs>
+      <marker id="ed-arrow" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
+        <path d="M0 0 L10 4 L0 8z" fill="#4b5563"/>
+      </marker>
+      <marker id="ed-arrow-green" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
+        <path d="M0 0 L10 4 L0 8z" fill="#22c55e"/>
+      </marker>
+      <marker id="ed-arrow-red" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
+        <path d="M0 0 L10 4 L0 8z" fill="#ef4444"/>
+      </marker>
+    </defs>`);
+
+    if (!currentTree) { svg.innerHTML = ''; return; }
+
+    for (const [nodeId, node] of Object.entries(currentTree) as any) {
+      if (nodeId.startsWith('_')) continue;
+      const fromPos = nodePositions.get(nodeId);
+      if (!fromPos) continue;
+
+      if (node.next) {
+        const toPos = nodePositions.get(node.next);
+        if (toPos) edgesSvg.push(drawEdge(fromPos, toPos, '#4b5563', 'ed-arrow'));
+      }
+
+      if (node.edges) {
+        for (const [eName, edge] of Object.entries(node.edges) as any) {
+          const target = edge.next || (edge.action === 'hangup' ? '__hangup__' : null);
+          if (!target) continue;
+          const toPos = nodePositions.get(target);
+          if (!toPos) continue;
+
+          if (eName === '_fallback') {
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', true));
+          } else if (edge.action === 'hangup') {
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red'));
+          } else {
+            edgesSvg.push(drawEdge(fromPos, toPos, '#22c55e', 'ed-arrow-green'));
+          }
+        }
+      }
+    }
+
+    svg.innerHTML = edgesSvg.join('');
   }
 
   function drawEdge(from: {x:number,y:number}, to: {x:number,y:number}, color: string, marker: string, dashed = false) {
@@ -1130,6 +1203,65 @@ const userEmail = session.email;
         ${edge.extract ? `<div class="text-[10px] text-blue-300">📦 Extracts: ${edge.extract.slot} (${edge.extract.regex || edge.extract.value || ''})</div>` : ''}
       </div>`;
     }).join('');
+
+    // Attach edge field event listeners via delegation
+    container.querySelectorAll('.edge-regex-input, .edge-speak-input, .edge-next-select, .edge-action-select, .edge-name-input').forEach(el => {
+      el.addEventListener('change', () => applyEdgeEdits());
+    });
+    container.querySelectorAll('.edge-regex-input, .edge-speak-input, .edge-name-input').forEach(el => {
+      el.addEventListener('input', debounce(() => applyEdgeEdits(), 500));
+    });
+    container.querySelectorAll('.edge-delete-btn').forEach(el => {
+      el.addEventListener('click', () => {
+        const edgeDiv = (el as HTMLElement).closest('[data-edge-name]') as HTMLElement;
+        const edgeName = edgeDiv?.dataset.edgeName;
+        if (!edgeName || !selectedNode || !currentTree[selectedNode]?.edges) return;
+        if (!confirm(`Delete edge "${edgeName}"?`)) return;
+        delete currentTree[selectedNode].edges[edgeName];
+        markDirty();
+        renderEdgesEditor(currentTree[selectedNode].edges);
+        renderCanvas();
+      });
+    });
+  }
+
+  function applyEdgeEdits() {
+    if (!selectedNode || !currentTree[selectedNode]) return;
+    const node = currentTree[selectedNode];
+    if (!node.edges) node.edges = {};
+
+    // Read all edge fields from DOM and write back to tree
+    const container = document.getElementById('edges-container')!;
+    const edgeDivs = container.querySelectorAll('[data-edge-name]');
+    const newEdges: Record<string, any> = {};
+
+    edgeDivs.forEach(div => {
+      const originalName = (div as HTMLElement).dataset.edgeName!;
+      const nameInput = div.querySelector('.edge-name-input') as HTMLInputElement;
+      const regexInput = div.querySelector('.edge-regex-input') as HTMLInputElement;
+      const speakInput = div.querySelector('.edge-speak-input') as HTMLInputElement;
+      const nextSelect = div.querySelector('.edge-next-select') as HTMLSelectElement;
+      const actionSelect = div.querySelector('.edge-action-select') as HTMLSelectElement;
+
+      const edgeName = nameInput?.value?.trim() || originalName;
+      const existingEdge = node.edges[originalName] || {};
+
+      newEdges[edgeName] = {
+        ...existingEdge,
+        match_regex: regexInput?.value || undefined,
+        speak: speakInput?.value ? [speakInput.value] : existingEdge.speak,
+        next: nextSelect?.value || undefined,
+        action: actionSelect?.value || undefined,
+      };
+      // Clean undefined fields
+      if (!newEdges[edgeName].match_regex) delete newEdges[edgeName].match_regex;
+      if (!newEdges[edgeName].next) delete newEdges[edgeName].next;
+      if (!newEdges[edgeName].action) delete newEdges[edgeName].action;
+    });
+
+    node.edges = newEdges;
+    markDirty();
+    renderCanvas();
   }
 
   // ═══════════════════════════════════════════════════════════════
