@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { verifySessionCookie } from '../../lib/ai-demo-auth';
+import { bridgeFetch } from '../../lib/voice-bridge';
 
-const VOICE_BRIDGE_URL = import.meta.env.VOICE_BRIDGE_URL?.trim() || 'http://localhost:3380';
 const SUPABASE_URL = import.meta.env.SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -71,7 +71,7 @@ export const GET: APIRoute = async ({ request, url }) => {
   // Raw tree from bridge (for editor)
   if (url.searchParams.get('raw') === 'true') {
     try {
-      const res = await fetch(`${VOICE_BRIDGE_URL}/dialog-tree?raw=true`);
+      const res = await bridgeFetch('/dialog-tree?raw=true');
       const data = await res.json();
       return new Response(JSON.stringify(data), {
         status: 200, headers: { 'Content-Type': 'application/json' },
@@ -86,7 +86,7 @@ export const GET: APIRoute = async ({ request, url }) => {
 
   // Default: visualization graph from bridge
   try {
-    const res = await fetch(`${VOICE_BRIDGE_URL}/dialog-tree`);
+    const res = await bridgeFetch('/dialog-tree');
     const data = await res.json();
     return new Response(JSON.stringify(data), {
       status: res.status,
@@ -224,7 +224,7 @@ export const PUT: APIRoute = async ({ request }) => {
 
   // Push to bridge's /reload-tree endpoint
   try {
-    const bridgeRes = await fetch(`${VOICE_BRIDGE_URL}/reload-tree`, {
+    const bridgeRes = await bridgeFetch('/reload-tree', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode, tree_data: rows[0].tree_data }),

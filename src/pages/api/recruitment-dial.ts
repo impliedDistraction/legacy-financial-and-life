@@ -1,7 +1,6 @@
 import type { APIRoute } from 'astro';
 import { verifySessionCookie } from '../../lib/ai-demo-auth';
-
-const VOICE_BRIDGE_URL = import.meta.env.VOICE_BRIDGE_URL?.trim() || 'http://localhost:3380';
+import { bridgeFetch } from '../../lib/voice-bridge';
 
 export const prerender = false;
 
@@ -37,7 +36,7 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const res = await fetch(`${VOICE_BRIDGE_URL}/dial/recruitment`, {
+    const res = await bridgeFetch('/dial/recruitment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone, prospectId, prospectName, prospectContext, transferNumber, testMode: !!testMode }),

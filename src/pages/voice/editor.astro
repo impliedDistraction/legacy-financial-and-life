@@ -389,13 +389,89 @@ const userEmail = session.email;
             <p class="text-xs text-amber-200"><strong>Note:</strong> The voice bridge (Sentinel) must be running for "Active (from bridge)" to load. If you see placeholder nodes like "Meta" or "Nodes", the bridge is offline — create a new tree or load a saved one instead.</p>
           </div>
         </div>
+
+        <!-- Step 7: Build a Sample Tree (Part 1) -->
+        <div class="tutorial-step hidden" data-step="6">
+          <h3 class="text-base font-semibold text-brand-300 mb-3">🛠️ Try It: Build a 2-Question Tree</h3>
+          <p class="text-sm text-gray-300 mb-3">
+            Let's walk through building a simple qualifying call. Click <strong class="text-white">"+ New"</strong> in the toolbar after this tutorial, then follow these steps:
+          </p>
+          <div class="bg-gray-900 rounded-lg p-4 border border-gray-700 space-y-4 text-sm">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="w-6 h-6 bg-brand-700 rounded-full flex items-center justify-center text-xs font-bold text-white">1</span>
+                <strong class="text-white">Set the tree name</strong>
+              </div>
+              <p class="text-xs text-gray-400 ml-8">In "Tree Settings" on the left, name it something like <code class="bg-gray-800 px-1 rounded text-green-300">"My Test Script"</code>. Set category to "Custom".</p>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="w-6 h-6 bg-brand-700 rounded-full flex items-center justify-center text-xs font-bold text-white">2</span>
+                <strong class="text-white">Edit the greeting node</strong>
+              </div>
+              <p class="text-xs text-gray-400 ml-8">Click the "Greeting" node on the canvas. In the right panel, change the speak text to:<br/><code class="bg-gray-800 px-1 rounded text-green-300 mt-1 inline-block">"Hi! This is an AI assistant calling from Legacy Financial. Is this a good time to chat for 30 seconds?"</code></p>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="w-6 h-6 bg-brand-700 rounded-full flex items-center justify-center text-xs font-bold text-white">3</span>
+                <strong class="text-white">Edit the main question</strong>
+              </div>
+              <p class="text-xs text-gray-400 ml-8">Click "Main Question" on canvas. Set speak text to:<br/><code class="bg-gray-800 px-1 rounded text-green-300 mt-1 inline-block">"Great! Are you currently looking at any life insurance or retirement options?"</code></p>
+            </div>
+          </div>
+          <div class="mt-3 bg-blue-900/30 border border-blue-700 rounded-lg p-3">
+            <p class="text-xs text-blue-200"><strong>What you have so far:</strong> A greeting that auto-advances to a question. The fallback edge on Main Question will re-ask if it doesn't understand. But we need edges for "yes" and "no"!</p>
+          </div>
+        </div>
+
+        <!-- Step 8: Build a Sample Tree (Part 2) -->
+        <div class="tutorial-step hidden" data-step="7">
+          <h3 class="text-base font-semibold text-brand-300 mb-3">🛠️ Try It: Add Edges &amp; a Transfer</h3>
+          <p class="text-sm text-gray-300 mb-3">Now let's make the tree actually <em>route</em> based on what the caller says:</p>
+          <div class="bg-gray-900 rounded-lg p-4 border border-gray-700 space-y-4 text-sm">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="w-6 h-6 bg-brand-700 rounded-full flex items-center justify-center text-xs font-bold text-white">4</span>
+                <strong class="text-white">Add a "yes" edge</strong>
+              </div>
+              <p class="text-xs text-gray-400 ml-8">With "Main Question" selected, click <strong class="text-purple-300">"+ Add Edge"</strong> in the right panel. Name it <code class="bg-gray-800 px-1 rounded text-green-300">"interested"</code>.</p>
+              <p class="text-xs text-gray-400 ml-8 mt-1">Set its <strong>Match</strong> to: <code class="bg-gray-800 px-1 rounded text-green-300">\b(yes|yeah|sure|looking|interested)\b</code></p>
+              <p class="text-xs text-gray-400 ml-8 mt-1">Set its <strong>Speak</strong> to: <code class="bg-gray-800 px-1 rounded text-green-300">"Wonderful! Let me connect you with one of our advisors."</code></p>
+              <p class="text-xs text-gray-400 ml-8 mt-1">Set <strong>Action</strong> to: <code class="bg-gray-800 px-1 rounded text-green-300">transfer</code></p>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="w-6 h-6 bg-brand-700 rounded-full flex items-center justify-center text-xs font-bold text-white">5</span>
+                <strong class="text-white">Add a "no" edge</strong>
+              </div>
+              <p class="text-xs text-gray-400 ml-8">Click "+ Add Edge" again. Name: <code class="bg-gray-800 px-1 rounded text-green-300">"not_interested"</code></p>
+              <p class="text-xs text-gray-400 ml-8 mt-1"><strong>Match:</strong> <code class="bg-gray-800 px-1 rounded text-green-300">\b(no|not really|don't think so|nah)\b</code></p>
+              <p class="text-xs text-gray-400 ml-8 mt-1"><strong>Speak:</strong> <code class="bg-gray-800 px-1 rounded text-green-300">"No problem at all. Thanks for your time! Have a great day."</code></p>
+              <p class="text-xs text-gray-400 ml-8 mt-1"><strong>Action:</strong> <code class="bg-gray-800 px-1 rounded text-green-300">hangup</code></p>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="w-6 h-6 bg-green-700 rounded-full flex items-center justify-center text-xs font-bold text-white">6</span>
+                <strong class="text-white">Check compliance &amp; save</strong>
+              </div>
+              <p class="text-xs text-gray-400 ml-8">Look at the compliance panel on the left — your tree should now pass all 4 checks (AI disclosure ✅, opt-out ✅, no deception ✅, terminal paths ✅). Hit <strong class="text-brand-300">Save</strong>!</p>
+            </div>
+          </div>
+          <div class="mt-3 bg-green-900/30 border border-green-700 rounded-lg p-3">
+            <p class="text-xs text-green-200"><strong>🎉 You built a complete call script!</strong> It greets the caller, asks if they're interested, transfers "yes" to a human, and politely ends "no" calls. To use it live, click Deploy.</p>
+          </div>
+          <div class="mt-2 bg-gray-900/50 border border-gray-700 rounded-lg p-3">
+            <p class="text-xs text-gray-400"><strong>Next steps:</strong> Add more nodes (+ Add Node), insert questions for age/zip/beneficiary, set conversational mode so off-script chatter doesn't derail the call, and build out branching logic. The active sales tree has 12 nodes — you'll get there!</p>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Footer -->
     <div class="px-6 py-3 border-t border-gray-700 flex items-center justify-between bg-gray-800/50">
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-3">
         <span id="tutorial-dots" class="flex gap-1"></span>
+        <button id="tutorial-skip" class="text-xs text-gray-500 hover:text-gray-300 underline">Skip tutorial</button>
       </div>
       <div class="flex items-center gap-2">
         <button id="tutorial-prev" class="px-3 py-1.5 bg-gray-700 text-gray-300 text-xs rounded hover:bg-gray-600 disabled:opacity-30" disabled>← Back</button>
@@ -430,7 +506,7 @@ const userEmail = session.email;
   // ═══════════════════════════════════════════════════════════════
   const TUTORIAL_KEY = 'voice-editor-tutorial-seen';
   let tutorialStep = 0;
-  const totalSteps = 6;
+  const totalSteps = 8;
 
   function initTutorial() {
     const modal = document.getElementById('tutorial-modal')!;
@@ -450,6 +526,7 @@ const userEmail = session.email;
     document.getElementById('btn-help')?.addEventListener('click', showTutorial);
     document.getElementById('tutorial-close')?.addEventListener('click', closeTutorial);
     document.getElementById('tutorial-done')?.addEventListener('click', closeTutorial);
+    document.getElementById('tutorial-skip')?.addEventListener('click', closeTutorial);
     document.getElementById('tutorial-next')?.addEventListener('click', () => goToStep(tutorialStep + 1));
     document.getElementById('tutorial-prev')?.addEventListener('click', () => goToStep(tutorialStep - 1));
 

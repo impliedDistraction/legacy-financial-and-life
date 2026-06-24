@@ -1,7 +1,6 @@
 import type { APIRoute } from 'astro';
 import { verifySessionCookie } from '../../lib/ai-demo-auth';
-
-const VOICE_BRIDGE_URL = import.meta.env.VOICE_BRIDGE_URL?.trim() || 'http://localhost:3380';
+import { bridgeFetch } from '../../lib/voice-bridge';
 
 export const prerender = false;
 
@@ -26,7 +25,7 @@ export const GET: APIRoute = async ({ request, url }) => {
   }
 
   try {
-    const res = await fetch(`${VOICE_BRIDGE_URL}/session/${sessionId}/transcript`);
+    const res = await bridgeFetch(`/session/${sessionId}/transcript`);
     const data = await res.json();
     return new Response(JSON.stringify(data), {
       status: res.status,
