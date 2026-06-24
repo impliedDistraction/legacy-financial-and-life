@@ -56,18 +56,25 @@ const userEmail = session.email;
   </header>
 
   <div class="flex h-[calc(100vh-44px)]">
-    <!-- Left Panel: Node List -->
-    <aside class="w-64 bg-gray-800 border-r border-gray-700 overflow-y-auto flex-shrink-0">
-      <div class="p-3">
-        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Nodes</h3>
-        <div id="node-list" class="space-y-1"></div>
-        <button id="btn-add-node" class="mt-3 w-full px-3 py-2 border border-dashed border-gray-600 rounded-lg text-xs text-gray-400 hover:border-gray-400 hover:text-gray-200 transition-colors">
-          + Add Node
-        </button>
-        <div class="flex gap-1 mt-1">
-          <button id="btn-add-group" class="flex-1 px-2 py-1.5 border border-dashed border-purple-700 rounded text-[10px] text-purple-400 hover:border-purple-500 hover:text-purple-300 transition-colors">
-            + Group
+    <!-- Left Panel: Tabbed (Nodes / Trees) -->
+    <aside class="w-64 bg-gray-800 border-r border-gray-700 overflow-y-auto flex-shrink-0 flex flex-col">
+      <!-- Tab Headers -->
+      <div class="flex border-b border-gray-700 flex-shrink-0">
+        <button id="tab-nodes" class="flex-1 px-3 py-2 text-xs font-semibold text-brand-300 border-b-2 border-brand-400 bg-gray-800" data-tab="nodes">Nodes</button>
+        <button id="tab-trees" class="flex-1 px-3 py-2 text-xs font-semibold text-gray-500 border-b-2 border-transparent hover:text-gray-300" data-tab="trees">Trees</button>
+      </div>
+
+      <!-- Nodes Tab -->
+      <div id="panel-nodes" class="flex-1 overflow-y-auto">
+        <div class="p-3">
+          <div id="node-list" class="space-y-1"></div>
+          <button id="btn-add-node" class="mt-3 w-full px-3 py-2 border border-dashed border-gray-600 rounded-lg text-xs text-gray-400 hover:border-gray-400 hover:text-gray-200 transition-colors">
+            + Add Node
           </button>
+          <div class="flex gap-1 mt-1">
+            <button id="btn-add-group" class="flex-1 px-2 py-1.5 border border-dashed border-purple-700 rounded text-[10px] text-purple-400 hover:border-purple-500 hover:text-purple-300 transition-colors">
+              + Group
+            </button>
           <button id="btn-import-nodes" class="flex-1 px-2 py-1.5 border border-dashed border-green-700 rounded text-[10px] text-green-400 hover:border-green-500 hover:text-green-300 transition-colors">
             ↓ Import
           </button>
@@ -114,6 +121,37 @@ const userEmail = session.email;
           <div class="flex items-center gap-2" id="check-optout"><span class="w-4">⏳</span> Opt-out Available</div>
           <div class="flex items-center gap-2" id="check-no-deception"><span class="w-4">⏳</span> No Deception</div>
           <div class="flex items-center gap-2" id="check-terminal"><span class="w-4">⏳</span> Has Terminal Paths</div>
+        </div>
+      </div>
+      </div><!-- /panel-nodes -->
+
+      <!-- Trees Tab -->
+      <div id="panel-trees" class="flex-1 overflow-y-auto hidden">
+        <div class="p-3">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">All Trees</h3>
+            <button id="btn-new-tree-tab" class="text-[10px] text-brand-400 hover:text-brand-300">+ New</button>
+          </div>
+          <div id="trees-list" class="space-y-1">
+            <div class="text-xs text-gray-500 py-4 text-center">Loading...</div>
+          </div>
+        </div>
+        <div class="p-3 border-t border-gray-700">
+          <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Filter</h3>
+          <select id="trees-filter-status" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 mb-1">
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="draft">Draft</option>
+            <option value="testing">Testing</option>
+            <option value="archived">Archived</option>
+          </select>
+          <select id="trees-filter-category" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200">
+            <option value="">All categories</option>
+            <option value="sales">Sales</option>
+            <option value="recruitment">Recruitment</option>
+            <option value="client_outreach">Client Outreach</option>
+            <option value="custom">Custom</option>
+          </select>
         </div>
       </div>
     </aside>
@@ -179,8 +217,44 @@ const userEmail = session.email;
             <option value="transfer">Transfer to Agent</option>
             <option value="hangup">Hang Up</option>
             <option value="book">Book Meeting</option>
-            <option value="llm_fallback">LLM Fallback</option>
+            <option value="llm_fallback">LLM Fallback (permanent)</option>
+            <option value="llm_gather">LLM Gather (reason &amp; return)</option>
           </select>
+          <p id="action-hint" class="text-[10px] text-gray-500 mt-0.5 hidden"></p>
+        </div>
+
+        <!-- LLM Gather Settings (shown when action=llm_gather) -->
+        <div class="mb-3 border border-amber-700/50 rounded-lg p-3 hidden" id="gather-settings">
+          <h4 class="text-xs font-semibold text-amber-300 mb-2">🧠 LLM Gather Settings</h4>
+          <p class="text-[10px] text-gray-400 mb-2">The AI will listen, reason about the response, extract info, then return to a specific node. Good for complex answers, stories, or multi-part gathering.</p>
+          <div class="space-y-2">
+            <div>
+              <label class="block text-[10px] text-gray-500 mb-0.5">Tone</label>
+              <select id="edit-gather-tone" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-0.5 text-xs text-gray-200">
+                <option value="professional">Professional (sales/recruiting)</option>
+                <option value="empathetic">Empathetic (client outreach)</option>
+                <option value="neutral">Neutral (data collection)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-gray-500 mb-0.5">Max LLM Turns (before redirect)</label>
+              <input id="edit-gather-max-turns" type="number" min="1" max="8" value="3" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-0.5 text-xs text-gray-200" />
+            </div>
+            <div>
+              <label class="block text-[10px] text-gray-500 mb-0.5">Return To Node (after gathering)</label>
+              <select id="edit-gather-return" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-0.5 text-xs text-gray-200">
+                <option value="">— Next in tree —</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[10px] text-gray-500 mb-0.5">Slots to Extract (one per line: slotName = description)</label>
+              <textarea id="edit-gather-slots" rows="3" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-0.5 text-[10px] font-mono text-gray-200" placeholder="age = their age in years&#10;family_situation = single, married, kids&#10;concern = what they're worried about"></textarea>
+            </div>
+            <div>
+              <label class="block text-[10px] text-gray-500 mb-0.5">LLM Context Prompt</label>
+              <textarea id="edit-gather-prompt" rows="2" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-0.5 text-[10px] text-gray-200" placeholder="Listen carefully and acknowledge their story. Extract key details about their family and insurance needs."></textarea>
+            </div>
+          </div>
         </div>
 
         <!-- Direct Next -->
@@ -1162,39 +1236,10 @@ const userEmail = session.email;
   });
 
   // ═══════════════════════════════════════════════════════════════
-  // ADD NODE
+  // ADD NODE (opens wizard)
   // ═══════════════════════════════════════════════════════════════
   document.getElementById('btn-add-node')?.addEventListener('click', () => {
-    const id = prompt('Node ID (snake_case):');
-    if (!id || !currentTree || currentTree[id]) return;
-    
-    // Deselect current node first
-    selectedNode = null;
-    document.getElementById('node-editor')!.classList.add('hidden');
-
-    currentTree[id] = {
-      speak: [""],
-      edges: {
-        _fallback: { speak: ["Could you repeat that?"], next: id }
-      }
-    };
-    
-    // Position new node in viewport center (accounting for zoom and pan)
-    const canvas = document.getElementById('canvas')!;
-    const viewCenterX = (canvas.scrollLeft + canvas.clientWidth / 2) / zoom;
-    const viewCenterY = (canvas.scrollTop + canvas.clientHeight / 2) / zoom;
-    nodePositions.set(id, { x: viewCenterX - NODE_W / 2, y: viewCenterY - NODE_H / 2 });
-    
-    markDirty();
-    renderCanvas();
-    renderNodeList();
-    selectNode(id);
-
-    // Scroll the new node into view
-    setTimeout(() => {
-      const nodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement;
-      if (nodeEl) nodeEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-    }, 50);
+    showNewNodeWizard();
   });
 
   // Delete node
@@ -1694,6 +1739,520 @@ const userEmail = session.email;
     });
     input.click();
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // LEFT SIDEBAR TABS (Nodes / Trees)
+  // ═══════════════════════════════════════════════════════════════
+  let allTrees: any[] = [];
+
+  document.querySelectorAll('[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = (btn as HTMLElement).dataset.tab;
+      // Toggle active styling
+      document.querySelectorAll('[data-tab]').forEach(b => {
+        (b as HTMLElement).className = `flex-1 px-3 py-2 text-xs font-semibold border-b-2 ${
+          (b as HTMLElement).dataset.tab === tab 
+            ? 'text-brand-300 border-brand-400 bg-gray-800' 
+            : 'text-gray-500 border-transparent hover:text-gray-300'
+        }`;
+      });
+      // Show/hide panels
+      document.getElementById('panel-nodes')!.classList.toggle('hidden', tab !== 'nodes');
+      document.getElementById('panel-trees')!.classList.toggle('hidden', tab !== 'trees');
+
+      if (tab === 'trees') refreshTreesList();
+    });
+  });
+
+  async function refreshTreesList() {
+    try {
+      const res = await fetch('/api/voice-dialog-tree?list=true');
+      if (!res.ok) return;
+      const data = await res.json();
+      allTrees = data.trees || [];
+      renderTreesList();
+    } catch {}
+  }
+
+  function renderTreesList() {
+    const list = document.getElementById('trees-list')!;
+    const statusFilter = (document.getElementById('trees-filter-status') as HTMLSelectElement).value;
+    const catFilter = (document.getElementById('trees-filter-category') as HTMLSelectElement).value;
+    
+    let filtered = allTrees;
+    if (statusFilter) filtered = filtered.filter(t => t.status === statusFilter);
+    if (catFilter) filtered = filtered.filter(t => t.category === catFilter);
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<div class="text-xs text-gray-500 py-4 text-center">No trees found</div>';
+      return;
+    }
+
+    list.innerHTML = filtered.map(t => {
+      const isActive = t.id === currentTreeId;
+      const statusIcon = t.status === 'active' ? '🟢' : t.status === 'testing' ? '🟡' : t.status === 'archived' ? '⚫' : '⚪';
+      return `<div class="px-2 py-2 rounded cursor-pointer text-xs transition-colors ${isActive ? 'bg-brand-600/30 border border-brand-500/50' : 'hover:bg-gray-700 border border-transparent'}" data-tree-id="${t.id}">
+        <div class="flex items-center gap-2">
+          <span class="text-[10px]">${statusIcon}</span>
+          <span class="font-medium text-gray-200 truncate flex-1">${t.name}</span>
+        </div>
+        <div class="flex items-center gap-2 mt-0.5 ml-5">
+          <span class="text-[10px] text-gray-500">${t.category || 'custom'}</span>
+          <span class="text-[10px] text-gray-600">•</span>
+          <span class="text-[10px] text-gray-500">${t.node_count || '?'} nodes</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Click to load tree
+    list.querySelectorAll('[data-tree-id]').forEach(el => {
+      el.addEventListener('click', async () => {
+        const id = (el as HTMLElement).dataset.treeId;
+        if (!id) return;
+        if (isDirty && !confirm('Discard unsaved changes?')) return;
+        try {
+          const res = await fetch(`/api/voice-dialog-tree?id=${id}`);
+          if (res.ok) {
+            const data = await res.json();
+            currentTree = data.tree_data;
+            currentTreeId = data.id;
+            currentSlug = data.slug;
+            (document.getElementById('tree-name') as HTMLInputElement).value = data.name;
+            (document.getElementById('tree-category') as HTMLSelectElement).value = data.category || 'custom';
+            (document.getElementById('tree-status') as HTMLSelectElement).value = data.status || 'draft';
+            isDirty = false;
+            selectedNode = null;
+            document.getElementById('node-editor')!.classList.add('hidden');
+            document.getElementById('save-status')!.textContent = 'Loaded';
+            document.getElementById('save-status')!.className = 'text-xs text-gray-500';
+            initEditor();
+            renderTreesList(); // Refresh to show active highlight
+            // Switch back to nodes tab
+            (document.querySelector('[data-tab="nodes"]') as HTMLElement)?.click();
+          }
+        } catch {}
+      });
+    });
+  }
+
+  // Filter change handlers
+  document.getElementById('trees-filter-status')?.addEventListener('change', renderTreesList);
+  document.getElementById('trees-filter-category')?.addEventListener('change', renderTreesList);
+  document.getElementById('btn-new-tree-tab')?.addEventListener('click', () => {
+    document.getElementById('btn-new-tree')?.click();
+    (document.querySelector('[data-tab="nodes"]') as HTMLElement)?.click();
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // LLM GATHER SETTINGS TOGGLE
+  // ═══════════════════════════════════════════════════════════════
+  const ACTION_HINTS: Record<string, string> = {
+    transfer: 'Ends AI conversation and live-transfers to a human agent.',
+    hangup: 'Politely ends the call.',
+    book: 'Sends Calendly link and ends with booking CTA.',
+    llm_fallback: 'Permanently hands off to LLM. No return to tree.',
+    llm_gather: 'LLM listens and reasons, extracts slots, then returns to tree.',
+  };
+
+  document.getElementById('edit-action')?.addEventListener('change', () => {
+    const val = (document.getElementById('edit-action') as HTMLSelectElement).value;
+    const hint = document.getElementById('action-hint')!;
+    const gatherPanel = document.getElementById('gather-settings')!;
+    
+    if (ACTION_HINTS[val]) {
+      hint.textContent = ACTION_HINTS[val];
+      hint.classList.remove('hidden');
+    } else {
+      hint.classList.add('hidden');
+    }
+    
+    gatherPanel.classList.toggle('hidden', val !== 'llm_gather');
+
+    // Populate return-to dropdown
+    if (val === 'llm_gather') {
+      const returnSel = document.getElementById('edit-gather-return') as HTMLSelectElement;
+      returnSel.innerHTML = '<option value="">— Next in tree —</option>' +
+        getTreeNodes().filter(n => n !== selectedNode).map(n => 
+          `<option value="${n}">${n}</option>`
+        ).join('');
+      
+      // Load existing gather config
+      if (selectedNode && currentTree[selectedNode]?.gather) {
+        const g = currentTree[selectedNode].gather;
+        (document.getElementById('edit-gather-tone') as HTMLSelectElement).value = g.tone || 'professional';
+        (document.getElementById('edit-gather-max-turns') as HTMLInputElement).value = String(g.max_turns || 3);
+        returnSel.value = g.return_to || '';
+        (document.getElementById('edit-gather-slots') as HTMLTextAreaElement).value = 
+          (g.slots || []).map((s: any) => `${s.name} = ${s.description}`).join('\n');
+        (document.getElementById('edit-gather-prompt') as HTMLTextAreaElement).value = g.prompt || '';
+      }
+    }
+  });
+
+  // Save gather settings into node
+  ['edit-gather-tone', 'edit-gather-max-turns', 'edit-gather-return', 'edit-gather-slots', 'edit-gather-prompt'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      if (!selectedNode || !currentTree[selectedNode]) return;
+      const node = currentTree[selectedNode];
+      
+      const slotsText = (document.getElementById('edit-gather-slots') as HTMLTextAreaElement).value;
+      const slots = slotsText.split('\n').filter(Boolean).map(line => {
+        const [name, ...desc] = line.split('=');
+        return { name: (name || '').trim(), description: (desc.join('=') || '').trim() };
+      }).filter(s => s.name);
+
+      node.gather = {
+        tone: (document.getElementById('edit-gather-tone') as HTMLSelectElement).value,
+        max_turns: parseInt((document.getElementById('edit-gather-max-turns') as HTMLInputElement).value) || 3,
+        return_to: (document.getElementById('edit-gather-return') as HTMLSelectElement).value || undefined,
+        slots: slots.length > 0 ? slots : undefined,
+        prompt: (document.getElementById('edit-gather-prompt') as HTMLTextAreaElement).value || undefined,
+      };
+      markDirty();
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // RUBBER-BAND SELECTION (box select on canvas)
+  // ═══════════════════════════════════════════════════════════════
+  let boxSelecting = false;
+  let boxStart = { x: 0, y: 0 };
+  let boxEnd = { x: 0, y: 0 };
+  let boxSelectedNodes: Set<string> = new Set();
+  let selectionBox: HTMLElement | null = null;
+
+  const canvas = document.getElementById('canvas')!;
+
+  canvas.addEventListener('mousedown', (e: MouseEvent) => {
+    // Only start box select on left click on empty canvas (not on nodes)
+    const target = e.target as HTMLElement;
+    if (target.id !== 'canvas' && target.id !== 'canvas-svg' && target.id !== 'nodes-layer') return;
+    if (e.button !== 0) return;
+    if (dragging) return;
+
+    boxSelecting = true;
+    boxStart = { x: e.offsetX + canvas.scrollLeft, y: e.offsetY + canvas.scrollTop };
+    boxEnd = { ...boxStart };
+    boxSelectedNodes.clear();
+
+    // Create selection rectangle
+    selectionBox = document.createElement('div');
+    selectionBox.className = 'absolute border-2 border-brand-400 bg-brand-400/10 rounded pointer-events-none z-40';
+    selectionBox.style.cssText = `left:${boxStart.x}px; top:${boxStart.y}px; width:0; height:0;`;
+    document.getElementById('nodes-layer')!.appendChild(selectionBox);
+    e.preventDefault();
+  });
+
+  canvas.addEventListener('mousemove', (e: MouseEvent) => {
+    if (!boxSelecting || !selectionBox) return;
+    boxEnd = { x: e.offsetX + canvas.scrollLeft, y: e.offsetY + canvas.scrollTop };
+    
+    const x = Math.min(boxStart.x, boxEnd.x);
+    const y = Math.min(boxStart.y, boxEnd.y);
+    const w = Math.abs(boxEnd.x - boxStart.x);
+    const h = Math.abs(boxEnd.y - boxStart.y);
+    selectionBox.style.cssText = `left:${x}px; top:${y}px; width:${w}px; height:${h}px;`;
+    
+    // Highlight nodes within box
+    boxSelectedNodes.clear();
+    const rect = { x, y, w, h };
+    for (const [nodeId, pos] of nodePositions) {
+      if (pos.x + NODE_W > rect.x && pos.x < rect.x + rect.w &&
+          pos.y + NODE_H > rect.y && pos.y < rect.y + rect.h) {
+        boxSelectedNodes.add(nodeId);
+      }
+    }
+    
+    // Visual feedback on nodes
+    document.querySelectorAll('[data-node-id]').forEach(el => {
+      const id = (el as HTMLElement).dataset.nodeId!;
+      if (boxSelectedNodes.has(id)) {
+        (el as HTMLElement).style.outline = '2px solid #818cf8';
+      } else {
+        (el as HTMLElement).style.outline = '';
+      }
+    });
+  });
+
+  canvas.addEventListener('mouseup', (e: MouseEvent) => {
+    if (!boxSelecting) return;
+    boxSelecting = false;
+    
+    if (selectionBox) {
+      selectionBox.remove();
+      selectionBox = null;
+    }
+    
+    // Clear outline styles
+    document.querySelectorAll('[data-node-id]').forEach(el => {
+      (el as HTMLElement).style.outline = '';
+    });
+
+    // If we selected multiple nodes, show the group creation prompt
+    if (boxSelectedNodes.size >= 2) {
+      showBoxSelectionActions(boxSelectedNodes);
+    } else if (boxSelectedNodes.size === 1) {
+      selectNode([...boxSelectedNodes][0]);
+    }
+  });
+
+  function showBoxSelectionActions(nodes: Set<string>) {
+    // Show a floating action bar near the selection
+    const positions = [...nodes].map(n => nodePositions.get(n)!).filter(Boolean);
+    const avgX = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+    const minY = Math.min(...positions.map(p => p.y));
+
+    // Remove existing action bar
+    document.getElementById('box-select-actions')?.remove();
+    
+    const bar = document.createElement('div');
+    bar.id = 'box-select-actions';
+    bar.className = 'absolute z-50 flex gap-2 bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 shadow-xl';
+    bar.style.cssText = `left:${avgX}px; top:${minY - 50}px;`;
+    bar.innerHTML = `
+      <span class="text-xs text-gray-300">${nodes.size} selected</span>
+      <button class="box-action px-2 py-0.5 bg-purple-700 text-white text-[10px] rounded hover:bg-purple-600" data-action="group">+ Group</button>
+      <button class="box-action px-2 py-0.5 bg-blue-700 text-white text-[10px] rounded hover:bg-blue-600" data-action="export">↑ Export</button>
+      <button class="box-action px-2 py-0.5 bg-gray-700 text-gray-300 text-[10px] rounded hover:bg-gray-600" data-action="dismiss">✕</button>
+    `;
+    
+    bar.querySelectorAll('.box-action').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = (btn as HTMLElement).dataset.action;
+        if (action === 'group') {
+          const name = prompt('Group name for these nodes:');
+          if (name) {
+            if (!currentTree._groups) currentTree._groups = {};
+            currentTree._groups[name] = {
+              label: name.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+              color: getNextGroupColor(),
+              nodes: [...nodes],
+              collapsed: false,
+            };
+            markDirty();
+            renderCanvas();
+            renderNodeList();
+          }
+        } else if (action === 'export') {
+          // Export all selected nodes
+          const exported: Record<string, any> = {};
+          for (const id of nodes) {
+            if (currentTree[id]) exported[id] = JSON.parse(JSON.stringify(currentTree[id]));
+          }
+          exported._exportMeta = {
+            source_tree: (document.getElementById('tree-name') as HTMLInputElement).value,
+            exported_at: new Date().toISOString(),
+            entry_node: [...nodes][0],
+            node_count: nodes.size,
+          };
+          const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `nodes-selection-${Date.now()}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+        bar.remove();
+      });
+    });
+
+    document.getElementById('nodes-layer')!.appendChild(bar);
+
+    // Dismiss on click elsewhere
+    const dismissOnClick = (e: MouseEvent) => {
+      if (!bar.contains(e.target as Node)) {
+        bar.remove();
+        document.removeEventListener('click', dismissOnClick);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', dismissOnClick), 100);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // + NEW NODE WIZARD (suggests missing nodes)
+  // ═══════════════════════════════════════════════════════════════
+  // Replace the plain prompt-based node creation with a wizard
+  // that analyzes the tree and suggests what's missing.
+
+  function analyzeTreeCompleteness(): { missing: Array<{ id: string; reason: string; category: string }> } {
+    if (!currentTree) return { missing: [] };
+    const nodes = getTreeNodes();
+    const missing: Array<{ id: string; reason: string; category: string }> = [];
+
+    // Check for greeting nodes
+    if (!nodes.includes('greeting_with_name') && !nodes.includes('greeting')) {
+      missing.push({ id: 'greeting_with_name', reason: 'Personalized greeting using {firstName}', category: 'greeting' });
+    }
+    if (!nodes.includes('greeting_no_name')) {
+      missing.push({ id: 'greeting_no_name', reason: 'Fallback greeting when name unknown', category: 'greeting' });
+    }
+
+    // Check for opt-out / DNC
+    if (!nodes.some(n => n.includes('opt_out') || n.includes('dnc') || n.includes('do_not_call'))) {
+      missing.push({ id: 'opt_out', reason: 'Required: handle "remove me" / DNC requests', category: 'compliance' });
+    }
+
+    // Check for wrong person
+    if (!nodes.some(n => n.includes('wrong_person'))) {
+      missing.push({ id: 'wrong_person', reason: 'Handle "that\'s not me" responses', category: 'routing' });
+    }
+
+    // Check for terminal nodes
+    if (!nodes.some(n => currentTree[n]?.action === 'transfer')) {
+      missing.push({ id: 'transfer_to_agent', reason: 'Happy path: transfer interested callers', category: 'terminal' });
+    }
+    if (!nodes.some(n => currentTree[n]?.action === 'hangup' || n.includes('goodbye'))) {
+      missing.push({ id: 'polite_goodbye', reason: 'Graceful call ending', category: 'terminal' });
+    }
+
+    // Check for identity confirmation
+    if (!nodes.some(n => n.includes('identity') || n.includes('confirm_name'))) {
+      missing.push({ id: 'identity_check', reason: 'Confirm you\'re speaking to the right person', category: 'opening' });
+    }
+
+    // Check for qualification question
+    const category = (document.getElementById('tree-category') as HTMLSelectElement).value;
+    if (category === 'sales' || category === 'recruitment') {
+      if (!nodes.some(n => n.includes('interest') || n.includes('pitch'))) {
+        missing.push({ id: 'interest_check', reason: 'Ask if they\'re open to hearing more', category: 'qualifying' });
+      }
+    }
+
+    // Check for objection handling
+    if (!nodes.some(n => n.includes('objection') || n.includes('not_interested'))) {
+      missing.push({ id: 'not_interested', reason: 'Handle "not interested" gracefully', category: 'objection' });
+    }
+
+    // Check for time/scheduling
+    if (!nodes.some(n => n.includes('schedule') || n.includes('callback') || n.includes('busy'))) {
+      missing.push({ id: 'busy_callback', reason: 'Handle "I\'m busy, call back later"', category: 'routing' });
+    }
+
+    // Check for gather node (empathetic listening)
+    if (category === 'client_outreach') {
+      if (!nodes.some(n => currentTree[n]?.action === 'llm_gather')) {
+        missing.push({ id: 'gather_needs', reason: 'Listen and understand client needs (LLM reasoning)', category: 'gathering' });
+      }
+    }
+
+    return { missing };
+  }
+
+  // Override the add-node button behavior is handled above (ADD NODE section)
+
+  function showNewNodeWizard() {
+    const { missing } = analyzeTreeCompleteness();
+    
+    // Create wizard modal
+    const modal = document.createElement('div');
+    modal.id = 'new-node-wizard';
+    modal.className = 'fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm';
+    
+    const suggestions = missing.length > 0 ? `
+      <div class="mb-4">
+        <h4 class="text-xs font-semibold text-amber-300 mb-2">💡 Suggested (missing from your tree)</h4>
+        <div class="space-y-1 max-h-48 overflow-y-auto">
+          ${missing.map(m => `
+            <button class="wizard-suggest w-full text-left px-3 py-2 bg-gray-700/50 border border-gray-600 rounded hover:bg-gray-700 hover:border-gray-500 transition-colors" data-id="${m.id}">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-mono text-gray-200">${m.id}</span>
+                <span class="text-[9px] px-1.5 py-0.5 rounded bg-gray-600 text-gray-300">${m.category}</span>
+              </div>
+              <p class="text-[10px] text-gray-400 mt-0.5">${m.reason}</p>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    ` : '<p class="text-xs text-green-300 mb-4">✅ Your tree looks complete! All standard nodes present.</p>';
+
+    modal.innerHTML = `
+      <div class="bg-gray-800 border border-gray-600 rounded-xl shadow-2xl w-[420px] mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+        <div class="px-5 py-3 border-b border-gray-700 flex items-center justify-between">
+          <h3 class="text-sm font-semibold text-white">+ Add Node</h3>
+          <button id="wizard-close" class="text-gray-400 hover:text-white text-lg leading-none">&times;</button>
+        </div>
+        <div class="px-5 py-4 overflow-y-auto">
+          ${suggestions}
+          <div>
+            <h4 class="text-xs font-semibold text-gray-300 mb-2">Custom Node</h4>
+            <div class="flex gap-2">
+              <input id="wizard-custom-id" type="text" class="flex-1 bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-gray-200 font-mono" placeholder="node_id_snake_case" />
+              <button id="wizard-custom-btn" class="px-3 py-1.5 bg-brand-600 text-white text-xs rounded hover:bg-brand-700">Create</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+
+    // Close handlers
+    modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.remove(); });
+    modal.querySelector('#wizard-close')?.addEventListener('click', () => modal.remove());
+
+    // Suggestion click
+    modal.querySelectorAll('.wizard-suggest').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = (btn as HTMLElement).dataset.id!;
+        createNodeFromWizard(id, missing.find(m => m.id === id)?.category || 'custom');
+        modal.remove();
+      });
+    });
+
+    // Custom node
+    modal.querySelector('#wizard-custom-btn')?.addEventListener('click', () => {
+      const id = (modal.querySelector('#wizard-custom-id') as HTMLInputElement).value.trim();
+      if (!id) return;
+      if (currentTree[id]) { alert('Node already exists!'); return; }
+      createNodeFromWizard(id, 'custom');
+      modal.remove();
+    });
+
+    // Enter in custom field
+    modal.querySelector('#wizard-custom-id')?.addEventListener('keydown', (ev: any) => {
+      if (ev.key === 'Enter') modal.querySelector('#wizard-custom-btn')?.dispatchEvent(new Event('click'));
+    });
+  }
+
+  function createNodeFromWizard(id: string, category: string) {
+    if (!currentTree) return;
+
+    // Create with sensible defaults based on category
+    const templates: Record<string, any> = {
+      greeting: { speak: ["Hi, is this {firstName}?"], next: '' },
+      compliance: { speak: ["No problem at all — I'll make sure you're removed from our list. Have a great day."], action: 'hangup' },
+      terminal: { speak: ["Let me connect you with someone who can help."], action: id.includes('transfer') ? 'transfer' : 'hangup' },
+      routing: { speak: ["Oh, I apologize for the confusion!"], action: 'hangup' },
+      opening: { speak: ["Great, glad I reached you!"], edges: { confirmed: { match_regex: "\\b(yes|yeah|that's me|speaking)\\b", next: '' }, wrong: { match_regex: "\\b(no|wrong|not me)\\b", next: 'wrong_person' }, _fallback: { speak: ["Sorry, could you say that again?"], next: id } } },
+      qualifying: { speak: ["I wanted to reach out because we've been helping people in your area with their coverage options. Do you have a quick minute?"], edges: { interested: { match_regex: "\\b(yes|sure|okay|go ahead)\\b", next: '' }, not_interested: { match_regex: "\\b(no|not interested|busy)\\b", next: 'not_interested' }, _fallback: { speak: ["No worries either way — just a quick question."], next: id } } },
+      objection: { speak: ["I completely understand. Would it be better if I called back at a different time, or would you prefer I didn't call again?"], edges: { callback: { match_regex: "\\b(call back|later|another time)\\b", next: 'busy_callback' }, remove: { match_regex: "\\b(don't call|remove|no)\\b", next: 'opt_out' }, _fallback: { speak: ["No pressure at all."], next: 'polite_goodbye' } } },
+      gathering: { speak: ["Tell me a bit about what's on your mind — I'm here to listen."], action: 'llm_gather', gather: { tone: 'empathetic', max_turns: 4, slots: [{ name: 'concern', description: 'what they are worried about' }] } },
+      custom: { speak: [""], edges: { _fallback: { speak: ["Could you repeat that?"], next: id } } },
+    };
+
+    currentTree[id] = templates[category] || templates.custom;
+    
+    // Position in viewport center
+    const canvasEl = document.getElementById('canvas')!;
+    const viewCenterX = (canvasEl.scrollLeft + canvasEl.clientWidth / 2) / zoom;
+    const viewCenterY = (canvasEl.scrollTop + canvasEl.clientHeight / 2) / zoom;
+    nodePositions.set(id, { x: viewCenterX - NODE_W / 2, y: viewCenterY - NODE_H / 2 });
+    
+    // Deselect previous and select new
+    selectedNode = null;
+    document.getElementById('node-editor')!.classList.add('hidden');
+    
+    markDirty();
+    renderCanvas();
+    renderNodeList();
+    selectNode(id);
+
+    setTimeout(() => {
+      const nodeEl = document.querySelector(`[data-node-id="${id}"]`) as HTMLElement;
+      if (nodeEl) nodeEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    }, 50);
+  }
 })();
 </script>
 
