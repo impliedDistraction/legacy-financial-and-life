@@ -257,6 +257,24 @@ const userEmail = session.email;
           </div>
         </div>
 
+        <!-- LLM Gather Escape Paths (shown when action=llm_gather and has history) -->
+        <div class="mb-3 border border-cyan-700/50 rounded-lg p-3 hidden" id="gather-escape-paths">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-xs font-semibold text-cyan-300">🧭 Escape Paths</h4>
+            <button id="btn-refresh-insights" class="text-[9px] text-gray-400 hover:text-gray-200">↻ Refresh</button>
+          </div>
+          <p class="text-[10px] text-gray-400 mb-2">How callers navigated this gather node in real calls.</p>
+          <div id="escape-paths-content" class="space-y-2 text-[10px]">
+            <div class="text-gray-500 italic">Loading insights...</div>
+          </div>
+          <!-- Unhandled patterns section -->
+          <div id="unhandled-patterns" class="mt-3 border-t border-gray-600 pt-2 hidden">
+            <h5 class="text-[10px] font-semibold text-amber-300 mb-1">💡 Unhandled Patterns</h5>
+            <p class="text-[9px] text-gray-500 mb-1">Repeated phrases that could become tree edges:</p>
+            <div id="unhandled-list" class="space-y-1"></div>
+          </div>
+        </div>
+
         <!-- Direct Next -->
         <div class="mb-3">
           <label class="block text-xs text-gray-500 mb-0.5">Direct Next (for greeting nodes)</label>
@@ -1158,8 +1176,34 @@ const userEmail = session.email;
     // Edges
     renderEdgesEditor(node.edges || {});
     updateTtsPreview();
+    loadEscapePaths(nodeId);
     renderCanvas();
     renderNodeList();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // INTENT LIBRARY (loaded once for Smart Match)
+  // ═══════════════════════════════════════════════════════════════
+  let intentLibrary: Record<string, any> = {};
+  let intentLibraryLoaded = false;
+
+  async function loadIntentLibrary() {
+    if (intentLibraryLoaded) return;
+    try {
+      const res = await fetch('/api/voice-intent-expand');
+      if (res.ok) {
+        const data = await res.json();
+        intentLibrary = data.intents || {};
+        intentLibraryLoaded = true;
+      }
+    } catch {}
+  }
+  loadIntentLibrary();
+
+  function getIntentOptions(): string {
+    return Object.entries(intentLibrary).map(([key, intent]: [string, any]) =>
+      `<option value="${key}">${intent.label || key}</option>`
+    ).join('');
   }
 
   function renderEdgesEditor(edges: Record<string, any>) {
@@ -1168,6 +1212,10 @@ const userEmail = session.email;
     
     container.innerHTML = edgeEntries.map(([name, edge]: [string, any]) => {
       const isFallback = name === '_fallback';
+      const matchMode = edge.match_intent ? 'intent' : (edge.match_fn ? 'function' : 'regex');
+      const intentOpts = getIntentOptions();
+      const extrasList = (edge.match_extras || []).join(', ');
+
       return `<div class="bg-gray-700/50 border border-gray-600 rounded-lg p-2 space-y-1" data-edge-name="${name}">
         <div class="flex items-center justify-between">
           <input type="text" value="${name}" class="bg-transparent text-xs font-mono text-gray-200 w-24 border-b border-gray-600 focus:border-brand-400 edge-name-input" ${isFallback ? 'readonly' : ''} />
@@ -1175,10 +1223,49 @@ const userEmail = session.email;
             ${!isFallback ? `<button class="text-xs text-red-400 hover:text-red-300 edge-delete-btn">✕</button>` : ''}
           </div>
         </div>
+        ${!isFallback ? `
         <div>
-          <label class="text-[10px] text-gray-500">Match (regex)</label>
-          <input type="text" value="${edge.match_regex || ''}" class="w-full bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-[10px] font-mono text-gray-300 edge-regex-input" placeholder="\\b(yes|yeah)\\b" />
+          <label class="text-[10px] text-gray-500">Match Mode</label>
+          <div class="flex gap-1 mt-0.5">
+            <button class="edge-mode-btn px-1.5 py-0.5 text-[9px] rounded ${matchMode === 'intent' ? 'bg-purple-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'}" data-mode="intent">Intent</button>
+            <button class="edge-mode-btn px-1.5 py-0.5 text-[9px] rounded ${matchMode === 'regex' ? 'bg-purple-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'}" data-mode="regex">Regex</button>
+            <button class="edge-mode-btn px-1.5 py-0.5 text-[9px] rounded ${matchMode === 'function' ? 'bg-purple-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'}" data-mode="function">Function</button>
+          </div>
         </div>
+        <div class="edge-match-panel" data-active-mode="${matchMode}">
+          <!-- Intent mode -->
+          <div class="edge-mode-content ${matchMode === 'intent' ? '' : 'hidden'}" data-for-mode="intent">
+            <label class="text-[10px] text-gray-500">Intent</label>
+            <select class="w-full bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-[10px] text-gray-300 edge-intent-select">
+              <option value="">— Select intent —</option>
+              ${intentOpts}
+            </select>
+            <label class="text-[10px] text-gray-500 mt-1 block">Extras (comma-separated)</label>
+            <input type="text" value="${extrasList}" class="w-full bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-[10px] text-gray-300 edge-extras-input" placeholder="also, totally, bet" />
+            <div class="text-[9px] text-gray-500 mt-0.5 font-mono edge-intent-preview truncate">${edge.match_regex ? '/' + (edge.match_regex.length > 50 ? edge.match_regex.slice(0, 50) + '…' : edge.match_regex) + '/' : ''}</div>
+            <button class="edge-expand-btn mt-1 px-2 py-0.5 bg-amber-800 text-amber-200 text-[9px] rounded hover:bg-amber-700">🧠 Expand with LLM</button>
+          </div>
+          <!-- Regex mode -->
+          <div class="edge-mode-content ${matchMode === 'regex' ? '' : 'hidden'}" data-for-mode="regex">
+            <label class="text-[10px] text-gray-500">Match (regex)</label>
+            <input type="text" value="${edge.match_regex || ''}" class="w-full bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-[10px] font-mono text-gray-300 edge-regex-input" placeholder="\\b(yes|yeah)\\b" />
+          </div>
+          <!-- Function mode -->
+          <div class="edge-mode-content ${matchMode === 'function' ? '' : 'hidden'}" data-for-mode="function">
+            <label class="text-[10px] text-gray-500">Built-in Function</label>
+            <select class="w-full bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-[10px] text-gray-300 edge-fn-select">
+              <option value="">—</option>
+              <option value="isAffirmative" ${edge.match_fn === 'isAffirmative' ? 'selected' : ''}>isAffirmative</option>
+              <option value="isNegative" ${edge.match_fn === 'isNegative' ? 'selected' : ''}>isNegative</option>
+              <option value="isConversational" ${edge.match_fn === 'isConversational' ? 'selected' : ''}>isConversational</option>
+              <option value="isSentimentPositive" ${edge.match_fn === 'isSentimentPositive' ? 'selected' : ''}>isSentimentPositive</option>
+              <option value="isSentimentNegative" ${edge.match_fn === 'isSentimentNegative' ? 'selected' : ''}>isSentimentNegative</option>
+            </select>
+          </div>
+        </div>
+        ` : `
+        <div class="text-[10px] text-gray-500 italic">Catches unmatched responses</div>
+        `}
         <div>
           <label class="text-[10px] text-gray-500">Speak</label>
           <input type="text" value="${Array.isArray(edge.speak) ? edge.speak[0] || '' : ''}" class="w-full bg-gray-800 border border-gray-600 rounded px-1.5 py-0.5 text-[10px] text-gray-300 edge-speak-input" placeholder="Response text..." />
@@ -1204,13 +1291,43 @@ const userEmail = session.email;
       </div>`;
     }).join('');
 
-    // Attach edge field event listeners via delegation
-    container.querySelectorAll('.edge-regex-input, .edge-speak-input, .edge-next-select, .edge-action-select, .edge-name-input').forEach(el => {
+    // Set selected intent values (must be done after innerHTML is set)
+    edgeEntries.forEach(([name, edge]: [string, any]) => {
+      if (edge.match_intent) {
+        const div = container.querySelector(`[data-edge-name="${name}"]`);
+        const select = div?.querySelector('.edge-intent-select') as HTMLSelectElement;
+        if (select) select.value = edge.match_intent;
+      }
+    });
+
+    // Attach edge field event listeners
+    container.querySelectorAll('.edge-regex-input, .edge-speak-input, .edge-next-select, .edge-action-select, .edge-name-input, .edge-intent-select, .edge-extras-input, .edge-fn-select').forEach(el => {
       el.addEventListener('change', () => applyEdgeEdits());
     });
-    container.querySelectorAll('.edge-regex-input, .edge-speak-input, .edge-name-input').forEach(el => {
+    container.querySelectorAll('.edge-regex-input, .edge-speak-input, .edge-name-input, .edge-extras-input').forEach(el => {
       el.addEventListener('input', debounce(() => applyEdgeEdits(), 500));
     });
+
+    // Mode toggle buttons
+    container.querySelectorAll('.edge-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = (btn as HTMLElement).dataset.mode!;
+        const panel = (btn as HTMLElement).closest('.bg-gray-700\\/50')!;
+        // Update button styles
+        panel.querySelectorAll('.edge-mode-btn').forEach(b => {
+          (b as HTMLElement).className = `edge-mode-btn px-1.5 py-0.5 text-[9px] rounded ${(b as HTMLElement).dataset.mode === mode ? 'bg-purple-700 text-white' : 'bg-gray-800 text-gray-400 hover:text-gray-200'}`;
+        });
+        // Show/hide content panels
+        panel.querySelectorAll('.edge-mode-content').forEach(p => {
+          (p as HTMLElement).classList.toggle('hidden', (p as HTMLElement).dataset.forMode !== mode);
+        });
+        const matchPanel = panel.querySelector('.edge-match-panel') as HTMLElement;
+        if (matchPanel) matchPanel.dataset.activeMode = mode;
+        applyEdgeEdits();
+      });
+    });
+
+    // Delete buttons
     container.querySelectorAll('.edge-delete-btn').forEach(el => {
       el.addEventListener('click', () => {
         const edgeDiv = (el as HTMLElement).closest('[data-edge-name]') as HTMLElement;
@@ -1221,6 +1338,47 @@ const userEmail = session.email;
         markDirty();
         renderEdgesEditor(currentTree[selectedNode].edges);
         renderCanvas();
+      });
+    });
+
+    // "Expand with LLM" buttons
+    container.querySelectorAll('.edge-expand-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const panel = (btn as HTMLElement).closest('.bg-gray-700\\/50')!;
+        const intentSelect = panel.querySelector('.edge-intent-select') as HTMLSelectElement;
+        const extrasInput = panel.querySelector('.edge-extras-input') as HTMLInputElement;
+        const previewEl = panel.querySelector('.edge-intent-preview') as HTMLElement;
+        
+        const intentKey = intentSelect?.value;
+        const extras = extrasInput?.value || '';
+        const description = intentKey
+          ? (intentLibrary[intentKey]?.description || intentKey) + (extras ? `. Also include: ${extras}` : '')
+          : extras || 'general affirmative response';
+        
+        (btn as HTMLButtonElement).disabled = true;
+        (btn as HTMLElement).textContent = '⏳ Expanding...';
+        
+        try {
+          const res = await fetch('/api/voice-intent-expand', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description, context: `Dialog tree edge for node "${selectedNode}"` }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            // Merge LLM phrases into extras
+            if (data.phrases?.length > 0) {
+              const existing = extras.split(',').map((s: string) => s.trim()).filter(Boolean);
+              const merged = [...new Set([...existing, ...data.phrases])];
+              extrasInput.value = merged.join(', ');
+              if (previewEl) previewEl.textContent = '/' + (data.regex || '').slice(0, 60) + (data.regex?.length > 60 ? '…' : '') + '/';
+              applyEdgeEdits();
+            }
+          }
+        } catch {}
+        
+        (btn as HTMLButtonElement).disabled = false;
+        (btn as HTMLElement).textContent = '🧠 Expand with LLM';
       });
     });
   }
@@ -1242,21 +1400,66 @@ const userEmail = session.email;
       const speakInput = div.querySelector('.edge-speak-input') as HTMLInputElement;
       const nextSelect = div.querySelector('.edge-next-select') as HTMLSelectElement;
       const actionSelect = div.querySelector('.edge-action-select') as HTMLSelectElement;
+      const intentSelect = div.querySelector('.edge-intent-select') as HTMLSelectElement;
+      const extrasInput = div.querySelector('.edge-extras-input') as HTMLInputElement;
+      const fnSelect = div.querySelector('.edge-fn-select') as HTMLSelectElement;
+      const matchPanel = div.querySelector('.edge-match-panel') as HTMLElement;
 
       const edgeName = nameInput?.value?.trim() || originalName;
       const existingEdge = node.edges[originalName] || {};
+      const activeMode = matchPanel?.dataset.activeMode || 'regex';
 
-      newEdges[edgeName] = {
+      // Build the edge based on active mode
+      const newEdge: any = {
         ...existingEdge,
-        match_regex: regexInput?.value || undefined,
         speak: speakInput?.value ? [speakInput.value] : existingEdge.speak,
         next: nextSelect?.value || undefined,
         action: actionSelect?.value || undefined,
       };
+
+      // Clear old match fields
+      delete newEdge.match_regex;
+      delete newEdge.match_fn;
+      delete newEdge.match_intent;
+      delete newEdge.match_extras;
+
+      if (activeMode === 'intent' && intentSelect?.value) {
+        const intentKey = intentSelect.value;
+        const intent = intentLibrary[intentKey];
+        const extras = (extrasInput?.value || '').split(',').map((s: string) => s.trim()).filter(Boolean);
+        
+        newEdge.match_intent = intentKey;
+        if (extras.length > 0) newEdge.match_extras = extras;
+        
+        // Generate final regex from intent base + extras
+        let baseRegex = intent?.regex || '';
+        if (extras.length > 0) {
+          const escapedExtras = extras.map((e: string) => e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+          // Append extras to the regex pattern
+          if (baseRegex.startsWith('\\b(') && baseRegex.endsWith(')\\b')) {
+            baseRegex = baseRegex.slice(0, -3) + '|' + escapedExtras.join('|') + ')\\b';
+          } else if (baseRegex.startsWith('(') && baseRegex.endsWith(')')) {
+            baseRegex = baseRegex.slice(0, -1) + '|' + escapedExtras.join('|') + ')';
+          } else {
+            baseRegex = baseRegex + '|' + escapedExtras.join('|');
+          }
+        }
+        newEdge.match_regex = baseRegex;
+        // Also carry forward match_fn if the intent has one
+        if (intent?.match_fn) newEdge.match_fn = intent.match_fn;
+      } else if (activeMode === 'function' && fnSelect?.value) {
+        newEdge.match_fn = fnSelect.value;
+      } else if (activeMode === 'regex') {
+        newEdge.match_regex = regexInput?.value || undefined;
+      }
+
       // Clean undefined fields
-      if (!newEdges[edgeName].match_regex) delete newEdges[edgeName].match_regex;
-      if (!newEdges[edgeName].next) delete newEdges[edgeName].next;
-      if (!newEdges[edgeName].action) delete newEdges[edgeName].action;
+      if (!newEdge.match_regex) delete newEdge.match_regex;
+      if (!newEdge.match_fn) delete newEdge.match_fn;
+      if (!newEdge.next) delete newEdge.next;
+      if (!newEdge.action) delete newEdge.action;
+
+      newEdges[edgeName] = newEdge;
     });
 
     node.edges = newEdges;
@@ -1595,6 +1798,96 @@ const userEmail = session.email;
       timer = setTimeout(() => fn(...args), ms);
     };
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // ZOOM CONTROLS
+  // ═══════════════════════════════════════════════════════════════
+  function applyZoom() {
+    const nodesLayer = document.getElementById('nodes-layer')!;
+    const svg = document.getElementById('canvas-svg')!;
+    nodesLayer.style.transform = `scale(${zoom})`;
+    nodesLayer.style.transformOrigin = 'top left';
+    svg.style.transform = `scale(${zoom})`;
+    svg.style.transformOrigin = 'top left';
+  }
+
+  document.getElementById('btn-zoom-in')?.addEventListener('click', () => {
+    zoom = Math.min(2, zoom + 0.15);
+    applyZoom();
+  });
+
+  document.getElementById('btn-zoom-out')?.addEventListener('click', () => {
+    zoom = Math.max(0.3, zoom - 0.15);
+    applyZoom();
+  });
+
+  document.getElementById('btn-zoom-reset')?.addEventListener('click', () => {
+    zoom = 1;
+    applyZoom();
+  });
+
+  // Mouse wheel zoom
+  document.getElementById('canvas')?.addEventListener('wheel', (e: WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      zoom = Math.max(0.3, Math.min(2, zoom - e.deltaY * 0.002));
+      applyZoom();
+    }
+  }, { passive: false });
+
+  // ═══════════════════════════════════════════════════════════════
+  // BULK TTS RENDER
+  // ═══════════════════════════════════════════════════════════════
+  document.getElementById('btn-render-tts')?.addEventListener('click', async () => {
+    if (!currentTree) return;
+    const btn = document.getElementById('btn-render-tts') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = '⏳ Rendering...';
+
+    const nodes = getTreeNodes();
+    const allTexts: string[] = [];
+    for (const id of nodes) {
+      const node = currentTree[id];
+      if (Array.isArray(node?.speak)) {
+        allTexts.push(...node.speak.filter(Boolean));
+      }
+      // Also render edge speaks
+      if (node?.edges) {
+        for (const edge of Object.values(node.edges) as any[]) {
+          if (Array.isArray(edge?.speak)) {
+            allTexts.push(...edge.speak.filter(Boolean));
+          }
+        }
+      }
+    }
+
+    if (allTexts.length === 0) {
+      btn.textContent = '🔊 Render';
+      btn.disabled = false;
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/voice-tts-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts: allTexts, cache: true }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        btn.textContent = `✓ ${data.cached || allTexts.length} cached`;
+      } else {
+        btn.textContent = '✕ Failed';
+      }
+    } catch {
+      btn.textContent = '✕ Unreachable';
+    }
+
+    setTimeout(() => {
+      btn.textContent = '🔊 Render';
+      btn.disabled = false;
+    }, 3000);
+  });
 
   // ═══════════════════════════════════════════════════════════════
   // TREE SELECTOR
@@ -1999,6 +2292,7 @@ const userEmail = session.email;
     }
     
     gatherPanel.classList.toggle('hidden', val !== 'llm_gather');
+    document.getElementById('gather-escape-paths')!.classList.toggle('hidden', val !== 'llm_gather');
 
     // Populate return-to dropdown
     if (val === 'llm_gather') {
@@ -2042,6 +2336,102 @@ const userEmail = session.email;
       };
       markDirty();
     });
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // ESCAPE PATHS (gather node analytics)
+  // ═══════════════════════════════════════════════════════════════
+  async function loadEscapePaths(nodeId: string) {
+    const panel = document.getElementById('gather-escape-paths')!;
+    const content = document.getElementById('escape-paths-content')!;
+    const unhandledSection = document.getElementById('unhandled-patterns')!;
+    const unhandledList = document.getElementById('unhandled-list')!;
+
+    // Only show for llm_gather nodes
+    const node = currentTree[nodeId];
+    if (!node || node.action !== 'llm_gather') {
+      panel.classList.add('hidden');
+      return;
+    }
+    panel.classList.remove('hidden');
+    content.innerHTML = '<div class="text-gray-500 italic">Loading insights...</div>';
+    unhandledSection.classList.add('hidden');
+
+    // Fetch gather session data + insights from Supabase (via API proxy)
+    try {
+      const res = await fetch(`/api/voice-gather-insights?node_id=${encodeURIComponent(nodeId)}&tree_id=${currentTreeId || ''}`);
+      if (!res.ok) {
+        content.innerHTML = '<div class="text-gray-500 italic">No call data yet. Insights appear after this node handles real calls.</div>';
+        return;
+      }
+      const data = await res.json();
+
+      // Render common paths
+      if (data.paths && data.paths.length > 0) {
+        content.innerHTML = data.paths.map((p: any) => {
+          const icon = p.outcome === 'returned' ? '🟢' : p.outcome === 'max_turns' ? '🟡' : '🔴';
+          const slotInfo = p.slots_filled ? `Slots: ${p.slots_filled}` : '';
+          return `<div class="bg-gray-800 rounded p-1.5">
+            <div class="flex items-center gap-1">
+              <span>${icon}</span>
+              <span class="font-medium text-gray-200">${p.label} (${p.count}x)</span>
+            </div>
+            ${slotInfo ? `<div class="text-gray-400 ml-5">${slotInfo}</div>` : ''}
+            ${p.sample ? `<div class="text-gray-500 ml-5 italic truncate">"${p.sample}"</div>` : ''}
+          </div>`;
+        }).join('');
+      } else {
+        content.innerHTML = '<div class="text-gray-500 italic">No call data yet. Insights appear after this node handles real calls.</div>';
+      }
+
+      // Render unhandled patterns
+      if (data.unhandled && data.unhandled.length > 0) {
+        unhandledSection.classList.remove('hidden');
+        unhandledList.innerHTML = data.unhandled.map((u: any) =>
+          `<div class="flex items-center justify-between bg-gray-800 rounded px-2 py-1">
+            <span class="text-gray-300 truncate flex-1">"${u.pattern}" (${u.count}x)</span>
+            <button class="promote-to-edge-btn text-[9px] px-1.5 py-0.5 bg-green-800 text-green-200 rounded hover:bg-green-700 flex-shrink-0 ml-2" data-pattern="${(u.pattern || '').replace(/"/g, '&quot;')}" data-examples='${JSON.stringify(u.examples || [])}'>+ Edge</button>
+          </div>`
+        ).join('');
+
+        // "Promote to edge" buttons
+        unhandledList.querySelectorAll('.promote-to-edge-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const pattern = (btn as HTMLElement).dataset.pattern || '';
+            let examples: string[] = [];
+            try { examples = JSON.parse((btn as HTMLElement).dataset.examples || '[]'); } catch {}
+            
+            const edgeName = prompt('Edge name for this pattern:', pattern.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 30));
+            if (!edgeName || !selectedNode || !currentTree[selectedNode]) return;
+            
+            const node = currentTree[selectedNode];
+            if (!node.edges) node.edges = {};
+            
+            // Generate regex from examples
+            const escapedExamples = [pattern, ...examples]
+              .map(e => e.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+            const regex = `(${[...new Set(escapedExamples)].join('|')})`;
+            
+            node.edges[edgeName] = {
+              match_regex: regex,
+              speak: [],
+              next: '',
+            };
+            
+            markDirty();
+            renderEdgesEditor(node.edges);
+            renderCanvas();
+          });
+        });
+      }
+    } catch {
+      content.innerHTML = '<div class="text-gray-500 italic">Could not load insights (bridge offline).</div>';
+    }
+  }
+
+  // Show escape paths when gather node selected
+  document.getElementById('btn-refresh-insights')?.addEventListener('click', () => {
+    if (selectedNode) loadEscapePaths(selectedNode);
   });
 
   // ═══════════════════════════════════════════════════════════════
