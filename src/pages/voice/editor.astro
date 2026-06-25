@@ -627,6 +627,11 @@ const userEmail = session.email;
   let dragging: string | null = null;
   let dragStart = { x: 0, y: 0 };
 
+  // Group drag state
+  let groupDragging = false;
+  let groupDragMembers: string[] = [];
+  let groupDragOffsets: Map<string, { x: number; y: number }> = new Map();
+
   const NODE_W = 200;
   const NODE_H = 64;
 
@@ -998,8 +1003,26 @@ const userEmail = session.email;
         if (e.button !== 0) return;
         const currentPos = nodePositions.get(nodeId)!;
         dragging = nodeId;
+        didDrag = false;
         dragStart = { x: e.clientX - currentPos.x, y: e.clientY - currentPos.y };
         mouseDownPos = { x: e.clientX, y: e.clientY };
+
+        // If this node is in a group and shift is NOT held, drag the group
+        if (!e.shiftKey && currentTree._groups) {
+          for (const [, group] of Object.entries(currentTree._groups) as any) {
+            if ((group.nodes || []).includes(nodeId)) {
+              groupDragging = true;
+              groupDragMembers = group.nodes.filter((n: string) => n !== nodeId && nodePositions.has(n));
+              groupDragOffsets.clear();
+              for (const memberId of groupDragMembers) {
+                const mPos = nodePositions.get(memberId)!;
+                groupDragOffsets.set(memberId, { x: e.clientX - mPos.x, y: e.clientY - mPos.y });
+              }
+              break;
+            }
+          }
+        }
+
         e.preventDefault();
       });
 
@@ -1016,8 +1039,10 @@ const userEmail = session.email;
 
   // Global mouse handlers for dragging — registered ONCE outside renderCanvas
   let dragRafPending = false;
+  let didDrag = false; // Track whether mouse actually moved (vs. just click)
   document.addEventListener('mousemove', (e: MouseEvent) => {
     if (!dragging) return;
+    didDrag = true;
     const newX = e.clientX - dragStart.x;
     const newY = e.clientY - dragStart.y;
     nodePositions.set(dragging, { x: Math.max(0, newX), y: Math.max(0, newY) });
@@ -1027,6 +1052,25 @@ const userEmail = session.email;
     if (draggedEl) {
       draggedEl.style.left = `${Math.max(0, newX)}px`;
       draggedEl.style.top = `${Math.max(0, newY)}px`;
+    }
+
+    // Also move all group members if dragging a group header
+    if (groupDragging && groupDragMembers.length > 0) {
+      for (const memberId of groupDragMembers) {
+        if (memberId === dragging) continue;
+        const mPos = nodePositions.get(memberId);
+        if (!mPos) continue;
+        const offset = groupDragOffsets.get(memberId);
+        if (!offset) continue;
+        const mx = e.clientX - offset.x;
+        const my = e.clientY - offset.y;
+        nodePositions.set(memberId, { x: Math.max(0, mx), y: Math.max(0, my) });
+        const memberEl = document.querySelector(`[data-node-id="${memberId}"]`) as HTMLElement;
+        if (memberEl) {
+          memberEl.style.left = `${Math.max(0, mx)}px`;
+          memberEl.style.top = `${Math.max(0, my)}px`;
+        }
+      }
     }
     
     // Debounce SVG edge redraw with rAF
@@ -1041,9 +1085,16 @@ const userEmail = session.email;
 
   document.addEventListener('mouseup', () => {
     if (dragging) {
+      const wasDrag = didDrag;
       dragging = null;
-      // Final full render to sync state
-      renderCanvas();
+      didDrag = false;
+      groupDragging = false;
+      groupDragMembers = [];
+      groupDragOffsets.clear();
+      // Only do a full re-render if we actually dragged (not a click)
+      if (wasDrag) {
+        renderCanvas();
+      }
     }
   });
 
@@ -1103,6 +1154,14 @@ const userEmail = session.email;
     const y2 = to.y;
 
     const dash = dashed ? 'stroke-dasharray="5 3"' : '';
+
+    // Self-loop: draw a small loop to the right side of the node
+    if (Math.abs(from.x - to.x) < 1 && Math.abs(from.y - to.y) < 1) {
+      const loopX = from.x + NODE_W + 20;
+      const loopY1 = from.y + NODE_H * 0.3;
+      const loopY2 = from.y + NODE_H * 0.7;
+      return `<path d="M${from.x + NODE_W},${loopY1} C${loopX},${loopY1} ${loopX},${loopY2} ${from.x + NODE_W},${loopY2}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash} opacity="0.5"/>`;
+    }
     
     if (Math.abs(x1 - x2) < 10) {
       return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash}/>`;
@@ -1118,20 +1177,96 @@ const userEmail = session.email;
     const list = document.getElementById('node-list')!;
     const nodes = getTreeNodes();
     
-    list.innerHTML = nodes.map(id => {
+    // Build a map of node → group for icons
+    const nodeGroupMap: Record<string, string> = {};
+    if (currentTree._groups) {
+      for (const [gName, g] of Object.entries(currentTree._groups) as any) {
+        for (const n of (g.nodes || [])) { nodeGroupMap[n] = gName; }
+      }
+    }
+
+    // Render groups first, then ungrouped nodes
+    let html = '';
+
+    // Grouped nodes (collapsible sections)
+    if (currentTree._groups) {
+      for (const [gName, group] of Object.entries(currentTree._groups) as any) {
+        const members = (group.nodes || []).filter((n: string) => currentTree[n]);
+        if (members.length === 0) continue;
+        const color = group.color || '#7c3aed';
+        html += `<div class="mt-2 mb-1">
+          <div class="flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer hover:bg-gray-700/50 group-header" data-group-select="${gName}">
+            <span class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:${color}"></span>
+            <span class="text-[10px] font-semibold uppercase tracking-wider flex-1 truncate" style="color:${color}">${group.label || gName}</span>
+            <span class="text-[9px] text-gray-500">${members.length}</span>
+          </div>
+          <div class="ml-3 border-l border-gray-700 pl-1.5 space-y-0.5 mt-0.5">`;
+        for (const id of members) {
+          const node = currentTree[id];
+          const icon = node.action === 'transfer' ? '📲' : node.action === 'hangup' ? '📴' : node.edges ? '❓' : '💬';
+          const isSelected = selectedNode === id;
+          html += `<div class="px-2 py-1 rounded cursor-pointer text-xs flex items-center gap-2 ${isSelected ? 'bg-brand-600/30 text-brand-200' : 'text-gray-300 hover:bg-gray-700'}" data-list-node="${id}">
+            <span>${icon}</span>
+            <span class="truncate">${id.replace(/_/g, ' ')}</span>
+          </div>`;
+        }
+        html += `</div></div>`;
+      }
+    }
+
+    // Ungrouped nodes
+    const ungrouped = nodes.filter(n => !nodeGroupMap[n]);
+    if (ungrouped.length > 0 && Object.keys(currentTree._groups || {}).length > 0) {
+      html += `<div class="mt-2 mb-1"><div class="px-2 py-1 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Ungrouped</div></div>`;
+    }
+    for (const id of ungrouped) {
       const node = currentTree[id];
       const icon = node.action === 'transfer' ? '📲' : node.action === 'hangup' ? '📴' : node.edges ? '❓' : '💬';
       const isSelected = selectedNode === id;
-      return `<div class="px-2 py-1.5 rounded cursor-pointer text-xs flex items-center gap-2 ${isSelected ? 'bg-brand-600/30 text-brand-200' : 'text-gray-300 hover:bg-gray-700'}"
-        data-list-node="${id}">
+      html += `<div class="px-2 py-1.5 rounded cursor-pointer text-xs flex items-center gap-2 ${isSelected ? 'bg-brand-600/30 text-brand-200' : 'text-gray-300 hover:bg-gray-700'}" data-list-node="${id}">
         <span>${icon}</span>
         <span class="truncate">${id.replace(/_/g, ' ')}</span>
       </div>`;
-    }).join('');
+    }
 
+    list.innerHTML = html;
+
+    // Node click handlers
     list.querySelectorAll('[data-list-node]').forEach(el => {
       el.addEventListener('click', () => {
         selectNode(el.getAttribute('data-list-node')!);
+      });
+    });
+
+    // Group header click: scroll to group center & highlight members
+    list.querySelectorAll('[data-group-select]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const gName = (el as HTMLElement).dataset.groupSelect!;
+        const group = currentTree._groups?.[gName];
+        if (!group?.nodes?.length) return;
+        
+        // Calculate group center and scroll canvas to it
+        const memberPositions = group.nodes.map((n: string) => nodePositions.get(n)).filter(Boolean);
+        if (memberPositions.length === 0) return;
+        const avgX = memberPositions.reduce((s: number, p: any) => s + p.x, 0) / memberPositions.length;
+        const avgY = memberPositions.reduce((s: number, p: any) => s + p.y, 0) / memberPositions.length;
+        
+        const canvasEl = document.getElementById('canvas')!;
+        canvasEl.scrollTo({
+          left: (avgX * zoom) - canvasEl.clientWidth / 2 + NODE_W / 2,
+          top: (avgY * zoom) - canvasEl.clientHeight / 2 + NODE_H / 2,
+          behavior: 'smooth'
+        });
+
+        // Flash highlight on group members
+        for (const nodeId of group.nodes) {
+          const nodeEl = document.querySelector(`[data-node-id="${nodeId}"]`) as HTMLElement;
+          if (nodeEl) {
+            nodeEl.style.outline = `2px solid ${group.color || '#7c3aed'}`;
+            setTimeout(() => { nodeEl.style.outline = ''; }, 1500);
+          }
+        }
       });
     });
   }
@@ -1729,7 +1864,17 @@ const userEmail = session.email;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      
+      // Check if response is an error (JSON instead of audio)
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok || contentType.includes('application/json')) {
+        let errMsg = 'TTS generation failed';
+        try {
+          const errData = await res.json();
+          errMsg = errData.error?.error || errData.error?.message || errData.error || errData.message || errMsg;
+        } catch {}
+        throw new Error(errMsg);
+      }
       
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -2445,6 +2590,14 @@ const userEmail = session.email;
 
   const canvas = document.getElementById('canvas')!;
 
+  function canvasCoords(e: MouseEvent): { x: number; y: number } {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left + canvas.scrollLeft) / zoom,
+      y: (e.clientY - rect.top + canvas.scrollTop) / zoom,
+    };
+  }
+
   canvas.addEventListener('mousedown', (e: MouseEvent) => {
     // Only start box select on left click on empty canvas (not on nodes)
     const target = e.target as HTMLElement;
@@ -2453,7 +2606,7 @@ const userEmail = session.email;
     if (dragging) return;
 
     boxSelecting = true;
-    boxStart = { x: e.offsetX + canvas.scrollLeft, y: e.offsetY + canvas.scrollTop };
+    boxStart = canvasCoords(e);
     boxEnd = { ...boxStart };
     boxSelectedNodes.clear();
 
@@ -2467,7 +2620,7 @@ const userEmail = session.email;
 
   canvas.addEventListener('mousemove', (e: MouseEvent) => {
     if (!boxSelecting || !selectionBox) return;
-    boxEnd = { x: e.offsetX + canvas.scrollLeft, y: e.offsetY + canvas.scrollTop };
+    boxEnd = canvasCoords(e);
     
     const x = Math.min(boxStart.x, boxEnd.x);
     const y = Math.min(boxStart.y, boxEnd.y);
