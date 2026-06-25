@@ -836,6 +836,23 @@ const userEmail = session.email;
     nodePositions.clear();
     const nodes = getTreeNodes();
     
+    // Restore saved positions from tree metadata if available
+    const savedPositions = currentTree?._meta?.positions;
+    if (savedPositions && typeof savedPositions === 'object') {
+      let allFound = true;
+      for (const n of nodes) {
+        if (savedPositions[n]) {
+          nodePositions.set(n, { x: savedPositions[n].x, y: savedPositions[n].y });
+        } else {
+          allFound = false;
+        }
+      }
+      // If all nodes have saved positions, use them directly
+      if (allFound && nodePositions.size === nodes.length) return;
+      // Otherwise fall through to auto-layout for any missing nodes
+    }
+    nodePositions.clear();
+    
     // Topological layout: greetings at top, then follow `next` chains
     const mainFlow: string[] = [];
     const visited = new Set<string>();
@@ -1151,6 +1168,7 @@ const userEmail = session.email;
       groupDragOffsets.clear();
       // Only do a full re-render if we actually dragged (not a click)
       if (wasDrag) {
+        markDirty();
         renderCanvas();
       }
     }
@@ -2064,6 +2082,14 @@ const userEmail = session.email;
     btn.textContent = 'Saving...';
 
     try {
+      // Persist node positions into tree metadata before saving
+      if (!currentTree._meta) currentTree._meta = {};
+      const positions: Record<string, { x: number; y: number }> = {};
+      for (const [nodeId, pos] of nodePositions) {
+        positions[nodeId] = pos;
+      }
+      currentTree._meta.positions = positions;
+
       const payload = {
         tree_data: currentTree,
         name: (document.getElementById('tree-name') as HTMLInputElement).value || 'Untitled',
