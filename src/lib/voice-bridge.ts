@@ -16,7 +16,9 @@ export async function bridgeFetch(path: string, opts?: RequestInit): Promise<Res
       ...opts,
       signal: AbortSignal.timeout(3000),
     });
-    if (res.ok) return res;
+    // Return ANY response from localhost (including errors) — this means the bridge is alive.
+    // Only fall through to tunnel if the connection itself fails.
+    return res;
   } catch {
     // localhost unreachable — expected on Vercel
   }
