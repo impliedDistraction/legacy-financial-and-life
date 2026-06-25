@@ -134,7 +134,7 @@ export const POST: APIRoute = async ({ request }) => {
   const record: any = {
     name: String(name).slice(0, 200),
     slug: String(slug || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60),
-    category: ['sales', 'recruitment', 'client_outreach', 'custom'].includes(category) ? category : 'custom',
+    category: ['sales', 'recruitment', 'client_outreach', 'inbound', 'custom'].includes(category) ? category : 'custom',
     status: ['draft', 'active', 'testing', 'archived'].includes(status) ? status : 'draft',
     tree_data,
     created_by: session.email,

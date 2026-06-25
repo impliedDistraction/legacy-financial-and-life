@@ -46,7 +46,9 @@ const userEmail = session.email;
       </div>
       <div class="flex items-center gap-2">
         <span id="save-status" class="text-xs text-gray-500">No changes</span>
-        <button id="btn-save" class="px-3 py-1 bg-brand-600 text-white text-xs font-medium rounded hover:bg-brand-700 disabled:opacity-50" disabled>Save</button>
+        <button id="btn-new" class="px-3 py-1 bg-gray-600 text-white text-xs font-medium rounded hover:bg-gray-500" title="Start a new tree (clears current)">New</button>
+        <button id="btn-save" class="px-3 py-1 bg-brand-600 text-white text-xs font-medium rounded hover:bg-brand-700 disabled:opacity-50">Save</button>
+        <button id="btn-save-as" class="px-3 py-1 bg-brand-700 text-white text-xs font-medium rounded hover:bg-brand-600" title="Save as a new copy">Save As</button>
         <button id="btn-test" class="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700">Deploy</button>
         <button id="btn-render-tts" class="px-3 py-1 bg-purple-600 text-white text-xs font-medium rounded hover:bg-purple-700" title="Pre-render TTS audio for all nodes">🔊 Render</button>
         <div class="h-4 w-px bg-gray-600"></div>
@@ -754,6 +756,8 @@ const userEmail = session.email;
           currentTree = data;
           currentTreeId = '';
           currentSlug = data._meta?.description?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'active-tree';
+          // Clear name so initEditor populates from _meta
+          (document.getElementById('tree-name') as HTMLInputElement).value = '';
           initEditor();
           return;
         }
@@ -795,7 +799,10 @@ const userEmail = session.email;
     if (!currentTree) return;
     
     const treeName = document.getElementById('tree-name') as HTMLInputElement;
-    treeName.value = currentTree._meta?.description || currentSlug || 'Untitled';
+    // Only set name from tree metadata if not already populated (e.g. from Supabase load)
+    if (!treeName.value || treeName.value === 'Untitled') {
+      treeName.value = currentTree._meta?.description || currentSlug || 'Untitled';
+    }
 
     // Build node positions from tree structure
     computeLayout();
@@ -1828,6 +1835,41 @@ const userEmail = session.email;
     }
   });
 
+  // New tree button — clears editor for a fresh tree
+  document.getElementById('btn-new')?.addEventListener('click', () => {
+    if (isDirty && !confirm('Discard unsaved changes?')) return;
+    currentTree = {
+      _meta: { description: 'New Dialog Tree', version: '1.0' },
+      greeting: { speak: ['Hello!'], edges: { default: 'END' } },
+    };
+    currentTreeId = '';
+    currentSlug = '';
+    isDirty = false;
+    selectedNode = null;
+    document.getElementById('node-editor')!.classList.add('hidden');
+    (document.getElementById('tree-name') as HTMLInputElement).value = 'Untitled';
+    (document.getElementById('tree-category') as HTMLSelectElement).value = 'custom';
+    (document.getElementById('tree-status') as HTMLSelectElement).value = 'draft';
+    (document.getElementById('tree-selector') as HTMLSelectElement).value = '';
+    document.getElementById('save-status')!.textContent = 'New tree';
+    document.getElementById('save-status')!.className = 'text-xs text-blue-400';
+    initEditor();
+  });
+
+  // Save As — always creates a new copy (clears currentTreeId)
+  document.getElementById('btn-save-as')?.addEventListener('click', async () => {
+    if (!currentTree) return;
+    const nameInput = document.getElementById('tree-name') as HTMLInputElement;
+    const newName = prompt('Save as new tree name:', nameInput.value + ' (copy)');
+    if (!newName) return;
+    nameInput.value = newName;
+    // Clear ID so it creates a new record
+    currentTreeId = '';
+    currentSlug = '';
+    // Trigger the normal save
+    (document.getElementById('btn-save') as HTMLButtonElement).click();
+  });
+
   // ═══════════════════════════════════════════════════════════════
   // ADD NODE (opens wizard)
   // ═══════════════════════════════════════════════════════════════
@@ -1912,7 +1954,7 @@ const userEmail = session.email;
       previewEl.textContent = `"${speaks[0]}"`;
       previewEl.className = 'text-sm text-gray-100 min-h-[2rem] leading-relaxed';
       variantsSection.classList.remove('hidden');
-      variantList.innerHTML = speaks.slice(1).map((s, i) => 
+      variantList.innerHTML = speaks.slice(1).map((s: string, i: number) => 
         `<div class="flex items-center gap-1">
           <span class="text-gray-600">${i + 2}.</span>
           <span class="truncate">"${s}"</span>

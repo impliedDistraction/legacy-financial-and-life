@@ -50,8 +50,19 @@ export const POST: APIRoute = async ({ request }) => {
     });
 
     if (!res.ok) {
-      const err = await res.text().catch(() => 'Unknown error');
-      return new Response(JSON.stringify({ error: err }), { status: 502 });
+      const errText = await res.text().catch(() => 'Unknown error');
+      // Try to parse as JSON to avoid double-wrapping
+      let errPayload: string;
+      try {
+        const parsed = JSON.parse(errText);
+        errPayload = parsed.error || parsed.message || errText;
+      } catch {
+        errPayload = errText;
+      }
+      return new Response(JSON.stringify({ error: errPayload }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     // Stream audio back
