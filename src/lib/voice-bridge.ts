@@ -2,10 +2,14 @@
  * Voice Bridge client — fetches from the Sentinel voice bridge.
  *
  * Tries localhost:3380 first (same machine / local dev), then falls back
- * to the configured VOICE_BRIDGE_URL (ngrok tunnel for production on Vercel).
+ * to the configured VOICE_BRIDGE_URL or OLLAMA_URL (ngrok tunnel for production on Vercel).
+ * Since Sentinel now proxies voice bridge routes through its main port (3377),
+ * the same ngrok tunnel used for OLLAMA_URL works for TTS/dialog-tree requests.
  */
 
-const VOICE_BRIDGE_URL = import.meta.env.VOICE_BRIDGE_URL?.trim() || 'http://localhost:3380';
+const VOICE_BRIDGE_URL = import.meta.env.VOICE_BRIDGE_URL?.trim()
+  || import.meta.env.OLLAMA_URL?.trim()?.replace(/\/+$/, '')
+  || 'http://localhost:3380';
 const VOICE_BRIDGE_LOCAL = 'http://localhost:3380';
 
 export async function bridgeFetch(path: string, opts?: RequestInit): Promise<Response> {

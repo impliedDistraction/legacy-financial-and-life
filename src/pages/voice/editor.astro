@@ -319,6 +319,16 @@ const userEmail = session.email;
           </div>
         </div>
 
+        <!-- Parallel Actions (watchers running alongside this node) -->
+        <div class="mb-3 border border-gray-600 rounded-lg p-3">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-xs font-semibold text-gray-300">⚡ Parallel Actions</h4>
+            <button id="btn-add-watcher" class="text-xs text-purple-400 hover:text-purple-300">+ Add</button>
+          </div>
+          <p class="text-[10px] text-gray-500 mb-2">Background processes running while this node is active (sentiment, scoring, trigger-watch).</p>
+          <div id="watchers-container" class="space-y-1.5"></div>
+        </div>
+
         <!-- Edges Section -->
         <div class="mb-3">
           <div class="flex items-center justify-between mb-2">
@@ -641,6 +651,12 @@ const userEmail = session.email;
   let groupDragging = false;
   let groupDragMembers: string[] = [];
   let groupDragOffsets: Map<string, { x: number; y: number }> = new Map();
+
+  // Connection handle drag state
+  let connecting = false;
+  let connectSource: string | null = null;
+  let connectTarget: string | null = null;
+  let connectLine: SVGLineElement | null = null;
 
   const NODE_W = 200;
   const NODE_H = 64;
@@ -1010,12 +1026,18 @@ const userEmail = session.email;
             ${node.action === 'hangup' ? '<span class="text-[9px] px-1 bg-red-800 text-red-200 rounded">📴 hangup</span>' : ''}
           </div>
         </div>
+        <!-- Connection handle (output port) -->
+        <div class="node-handle node-handle-out absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gray-600 border-2 border-gray-400 hover:bg-brand-500 hover:border-brand-300 hover:scale-125 transition-all cursor-crosshair z-10" data-handle="out" data-source="${nodeId}" title="Drag to connect"></div>
+        <!-- Connection handle (input port) -->
+        <div class="node-handle node-handle-in absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-gray-700 border-2 border-gray-500 hover:bg-green-500 hover:border-green-300 hover:scale-125 transition-all cursor-crosshair z-10 opacity-0 hover:opacity-100" data-handle="in" data-target="${nodeId}"></div>
       `;
 
       // Drag to reposition
       let mouseDownPos = { x: 0, y: 0 };
       div.addEventListener('mousedown', (e: MouseEvent) => {
         if (e.button !== 0) return;
+        // Don't start node drag if clicking on a connection handle
+        if ((e.target as HTMLElement).closest('[data-handle]')) return;
         const currentPos = nodePositions.get(nodeId)!;
         dragging = nodeId;
         didDrag = false;
@@ -1098,7 +1120,28 @@ const userEmail = session.email;
     }
   });
 
-  document.addEventListener('mouseup', () => {
+  document.addEventListener('mouseup', (e: MouseEvent) => {
+    // Handle connection completion
+    if (connecting && connectSource) {
+      const targetEl = (e.target as HTMLElement).closest('[data-node-id]') as HTMLElement;
+      const targetHandle = (e.target as HTMLElement).closest('[data-handle="in"]') as HTMLElement;
+      const targetNodeId = targetHandle?.dataset.target || targetEl?.dataset.nodeId;
+      
+      if (targetNodeId && targetNodeId !== connectSource && currentTree[connectSource]) {
+        // Show connection type menu
+        showConnectionMenu(connectSource, targetNodeId, e.clientX, e.clientY);
+      }
+      // Remove temp line
+      connectLine?.remove();
+      connectLine = null;
+      connecting = false;
+      connectSource = null;
+      connectTarget = null;
+      // Remove all hover highlights
+      document.querySelectorAll('.node-connect-target').forEach(el => el.classList.remove('node-connect-target'));
+      return;
+    }
+
     if (dragging) {
       const wasDrag = didDrag;
       dragging = null;
@@ -1112,6 +1155,139 @@ const userEmail = session.email;
       }
     }
   });
+
+  // Connection handle: mousedown on output port starts connection drag
+  document.addEventListener('mousedown', (e: MouseEvent) => {
+    const handle = (e.target as HTMLElement).closest('[data-handle="out"]') as HTMLElement;
+    if (!handle) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    connectSource = handle.dataset.source || null;
+    if (!connectSource) return;
+    
+    connecting = true;
+    const sourcePos = nodePositions.get(connectSource);
+    if (!sourcePos) return;
+    
+    // Create a temporary SVG line from the source bottom center
+    const svg = document.getElementById('canvas-svg')!;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', String(sourcePos.x + NODE_W / 2));
+    line.setAttribute('y1', String(sourcePos.y + NODE_H));
+    line.setAttribute('x2', String(sourcePos.x + NODE_W / 2));
+    line.setAttribute('y2', String(sourcePos.y + NODE_H));
+    line.setAttribute('stroke', '#60a5fa');
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('stroke-dasharray', '6 3');
+    line.id = 'temp-connect-line';
+    svg.appendChild(line);
+    connectLine = line;
+
+    // Show all input handles
+    document.querySelectorAll('.node-handle-in').forEach(el => {
+      (el as HTMLElement).style.opacity = '1';
+    });
+  }, true); // Capture phase to prevent node drag
+
+  // Connection handle: mousemove updates the temp line
+  document.addEventListener('mousemove', (e: MouseEvent) => {
+    if (!connecting || !connectLine) return;
+    
+    const canvas = document.getElementById('editor-canvas')!;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left + canvas.scrollLeft;
+    const y = e.clientY - rect.top + canvas.scrollTop;
+    
+    connectLine.setAttribute('x2', String(x));
+    connectLine.setAttribute('y2', String(y));
+
+    // Highlight potential target nodes
+    const targetEl = (e.target as HTMLElement).closest('[data-node-id]') as HTMLElement;
+    document.querySelectorAll('.node-connect-target').forEach(el => el.classList.remove('node-connect-target'));
+    if (targetEl && targetEl.dataset.nodeId !== connectSource) {
+      targetEl.classList.add('node-connect-target');
+    }
+  });
+
+  // Connection menu — shows options for how to connect two nodes
+  function showConnectionMenu(source: string, target: string, x: number, y: number) {
+    // Remove any existing menu
+    document.getElementById('connect-menu')?.remove();
+    
+    const node = currentTree[source];
+    const hasEdges = node.edges && Object.keys(node.edges).length > 0;
+    
+    const menu = document.createElement('div');
+    menu.id = 'connect-menu';
+    menu.className = 'fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-xl py-1 min-w-[180px] text-sm';
+    menu.style.cssText = `left: ${x}px; top: ${y}px;`;
+    
+    const options = [
+      { label: '→ Set as "next" (default flow)', action: 'next' },
+      { label: '→ Set as fallback edge', action: 'fallback' },
+      { label: '→ Add named edge...', action: 'named' },
+    ];
+    if (hasEdges) {
+      options.push({ label: '✎ Replace existing edge...', action: 'replace' });
+    }
+    
+    menu.innerHTML = `
+      <div class="px-3 py-1.5 text-[10px] text-gray-400 border-b border-gray-700">
+        Connect <span class="text-gray-200">${source}</span> → <span class="text-gray-200">${target}</span>
+      </div>
+      ${options.map(o => `
+        <button class="w-full text-left px-3 py-1.5 text-gray-200 hover:bg-gray-700 transition-colors" data-connect-action="${o.action}">
+          ${o.label}
+        </button>
+      `).join('')}
+    `;
+
+    menu.addEventListener('click', (ev) => {
+      const btn = (ev.target as HTMLElement).closest('[data-connect-action]') as HTMLElement;
+      if (!btn) return;
+      const action = btn.dataset.connectAction;
+      
+      if (action === 'next') {
+        currentTree[source].next = target;
+        markDirty();
+      } else if (action === 'fallback') {
+        if (!currentTree[source].edges) currentTree[source].edges = {};
+        currentTree[source].edges._fallback = { next: target };
+        markDirty();
+      } else if (action === 'named') {
+        const name = prompt('Edge name (e.g., "yes", "interested", "age_given"):');
+        if (name) {
+          if (!currentTree[source].edges) currentTree[source].edges = {};
+          currentTree[source].edges[name] = { next: target };
+          markDirty();
+        }
+      } else if (action === 'replace') {
+        const edges = Object.keys(currentTree[source].edges || {});
+        const edgeName = prompt(`Which edge to redirect to "${target}"?\n\nExisting: ${edges.join(', ')}`);
+        if (edgeName && currentTree[source].edges[edgeName]) {
+          currentTree[source].edges[edgeName].next = target;
+          markDirty();
+        }
+      }
+      
+      menu.remove();
+      renderCanvas();
+      if (selectedNode === source) selectNode(source);
+    });
+
+    // Close on outside click
+    setTimeout(() => {
+      document.addEventListener('click', function closeMenu(ev) {
+        if (!menu.contains(ev.target as HTMLElement)) {
+          menu.remove();
+          document.removeEventListener('click', closeMenu);
+        }
+      });
+    }, 50);
+
+    document.body.appendChild(menu);
+  }
 
   // Lightweight edge-only redraw (no DOM recreation)
   function redrawEdges() {
@@ -1323,6 +1499,9 @@ const userEmail = session.email;
     (document.getElementById('edit-converse-max') as HTMLInputElement).value = String(converse.max_turns || 1);
     (document.getElementById('edit-converse-bot') as HTMLTextAreaElement).value = (converse.back_on_track || []).join('\n');
 
+    // Parallel actions / watchers
+    renderWatchers(node.watchers || []);
+
     // Edges
     renderEdgesEditor(node.edges || {});
     renderEdgeFlowViz(nodeId);
@@ -1356,6 +1535,87 @@ const userEmail = session.email;
       `<option value="${key}">${intent.label || key}</option>`
     ).join('');
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // PARALLEL ACTIONS / WATCHERS
+  // ═══════════════════════════════════════════════════════════════
+  const WATCHER_TYPES = [
+    { value: 'sentiment', label: '😊 Sentiment Tracker', desc: 'Track caller tone/emotion in real-time' },
+    { value: 'scoring', label: '📊 Call Scoring', desc: 'Score lead quality as info is gathered' },
+    { value: 'trigger_watch', label: '🎯 Trigger Watch', desc: 'Listen for keywords/topics to act on' },
+    { value: 'gather', label: '📋 Info Gatherer', desc: 'Passively collect data points (age, location, etc.)' },
+    { value: 'compliance', label: '⚖️ Compliance Monitor', desc: 'Flag regulatory issues in real-time' },
+    { value: 'custom', label: '⚙️ Custom Callback', desc: 'Run a custom function/webhook' },
+  ];
+
+  function renderWatchers(watchers: any[]) {
+    const container = document.getElementById('watchers-container')!;
+    if (!watchers.length) {
+      container.innerHTML = '<div class="text-[10px] text-gray-600 italic">No parallel actions configured</div>';
+      return;
+    }
+    container.innerHTML = watchers.map((w, i) => {
+      const typeInfo = WATCHER_TYPES.find(t => t.value === w.type) || { label: w.type, desc: '' };
+      return `
+        <div class="flex items-center gap-2 p-1.5 bg-gray-700/50 rounded border border-gray-600 group">
+          <span class="text-[10px] flex-1">
+            <span class="text-purple-300 font-medium">${typeInfo.label}</span>
+            ${w.config?.keywords ? `<span class="text-gray-500 ml-1">[${w.config.keywords.join(', ')}]</span>` : ''}
+            ${w.config?.slot ? `<span class="text-blue-400 ml-1">→ ${w.config.slot}</span>` : ''}
+          </span>
+          <button class="watcher-remove text-[10px] text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-300" data-idx="${i}">✕</button>
+        </div>
+      `;
+    }).join('');
+
+    // Remove watcher
+    container.querySelectorAll('.watcher-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!selectedNode || !currentTree[selectedNode]) return;
+        const idx = parseInt((btn as HTMLElement).dataset.idx || '0');
+        const watchers = currentTree[selectedNode].watchers || [];
+        watchers.splice(idx, 1);
+        if (watchers.length === 0) delete currentTree[selectedNode].watchers;
+        renderWatchers(currentTree[selectedNode].watchers || []);
+        markDirty();
+      });
+    });
+  }
+
+  // Add watcher button
+  document.getElementById('btn-add-watcher')?.addEventListener('click', () => {
+    if (!selectedNode || !currentTree[selectedNode]) return;
+
+    // Show type picker
+    const type = prompt(
+      `Add parallel action type:\n\n${WATCHER_TYPES.map((t, i) => `${i + 1}. ${t.label} — ${t.desc}`).join('\n')}\n\nEnter number (1-${WATCHER_TYPES.length}):`
+    );
+    if (!type) return;
+    const idx = parseInt(type) - 1;
+    if (idx < 0 || idx >= WATCHER_TYPES.length) return;
+
+    const watcherType = WATCHER_TYPES[idx].value;
+    const watcher: any = { type: watcherType, config: {} };
+
+    // Type-specific config
+    if (watcherType === 'trigger_watch') {
+      const keywords = prompt('Keywords to watch for (comma-separated):');
+      if (keywords) watcher.config.keywords = keywords.split(',').map(k => k.trim()).filter(Boolean);
+      const action = prompt('Action when triggered (e.g., "flag", "branch_to:<node_id>", "notify"):') || 'flag';
+      watcher.config.action = action;
+    } else if (watcherType === 'gather') {
+      const slot = prompt('Slot name to fill (e.g., "age", "zip_code", "income_range"):');
+      if (slot) watcher.config.slot = slot;
+    } else if (watcherType === 'custom') {
+      const url = prompt('Webhook URL or function name:');
+      if (url) watcher.config.callback = url;
+    }
+
+    if (!currentTree[selectedNode].watchers) currentTree[selectedNode].watchers = [];
+    currentTree[selectedNode].watchers.push(watcher);
+    renderWatchers(currentTree[selectedNode].watchers);
+    markDirty();
+  });
 
   function renderEdgesEditor(edges: Record<string, any>) {
     const container = document.getElementById('edges-container')!;
@@ -3095,5 +3355,18 @@ const userEmail = session.email;
   }
 })();
 </script>
+
+<style>
+  .node-connect-target {
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.6), 0 0 12px rgba(96, 165, 250, 0.3);
+    border-color: #60a5fa !important;
+  }
+  .node-connect-target .node-handle-in {
+    opacity: 1 !important;
+    background: #22c55e;
+    border-color: #86efac;
+    transform: translateX(-50%) scale(1.4);
+  }
+</style>
 
 </Base>
