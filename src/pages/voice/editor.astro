@@ -49,7 +49,8 @@ const userEmail = session.email;
         <button id="btn-new" class="px-3 py-1 bg-gray-600 text-white text-xs font-medium rounded hover:bg-gray-500" title="Start a new tree (clears current)">New</button>
         <button id="btn-save" class="px-3 py-1 bg-brand-600 text-white text-xs font-medium rounded hover:bg-brand-700 disabled:opacity-50">Save</button>
         <button id="btn-save-as" class="px-3 py-1 bg-brand-700 text-white text-xs font-medium rounded hover:bg-brand-600" title="Save as a new copy">Save As</button>
-        <button id="btn-test" class="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700">Deploy</button>
+        <button id="btn-run-tests" class="px-3 py-1 bg-amber-600 text-white text-xs font-medium rounded hover:bg-amber-700" title="Run synthetic prospect tests before deploying">🧪 Test</button>
+        <button id="btn-deploy" class="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700">Deploy</button>
         <button id="btn-render-tts" class="px-3 py-1 bg-purple-600 text-white text-xs font-medium rounded hover:bg-purple-700" title="Pre-render TTS audio for all nodes">🔊 Render</button>
         <div class="h-4 w-px bg-gray-600"></div>
         <button id="btn-help" class="w-6 h-6 flex items-center justify-center bg-gray-700 border border-gray-600 rounded-full text-xs text-gray-300 hover:bg-gray-600 hover:text-white" title="Show tutorial">?</button>
@@ -644,6 +645,23 @@ const userEmail = session.email;
   let nodePositions: Map<string, { x: number; y: number }> = new Map();
   let zoom = 1;
   let panOffset = { x: 0, y: 0 };
+
+  /** Build a snapshot of the current tree data (same as what gets saved). */
+  function buildTreeData(): any {
+    if (!currentTree) return null;
+    // Inject positions
+    if (!currentTree._meta) currentTree._meta = {};
+    const positions: Record<string, { x: number; y: number }> = {};
+    for (const [nodeId, pos] of nodePositions) {
+      positions[nodeId] = pos;
+    }
+    currentTree._meta.positions = positions;
+    // Inject category from selector if available
+    const catEl = document.getElementById('tree-category') as HTMLSelectElement | null;
+    if (catEl) currentTree._meta.category = catEl.value;
+    return currentTree;
+  }
+
   let dragging: string | null = null;
   let dragStart = { x: 0, y: 0 };
 
@@ -2531,12 +2549,12 @@ const userEmail = session.email;
   // ═══════════════════════════════════════════════════════════════
   // DEPLOY TO BRIDGE
   // ═══════════════════════════════════════════════════════════════
-  document.getElementById('btn-test')?.addEventListener('click', async () => {
+  document.getElementById('btn-deploy')?.addEventListener('click', async () => {
     if (!currentTreeId) {
       alert('Save the tree first, then deploy.');
       return;
     }
-    const btn = document.getElementById('btn-test') as HTMLButtonElement;
+    const btn = document.getElementById('btn-deploy') as HTMLButtonElement;
     btn.textContent = 'Deploying...';
     btn.disabled = true;
 
@@ -2563,6 +2581,140 @@ const userEmail = session.email;
       btn.disabled = false;
     }
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // TEST TREE — Run synthetic prospect scenarios
+  // ═══════════════════════════════════════════════════════════════
+  document.getElementById('btn-run-tests')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-run-tests') as HTMLButtonElement;
+    btn.textContent = '🧪 Running...';
+    btn.disabled = true;
+
+    // Build tree_data from current editor state
+    const treeData = buildTreeData();
+    if (!treeData || !treeData._meta) {
+      alert('Build a tree with at least one node before testing.');
+      btn.textContent = '🧪 Test';
+      btn.disabled = false;
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/voice-test-tree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tree_data: treeData, runs: 20 }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        showTestResults(null, err.error || err.detail || 'Test runner failed');
+        btn.textContent = '🧪 Test';
+        btn.disabled = false;
+        return;
+      }
+
+      const data = await res.json();
+      showTestResults(data, null);
+      btn.textContent = '🧪 Test';
+      btn.disabled = false;
+    } catch (err: any) {
+      showTestResults(null, err.message || 'Connection failed');
+      btn.textContent = '🧪 Test';
+      btn.disabled = false;
+    }
+  });
+
+  function showTestResults(data: any, error: string | null) {
+    // Remove any existing panel
+    document.getElementById('test-results-panel')?.remove();
+
+    const panel = document.createElement('div');
+    panel.id = 'test-results-panel';
+    panel.className = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/70';
+
+    if (error) {
+      panel.innerHTML = `
+        <div class="bg-gray-800 border border-gray-600 rounded-lg p-6 max-w-lg w-full shadow-xl">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-red-400">🧪 Test Failed</h3>
+            <button onclick="this.closest('#test-results-panel').remove()" class="text-gray-400 hover:text-white text-xl">&times;</button>
+          </div>
+          <p class="text-red-300 text-sm">${error}</p>
+          <p class="text-gray-400 text-xs mt-2">Make sure Sentinel is running and reachable.</p>
+        </div>`;
+      document.body.appendChild(panel);
+      return;
+    }
+
+    const report = data.report;
+    const baseline = data.baseline;
+    const deployable = report.deployable;
+    const scoreColor = report.overallScore >= 70 ? 'text-green-400' : report.overallScore >= 50 ? 'text-amber-400' : 'text-red-400';
+    const statusIcon = deployable ? '✅' : '❌';
+    const statusText = deployable ? 'READY TO DEPLOY' : 'NOT DEPLOYABLE';
+    const statusColor = deployable ? 'text-green-400' : 'text-red-400';
+
+    let scenarioHtml = '';
+    for (const s of report.scenarioResults || []) {
+      const sIcon = s.score >= 70 ? '✅' : s.score >= 50 ? '⚠️' : '❌';
+      const dimBar = (label: string, val: number) => {
+        const color = val >= 80 ? 'bg-green-500' : val >= 50 ? 'bg-amber-500' : 'bg-red-500';
+        return `<div class="flex items-center gap-2 text-xs"><span class="w-20 text-gray-400">${label}</span><div class="flex-1 h-2 bg-gray-700 rounded"><div class="${color} h-2 rounded" style="width:${val}%"></div></div><span class="w-8 text-right text-gray-300">${val}%</span></div>`;
+      };
+      scenarioHtml += `
+        <div class="border border-gray-700 rounded p-3 mb-2">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-medium text-white">${sIcon} ${s.name.replace(/_/g, ' ')}</span>
+            <span class="text-xs font-mono ${s.score >= 70 ? 'text-green-400' : 'text-amber-400'}">${s.score}/100</span>
+          </div>
+          <div class="space-y-1">
+            ${dimBar('Flow', s.dimensions.flow)}
+            ${dimBar('Compliance', s.dimensions.compliance)}
+            ${dimBar('Efficiency', s.dimensions.efficiency)}
+            ${dimBar('Robustness', s.dimensions.robustness)}
+          </div>
+          <div class="text-xs text-gray-500 mt-1">Pass rate: ${s.passRate}%${s.complianceIssues?.length ? ' | ⚠️ ' + s.complianceIssues.join(', ') : ''}</div>
+        </div>`;
+    }
+
+    let blockersHtml = '';
+    if (report.blockers?.length) {
+      blockersHtml = `
+        <div class="mt-3 p-3 bg-red-900/30 border border-red-700 rounded">
+          <div class="text-xs font-bold text-red-400 mb-1">🚫 Deployment Blockers:</div>
+          ${report.blockers.map((b: string) => `<div class="text-xs text-red-300">• ${b}</div>`).join('')}
+        </div>`;
+    }
+
+    panel.innerHTML = `
+      <div class="bg-gray-800 border border-gray-600 rounded-lg p-6 max-w-2xl w-full shadow-xl max-h-[85vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-bold text-white">🧪 Test Results</h3>
+          <button onclick="this.closest('#test-results-panel').remove()" class="text-gray-400 hover:text-white text-xl">&times;</button>
+        </div>
+        <div class="flex items-center justify-between mb-4 p-3 bg-gray-900 rounded">
+          <div>
+            <div class="text-2xl font-bold ${scoreColor}">${report.overallScore}/100</div>
+            <div class="text-xs text-gray-400">Overall Score (threshold: ${report.passThreshold})</div>
+          </div>
+          <div class="text-right">
+            <div class="text-lg font-bold ${statusColor}">${statusIcon} ${statusText}</div>
+            <div class="text-xs text-gray-500">Category: ${data.category} | Min: ${baseline?.minComposite || 65}</div>
+          </div>
+        </div>
+        ${blockersHtml}
+        <div class="mt-4">
+          <div class="text-xs font-bold text-gray-300 mb-2 uppercase tracking-wide">Scenario Results (20 runs each)</div>
+          ${scenarioHtml || '<div class="text-sm text-gray-500">No matching scenarios found for this tree category.</div>'}
+        </div>
+        <div class="mt-4 p-3 bg-gray-900 rounded text-xs text-gray-400">
+          <strong class="text-gray-300">Category Baseline (${data.category}):</strong> ${baseline?.description || ''}
+        </div>
+        ${deployable ? `<div class="mt-4 text-center"><button onclick="document.getElementById('btn-deploy')?.click(); this.closest('#test-results-panel').remove();" class="px-4 py-2 bg-green-600 text-white font-medium rounded hover:bg-green-700">✓ Tests Passed — Deploy Now</button></div>` : ''}
+      </div>`;
+    document.body.appendChild(panel);
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // NEW TREE
