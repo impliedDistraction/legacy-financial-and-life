@@ -50,6 +50,7 @@ const userEmail = session.email;
         <button id="btn-save" class="px-3 py-1 bg-brand-600 text-white text-xs font-medium rounded hover:bg-brand-700 disabled:opacity-50">Save</button>
         <button id="btn-save-as" class="px-3 py-1 bg-brand-700 text-white text-xs font-medium rounded hover:bg-brand-600" title="Save as a new copy">Save As</button>
         <button id="btn-run-tests" class="px-3 py-1 bg-amber-600 text-white text-xs font-medium rounded hover:bg-amber-700" title="Run synthetic prospect tests before deploying">🧪 Test</button>
+        <button id="btn-experiments" class="px-3 py-1 bg-indigo-600 text-white text-xs font-medium rounded hover:bg-indigo-700" title="View A/B experiment results">🧬 Experiments</button>
         <button id="btn-deploy" class="px-3 py-1 bg-green-600 text-white text-xs font-medium rounded hover:bg-green-700">Deploy</button>
         <button id="btn-render-tts" class="px-3 py-1 bg-purple-600 text-white text-xs font-medium rounded hover:bg-purple-700" title="Pre-render TTS audio for all nodes">🔊 Render</button>
         <div class="h-4 w-px bg-gray-600"></div>
@@ -2712,6 +2713,102 @@ const userEmail = session.email;
           <strong class="text-gray-300">Category Baseline (${data.category}):</strong> ${baseline?.description || ''}
         </div>
         ${deployable ? `<div class="mt-4 text-center"><button onclick="document.getElementById('btn-deploy')?.click(); this.closest('#test-results-panel').remove();" class="px-4 py-2 bg-green-600 text-white font-medium rounded hover:bg-green-700">✓ Tests Passed — Deploy Now</button></div>` : ''}
+      </div>`;
+    document.body.appendChild(panel);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // EXPERIMENT STATUS PANEL
+  // ═══════════════════════════════════════════════════════════════
+  document.getElementById('btn-experiments')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-experiments') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = '🧬 Loading...';
+
+    try {
+      const res = await fetch('/api/voice-experiments');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      showExperimentPanel(data);
+    } catch (err: any) {
+      alert(`Experiment status failed: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '🧬 Experiments';
+    }
+  });
+
+  function showExperimentPanel(data: any) {
+    document.getElementById('experiment-panel')?.remove();
+
+    if (!data.enabled) {
+      const panel = document.createElement('div');
+      panel.id = 'experiment-panel';
+      panel.className = 'fixed inset-0 bg-black/80 flex items-center justify-center z-[9999]';
+      panel.onclick = (e) => { if (e.target === panel) panel.remove(); };
+      panel.innerHTML = `<div class="bg-gray-800 rounded-lg p-6 max-w-md border border-gray-600">
+        <h3 class="text-lg font-bold text-white mb-2">🧬 Experiments</h3>
+        <p class="text-gray-400 text-sm">No experiment tree is active. Set <code class="bg-gray-900 px-1 rounded">EXPERIMENT_TREE=true</code> in the bridge environment to enable.</p>
+        <button onclick="this.closest('#experiment-panel').remove();" class="mt-4 px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-500">Close</button>
+      </div>`;
+      document.body.appendChild(panel);
+      return;
+    }
+
+    const experiments = data.experiments || {};
+    const expCount = Object.keys(experiments).length;
+
+    let experimentCards = '';
+    for (const [expId, exp] of Object.entries(experiments) as any) {
+      const convIcon = exp.converged ? '✅' : exp.totalSamples > 0 ? '🔄' : '⏳';
+      let armsHtml = '';
+      for (const [armName, armStats] of Object.entries(exp.arms) as any) {
+        const pct = armStats.successRate || 0;
+        const barWidth = Math.max(2, pct);
+        const isWinner = exp.winner === armName;
+        const barColor = isWinner ? 'bg-green-500' : 'bg-indigo-500';
+        armsHtml += `
+          <div class="flex items-center gap-2 text-xs py-0.5">
+            <span class="w-32 truncate text-gray-300 ${isWinner ? 'font-bold text-green-400' : ''}">${armName}${isWinner ? ' 👑' : ''}</span>
+            <div class="flex-1 h-3 bg-gray-700 rounded overflow-hidden">
+              <div class="${barColor} h-full rounded" style="width: ${barWidth}%"></div>
+            </div>
+            <span class="w-16 text-right text-gray-400">${pct}%</span>
+            <span class="w-12 text-right text-gray-500">n=${armStats.samples}</span>
+          </div>`;
+      }
+
+      const confidenceHtml = exp.converged
+        ? `<div class="text-xs text-green-400 mt-1">Converged: ${exp.winner} at ${Math.round((exp.winnerConfidence || 0) * 100)}% confidence</div>`
+        : exp.winner
+          ? `<div class="text-xs text-yellow-400 mt-1">Leading: ${exp.winner} (needs more data)</div>`
+          : '';
+
+      experimentCards += `
+        <div class="bg-gray-900 rounded p-3 border border-gray-700">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-medium text-white text-sm">${convIcon} ${expId}</span>
+            <span class="text-xs text-gray-500">metric: ${exp.metric} | n=${exp.totalSamples}</span>
+          </div>
+          ${armsHtml}
+          ${confidenceHtml}
+        </div>`;
+    }
+
+    const panel = document.createElement('div');
+    panel.id = 'experiment-panel';
+    panel.className = 'fixed inset-0 bg-black/80 flex items-center justify-center z-[9999]';
+    panel.onclick = (e) => { if (e.target === panel) panel.remove(); };
+    panel.innerHTML = `
+      <div class="bg-gray-800 rounded-lg p-6 max-w-2xl w-full max-h-[85vh] overflow-y-auto border border-gray-600" onclick="event.stopPropagation()">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold text-white">🧬 Live Experiments — ${data.treeId}</h3>
+          <button onclick="this.closest('#experiment-panel').remove();" class="text-gray-400 hover:text-white text-xl">×</button>
+        </div>
+        <div class="text-xs text-gray-400 mb-4">${expCount} experiments active. Results update after each call.</div>
+        <div class="space-y-3">
+          ${experimentCards || '<div class="text-gray-500 text-sm">No experiments found.</div>'}
+        </div>
       </div>`;
     document.body.appendChild(panel);
   }
