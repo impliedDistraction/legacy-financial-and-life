@@ -134,7 +134,7 @@ export const POST: APIRoute = async ({ request }) => {
   const record: any = {
     name: String(name).slice(0, 200),
     slug: String(slug || name).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60),
-    category: ['sales', 'recruitment', 'client_outreach', 'inbound', 'custom'].includes(category) ? category : 'custom',
+    category: ['sales', 'recruitment', 'client_outreach', 'inbound', 'experimental', 'custom'].includes(category) ? category : 'custom',
     status: ['draft', 'active', 'testing', 'archived'].includes(status) ? status : 'draft',
     tree_data,
     created_by: session.email,
@@ -207,6 +207,9 @@ export const PUT: APIRoute = async ({ request }) => {
   const { id, mode = 'sales' } = body;
   if (!id) {
     return new Response(JSON.stringify({ error: 'Tree id required' }), { status: 400 });
+  }
+  if (!['sales', 'recruitment', 'experiment', 'inbound'].includes(mode)) {
+    return new Response(JSON.stringify({ error: 'Invalid mode' }), { status: 400 });
   }
 
   // Fetch tree data from Supabase

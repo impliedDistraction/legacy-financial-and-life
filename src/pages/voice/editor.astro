@@ -102,6 +102,7 @@ const userEmail = session.email;
               <option value="sales">Sales Qualifying</option>
               <option value="recruitment">Recruitment</option>
               <option value="inbound">Inbound / Reception</option>
+              <option value="experimental">Experimental (A/B)</option>
               <option value="client_outreach">Client Outreach</option>
               <option value="custom">Custom</option>
             </select>
@@ -155,6 +156,7 @@ const userEmail = session.email;
             <option value="sales">Sales</option>
             <option value="recruitment">Recruitment</option>
             <option value="inbound">Inbound / Reception</option>
+            <option value="experimental">Experimental (A/B)</option>
             <option value="client_outreach">Client Outreach</option>
             <option value="custom">Custom</option>
           </select>
@@ -2561,7 +2563,7 @@ const userEmail = session.email;
 
     try {
       const category = (document.getElementById('tree-category') as HTMLSelectElement).value;
-      const mode = category === 'recruitment' ? 'recruitment' : 'sales';
+      const mode = category === 'recruitment' ? 'recruitment' : category === 'experimental' ? 'experiment' : category === 'inbound' ? 'inbound' : 'sales';
       const res = await fetch('/api/voice-dialog-tree', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
