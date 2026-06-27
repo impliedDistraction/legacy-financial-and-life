@@ -79,13 +79,15 @@ export const GET: APIRoute = async ({ request, url }) => {
   }
 
   // List all campaigns with accurate counts from survey_sends
-  const [campRes, sendsCountRes] = await Promise.all([
+  const [campRes, sendsCountRes, questionsCountRes] = await Promise.all([
     supa('survey_campaigns?order=created_at.desc'),
     supa('survey_sends?select=campaign_id,responded'),
+    supa('survey_questions?select=campaign_id'),
   ]);
   if (!campRes.ok) return jsonRes({ error: 'Failed to fetch campaigns' }, 500);
   const campaigns = await campRes.json();
   const allSends = sendsCountRes.ok ? await sendsCountRes.json() : [];
+  const allQuestions = questionsCountRes.ok ? await questionsCountRes.json() : [];
 
   // Build accurate counts per campaign from survey_sends (truth source)
   const sendCounts: Record<string, { sent: number; responded: number }> = {};
@@ -95,6 +97,12 @@ export const GET: APIRoute = async ({ request, url }) => {
     if (s.responded) sendCounts[s.campaign_id].responded++;
   }
 
+  // Count questions per campaign
+  const questionCounts: Record<string, number> = {};
+  for (const q of allQuestions) {
+    questionCounts[q.campaign_id] = (questionCounts[q.campaign_id] || 0) + 1;
+  }
+
   // Override cached counts with accurate values
   for (const c of campaigns) {
     const accurate = sendCounts[c.id];
@@ -102,6 +110,7 @@ export const GET: APIRoute = async ({ request, url }) => {
       c.send_count = accurate.sent;
       c.response_count = accurate.responded;
     }
+    c._questionCount = questionCounts[c.id] || 0;
   }
 
   return jsonRes({ campaigns });
