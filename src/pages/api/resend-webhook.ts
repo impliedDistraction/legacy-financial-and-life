@@ -219,7 +219,7 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
   const prospectId = headers.find(h => h.name.toLowerCase() === 'x-legacy-prospect-id')?.value;
   const template = headers.find(h => h.name.toLowerCase() === 'x-legacy-template')?.value;
   // Track all outbound templates that include prospect IDs
-  const TRACKED_TEMPLATES = ['recruitment', 'recruitment-auto-invite', 'recruitment-warm-visitor', 'recruitment-info-pack', 'sales_quote', 'survey'];
+  const TRACKED_TEMPLATES = ['recruitment', 'recruitment-auto-invite', 'recruitment-warm-visitor', 'recruitment-info-pack', 'sales_quote', 'survey', 'market_pulse'];
   if (!prospectId || !template || !TRACKED_TEMPLATES.includes(template)) return;
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
