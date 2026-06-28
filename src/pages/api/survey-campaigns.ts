@@ -79,10 +79,11 @@ export const GET: APIRoute = async ({ request, url }) => {
   }
 
   // List all campaigns with accurate counts from survey_sends
+  // Use limit=50000 to avoid Supabase's default 1000-row pagination cutoff
   const [campRes, sendsCountRes, questionsCountRes] = await Promise.all([
     supa('survey_campaigns?order=created_at.desc'),
-    supa('survey_sends?select=campaign_id,responded'),
-    supa('survey_questions?select=campaign_id'),
+    supa('survey_sends?select=campaign_id,responded&limit=50000'),
+    supa('survey_questions?select=campaign_id&limit=5000'),
   ]);
   if (!campRes.ok) return jsonRes({ error: 'Failed to fetch campaigns' }, 500);
   const campaigns = await campRes.json();

@@ -162,23 +162,22 @@ export const GET: APIRoute = async ({ url }) => {
         }),
       });
 
-      // Mark survey_sends as responded (check if already responded to avoid double-counting)
-      const sendCheckRes = await supa(
-        `survey_sends?campaign_id=eq.${encodeURIComponent(cid)}&prospect_id=eq.${encodeURIComponent(pid)}&select=id,responded&limit=1`
-      );
-      const [sendRecord] = sendCheckRes.ok ? await sendCheckRes.json() : [null];
-      const isFirstResponse = sendRecord && !sendRecord.responded;
-
-      if (sendRecord) {
-        await supa(`survey_sends?id=eq.${encodeURIComponent(sendRecord.id)}`, {
+      // Mark survey_sends as responded using atomic conditional PATCH
+      // Only matches rows where responded=false, preventing race condition
+      // from concurrent bot/human clicks that would double-count
+      const patchRes = await supa(
+        `survey_sends?campaign_id=eq.${encodeURIComponent(cid)}&prospect_id=eq.${encodeURIComponent(pid)}&responded=eq.false`,
+        {
           method: 'PATCH',
-          headers: { Prefer: 'return=minimal' },
+          headers: { Prefer: 'return=representation' },
           body: JSON.stringify({
             responded: true,
             responded_at: new Date().toISOString(),
           }),
-        });
-      }
+        }
+      );
+      const patched = patchRes.ok ? await patchRes.json() : [];
+      const isFirstResponse = patched.length > 0;
 
       // Only increment response_count for first-time respondents (not per-answer)
       if (isFirstResponse) {
