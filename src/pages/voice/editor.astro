@@ -212,7 +212,10 @@ const userEmail = session.email;
 
         <!-- Speak Text -->
         <div class="mb-3">
-          <label class="block text-xs text-gray-500 mb-0.5">Speak Text (variants, one per line)</label>
+          <div class="flex items-center justify-between mb-0.5">
+            <label class="block text-xs text-gray-500">Speak Text (variants, one per line)</label>
+            <button id="btn-ai-generate-speak" class="px-2 py-0.5 bg-indigo-700 text-white text-[10px] rounded hover:bg-indigo-600 disabled:opacity-40" title="Generate speak text with AI based on node context">✨ AI Fill</button>
+          </div>
           <textarea id="edit-speak" rows="3" class="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200" placeholder="Hi, is this {firstName}?"></textarea>
           <p class="text-xs text-gray-500 mt-0.5">Use &#123;slotName&#125; for dynamic values. Multiple lines = random variant selection.</p>
         </div>
@@ -2362,6 +2365,77 @@ const userEmail = session.email;
       playBtn.textContent = '▶ Play';
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  // AI GENERATE SPEAK TEXT
+  // ═══════════════════════════════════════════════════════════════
+  document.getElementById('btn-ai-generate-speak')?.addEventListener('click', async () => {
+    if (!selectedNode || !currentTree) return;
+    const btn = document.getElementById('btn-ai-generate-speak') as HTMLButtonElement;
+    const textarea = document.getElementById('edit-speak') as HTMLTextAreaElement;
+    btn.disabled = true;
+    btn.textContent = '⏳ Generating...';
+
+    try {
+      const node = currentTree[selectedNode];
+      const edges = node?.edges ? Object.keys(node.edges) : [];
+      const slots = currentTree._meta?.slots || [];
+      const category = (document.getElementById('tree-category') as HTMLSelectElement)?.value || 'sales';
+      const treeName = (document.getElementById('tree-name') as HTMLInputElement)?.value || '';
+      const nodeAction = node?.action || '';
+
+      // Gather context: previous node's transition speak, and what this node collects
+      let prevContext = '';
+      for (const [nid, ndata] of Object.entries(currentTree) as [string, any][]) {
+        if (nid.startsWith('_')) continue;
+        if (!ndata.edges) continue;
+        for (const [, edge] of Object.entries(ndata.edges) as [string, any][]) {
+          if (edge.next === selectedNode && edge.speak) {
+            prevContext = Array.isArray(edge.speak) ? edge.speak[0] : edge.speak;
+            break;
+          }
+        }
+        if (prevContext) break;
+      }
+
+      const res = await fetch('/api/voice-ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nodeId: selectedNode,
+          edges,
+          slots,
+          category,
+          treeName,
+          nodeAction,
+          prevContext,
+          existingSpeak: textarea.value.trim() || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Generation failed' }));
+        throw new Error(err.error || 'AI generation failed');
+      }
+
+      const data = await res.json();
+      if (data.speak && data.speak.length > 0) {
+        textarea.value = data.speak.join('\n');
+        // Trigger the input change event to save to node
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        btn.textContent = '✓ Done';
+        setTimeout(() => { btn.textContent = '✨ AI Fill'; }, 2000);
+      } else {
+        btn.textContent = '✕ No output';
+        setTimeout(() => { btn.textContent = '✨ AI Fill'; }, 2000);
+      }
+    } catch (err: any) {
+      btn.textContent = `✕ ${err.message?.slice(0, 20) || 'Failed'}`;
+      setTimeout(() => { btn.textContent = '✨ AI Fill'; }, 3000);
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   // ═══════════════════════════════════════════════════════════════
   // COMPLIANCE CHECKS
