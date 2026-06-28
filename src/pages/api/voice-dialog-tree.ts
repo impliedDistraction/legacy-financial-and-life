@@ -163,27 +163,38 @@ export const POST: APIRoute = async ({ request }) => {
       status: 200, headers: { 'Content-Type': 'application/json' },
     });
   } else {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/dialog_trees`,
-      {
-        method: 'POST',
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=representation',
-        },
-        body: JSON.stringify(record),
+    // Try to create; on slug conflict, append a short suffix and retry
+    let attempts = 0;
+    let lastErr = '';
+    while (attempts < 3) {
+      const slugToUse = attempts === 0 ? record.slug : `${record.slug.slice(0, 50)}-${Date.now().toString(36).slice(-4)}`;
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/dialog_trees`,
+        {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          body: JSON.stringify({ ...record, slug: slugToUse }),
+        }
+      );
+      if (res.ok) {
+        const rows = await res.json();
+        return new Response(JSON.stringify(rows[0]), {
+          status: 201, headers: { 'Content-Type': 'application/json' },
+        });
       }
-    );
-    if (!res.ok) {
-      const errText = await res.text();
-      return new Response(JSON.stringify({ error: 'Create failed', detail: errText }), { status: 500 });
+      lastErr = await res.text();
+      // Only retry on unique constraint violation (code 23505)
+      if (!lastErr.includes('23505')) {
+        return new Response(JSON.stringify({ error: 'Create failed', detail: lastErr }), { status: 500 });
+      }
+      attempts++;
     }
-    const rows = await res.json();
-    return new Response(JSON.stringify(rows[0]), {
-      status: 201, headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({ error: 'Create failed', detail: lastErr }), { status: 500 });
   }
 };
 

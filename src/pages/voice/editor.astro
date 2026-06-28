@@ -792,7 +792,7 @@ const userEmail = session.email;
         if (data._meta || Object.values(data).some((v: any) => v && (v.speak || v.edges || v.next))) {
           currentTree = data;
           currentTreeId = '';
-          currentSlug = data._meta?.description?.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'active-tree';
+          currentSlug = ''; // Don't pre-fill slug from bridge — let save generate from name
           // Clear name so initEditor populates from _meta
           (document.getElementById('tree-name') as HTMLInputElement).value = '';
           initEditor();
