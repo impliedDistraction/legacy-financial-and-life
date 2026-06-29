@@ -680,10 +680,32 @@ const userEmail = session.email;
   let connecting = false;
   let connectSource: string | null = null;
   let connectTarget: string | null = null;
+  let connectEdgeName: string | null = null; // Which specific edge is being dragged
   let connectLine: SVGLineElement | null = null;
 
   const NODE_W = 200;
   const NODE_H = 64;
+  const EDGE_HANDLE_H = 16; // Height per edge handle on right side
+
+  /** Compute rendered height of a node: base + edge handles area */
+  function getNodeHeight(node: any): number {
+    if (!node?.edges) return NODE_H;
+    const edgeCount = Object.keys(node.edges).length;
+    if (edgeCount <= 1) return NODE_H;
+    // Base height + extra for each edge beyond the first
+    return NODE_H + (edgeCount - 1) * EDGE_HANDLE_H;
+  }
+
+  /** Get the Y offset for a specific edge handle on a node */
+  function getEdgeHandleY(node: any, edgeIndex: number): number {
+    const totalEdges = node?.edges ? Object.keys(node.edges).length : 0;
+    if (totalEdges === 0) return NODE_H / 2;
+    const nodeH = getNodeHeight(node);
+    const handleAreaTop = NODE_H - 8; // Start handles below the node header
+    const handleAreaHeight = nodeH - handleAreaTop;
+    const spacing = totalEdges > 1 ? handleAreaHeight / (totalEdges) : handleAreaHeight / 2;
+    return handleAreaTop + spacing * (edgeIndex + 0.5);
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // TUTORIAL
@@ -920,7 +942,7 @@ const userEmail = session.email;
       nodePositions.set(g, { x: gx, y });
       gx += NODE_W + 60;
     }
-    if (greetings.length > 0) y += NODE_H + 50;
+    if (greetings.length > 0) y += getNodeHeight(currentTree[greetings[0]]) + 50;
 
     // Terminal nodes on the right
     const terminals: string[] = [];
@@ -938,14 +960,14 @@ const userEmail = session.email;
     // Main flow column
     for (const n of questioners) {
       nodePositions.set(n, { x: centerX, y });
-      y += NODE_H + 40;
+      y += getNodeHeight(currentTree[n]) + 40;
     }
 
     // Terminals to the right
     let ty = 120;
     for (const n of terminals) {
       nodePositions.set(n, { x: centerX + NODE_W + 150, y: ty });
-      ty += NODE_H + 30;
+      ty += getNodeHeight(currentTree[n]) + 30;
     }
   }
 
@@ -971,7 +993,10 @@ const userEmail = session.email;
         const minX = Math.min(...positions.map((p: any) => p.x)) - padding;
         const minY = Math.min(...positions.map((p: any) => p.y)) - padding - 20; // extra for label
         const maxX = Math.max(...positions.map((p: any) => p.x)) + NODE_W + padding;
-        const maxY = Math.max(...positions.map((p: any) => p.y)) + NODE_H + padding;
+        const maxY = Math.max(...memberNodes.map((n: string) => {
+          const p = nodePositions.get(n)!;
+          return p.y + getNodeHeight(currentTree[n]);
+        })) + padding;
 
         const groupDiv = document.createElement('div');
         groupDiv.className = 'absolute rounded-xl border-2 border-dashed pointer-events-none';
@@ -1000,6 +1025,9 @@ const userEmail = session.email;
       <marker id="ed-arrow-red" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
         <path d="M0 0 L10 4 L0 8z" fill="#ef4444"/>
       </marker>
+      <marker id="ed-arrow-amber" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
+        <path d="M0 0 L10 4 L0 8z" fill="#f59e0b"/>
+      </marker>
     </defs>`);
 
     for (const [nodeId, node] of Object.entries(currentTree) as any) {
@@ -1007,30 +1035,33 @@ const userEmail = session.email;
       const fromPos = nodePositions.get(nodeId);
       if (!fromPos) continue;
 
-      // Direct next
-      if (node.next) {
+      // Direct next (no edges) — bottom-center
+      if (node.next && !node.edges) {
         const toPos = nodePositions.get(node.next);
         if (toPos) {
-          edgesSvg.push(drawEdge(fromPos, toPos, '#4b5563', 'ed-arrow'));
+          edgesSvg.push(drawEdge(fromPos, toPos, '#4b5563', 'ed-arrow', false, node, -1));
         }
       }
 
-      // Edges
+      // Named edges — from per-edge handles on right side
       if (node.edges) {
-        for (const [eName, edge] of Object.entries(node.edges) as any) {
+        const edgeEntries = Object.entries(node.edges);
+        edgeEntries.forEach(([eName, edge]: [string, any], idx) => {
           const target = edge.next || (edge.action === 'hangup' ? '__hangup__' : null);
-          if (!target) continue;
+          if (!target) return;
           const toPos = nodePositions.get(target);
-          if (!toPos) continue;
+          if (!toPos) return;
 
           if (eName === '_fallback') {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', true));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', true, node, idx));
           } else if (edge.action === 'hangup') {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red'));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', false, node, idx));
+          } else if (edge.action === 'transfer' || edge.action === 'transfer_beth' || edge.action === 'transfer_tim') {
+            edgesSvg.push(drawEdge(fromPos, toPos, '#f59e0b', 'ed-arrow-amber', false, node, idx));
           } else {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#22c55e', 'ed-arrow-green'));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#22c55e', 'ed-arrow-green', false, node, idx));
           }
-        }
+        });
       }
     }
 
@@ -1041,13 +1072,14 @@ const userEmail = session.email;
       const node = currentTree[nodeId];
       if (!node) continue;
 
+      const nodeH = getNodeHeight(node);
       const div = document.createElement('div');
       div.className = `absolute rounded-lg border-2 shadow-md cursor-pointer transition-all select-none
         ${selectedNode === nodeId ? 'ring-2 ring-brand-400 border-brand-500' : 'border-gray-600 hover:border-gray-400'}
-        ${node.action === 'transfer' ? 'bg-green-900/60 border-green-500' : 
+        ${node.action === 'transfer' || node.action === 'transfer_beth' || node.action === 'transfer_tim' ? 'bg-green-900/60 border-green-500' : 
           node.action === 'hangup' ? 'bg-red-900/40 border-red-500' :
           node.edges ? 'bg-blue-900/30 border-blue-600' : 'bg-gray-700'}`;
-      div.style.cssText = `left:${pos.x}px; top:${pos.y}px; width:${NODE_W}px; height:${NODE_H}px;`;
+      div.style.cssText = `left:${pos.x}px; top:${pos.y}px; width:${NODE_W}px; min-height:${nodeH}px;`;
       div.dataset.nodeId = nodeId;
 
       // Node content
@@ -1056,19 +1088,41 @@ const userEmail = session.email;
       const hasConverse = node.converse?.mode;
       const speakPreview = Array.isArray(node.speak) ? (node.speak[0] || '').slice(0, 35) : '';
       
+      // Build edge handles HTML for the right side
+      let edgeHandlesHtml = '';
+      if (node.edges) {
+        const edgeEntries = Object.entries(node.edges);
+        edgeEntries.forEach(([eName, edge]: [string, any], idx) => {
+          const handleY = getEdgeHandleY(node, idx);
+          const isFallback = eName === '_fallback';
+          const isAction = edge.action === 'hangup' || edge.action === 'transfer';
+          const dotColor = isFallback ? 'bg-red-500' : isAction ? 'bg-amber-500' : 'bg-green-500';
+          const textColor = isFallback ? 'text-red-400' : isAction ? 'text-amber-400' : 'text-green-400';
+          const displayName = eName === '_fallback' ? '✗' : eName.slice(0, 12);
+          edgeHandlesHtml += `
+            <div class="absolute flex items-center gap-0.5" style="right: -6px; top: ${handleY - 6}px;" data-edge-handle="${eName}" data-edge-source="${nodeId}">
+              <span class="text-[8px] ${textColor} font-mono truncate max-w-[60px] text-right pr-0.5 pointer-events-none select-none">${displayName}</span>
+              <div class="w-3 h-3 rounded-full ${dotColor} border border-gray-900 hover:scale-150 hover:border-white transition-all cursor-crosshair z-10 flex-shrink-0" data-handle="out" data-source="${nodeId}" data-edge-name="${eName}" title="${eName} → ${edge.next || edge.action || '?'}"></div>
+            </div>`;
+        });
+      }
+
       div.innerHTML = `
-        <div class="px-3 py-2 h-full flex flex-col justify-center">
+        <div class="px-3 py-2 flex flex-col justify-center" style="min-height: ${NODE_H - 4}px;">
           <div class="text-xs font-semibold text-gray-100 truncate">${label}</div>
           <div class="text-[10px] text-gray-400 truncate mt-0.5">${speakPreview || (node.action ? '⚡ ' + node.action : '...')}</div>
-          <div class="flex gap-1 mt-1">
+          <div class="flex gap-1 mt-1 flex-wrap">
             ${hasSlots ? '<span class="text-[9px] px-1 bg-blue-800 text-blue-200 rounded">📦 slot</span>' : ''}
             ${hasConverse ? `<span class="text-[9px] px-1 bg-purple-800 text-purple-200 rounded">🗣️ ${hasConverse}</span>` : ''}
-            ${node.action === 'transfer' ? '<span class="text-[9px] px-1 bg-green-800 text-green-200 rounded">📲 transfer</span>' : ''}
+            ${node.action === 'transfer' || node.action === 'transfer_beth' || node.action === 'transfer_tim' ? '<span class="text-[9px] px-1 bg-green-800 text-green-200 rounded">📲 transfer</span>' : ''}
             ${node.action === 'hangup' ? '<span class="text-[9px] px-1 bg-red-800 text-red-200 rounded">📴 hangup</span>' : ''}
+            ${node.action === 'send_booking_sms' ? '<span class="text-[9px] px-1 bg-amber-800 text-amber-200 rounded">📱 sms</span>' : ''}
+            ${node.action === 'send_message_email' ? '<span class="text-[9px] px-1 bg-cyan-800 text-cyan-200 rounded">📧 email</span>' : ''}
           </div>
         </div>
-        <!-- Connection handle (output port) -->
-        <div class="node-handle node-handle-out absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gray-600 border-2 border-gray-400 hover:bg-brand-500 hover:border-brand-300 hover:scale-125 transition-all cursor-crosshair z-10" data-handle="out" data-source="${nodeId}" title="Drag to connect"></div>
+        ${edgeHandlesHtml}
+        <!-- Connection handle (default output port — used if no edges) -->
+        ${!node.edges ? `<div class="node-handle node-handle-out absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gray-600 border-2 border-gray-400 hover:bg-brand-500 hover:border-brand-300 hover:scale-125 transition-all cursor-crosshair z-10" data-handle="out" data-source="${nodeId}" title="Drag to connect"></div>` : ''}
         <!-- Connection handle (input port) -->
         <div class="node-handle node-handle-in absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-gray-700 border-2 border-gray-500 hover:bg-green-500 hover:border-green-300 hover:scale-125 transition-all cursor-crosshair z-10 opacity-0 hover:opacity-100" data-handle="in" data-target="${nodeId}"></div>
       `;
@@ -1169,8 +1223,18 @@ const userEmail = session.email;
       const targetNodeId = targetHandle?.dataset.target || targetEl?.dataset.nodeId;
       
       if (targetNodeId && targetNodeId !== connectSource && currentTree[connectSource]) {
-        // Show connection type menu
-        showConnectionMenu(connectSource, targetNodeId, e.clientX, e.clientY);
+        if (connectEdgeName) {
+          // Dragged from a specific edge handle → directly update that edge's target
+          if (currentTree[connectSource].edges && currentTree[connectSource].edges[connectEdgeName]) {
+            currentTree[connectSource].edges[connectEdgeName].next = targetNodeId;
+            markDirty();
+            renderCanvas();
+            if (selectedNode === connectSource) selectNode(connectSource);
+          }
+        } else {
+          // Show connection type menu for generic handle
+          showConnectionMenu(connectSource, targetNodeId, e.clientX, e.clientY);
+        }
       }
       // Remove temp line
       connectLine?.remove();
@@ -1178,6 +1242,7 @@ const userEmail = session.email;
       connecting = false;
       connectSource = null;
       connectTarget = null;
+      connectEdgeName = null;
       // Remove all hover highlights
       document.querySelectorAll('.node-connect-target').forEach(el => el.classList.remove('node-connect-target'));
       return;
@@ -1206,19 +1271,37 @@ const userEmail = session.email;
     e.stopPropagation();
     
     connectSource = handle.dataset.source || null;
+    connectEdgeName = handle.dataset.edgeName || null;
     if (!connectSource) return;
     
     connecting = true;
     const sourcePos = nodePositions.get(connectSource);
     if (!sourcePos) return;
     
-    // Create a temporary SVG line from the source bottom center
+    // Determine origin point: per-edge handle on right side, or bottom-center
+    let startX: number, startY: number;
+    if (connectEdgeName && currentTree[connectSource]?.edges) {
+      const edgeEntries = Object.keys(currentTree[connectSource].edges);
+      const edgeIdx = edgeEntries.indexOf(connectEdgeName);
+      if (edgeIdx >= 0) {
+        startX = sourcePos.x + NODE_W + 4;
+        startY = sourcePos.y + getEdgeHandleY(currentTree[connectSource], edgeIdx);
+      } else {
+        startX = sourcePos.x + NODE_W / 2;
+        startY = sourcePos.y + getNodeHeight(currentTree[connectSource]);
+      }
+    } else {
+      startX = sourcePos.x + NODE_W / 2;
+      startY = sourcePos.y + getNodeHeight(currentTree[connectSource]);
+    }
+    
+    // Create a temporary SVG line from the source
     const svg = document.getElementById('canvas-svg')!;
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', String(sourcePos.x + NODE_W / 2));
-    line.setAttribute('y1', String(sourcePos.y + NODE_H));
-    line.setAttribute('x2', String(sourcePos.x + NODE_W / 2));
-    line.setAttribute('y2', String(sourcePos.y + NODE_H));
+    line.setAttribute('x1', String(startX));
+    line.setAttribute('y1', String(startY));
+    line.setAttribute('x2', String(startX));
+    line.setAttribute('y2', String(startY));
     line.setAttribute('stroke', '#60a5fa');
     line.setAttribute('stroke-width', '2');
     line.setAttribute('stroke-dasharray', '6 3');
@@ -1345,6 +1428,9 @@ const userEmail = session.email;
       <marker id="ed-arrow-red" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
         <path d="M0 0 L10 4 L0 8z" fill="#ef4444"/>
       </marker>
+      <marker id="ed-arrow-amber" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
+        <path d="M0 0 L10 4 L0 8z" fill="#f59e0b"/>
+      </marker>
     </defs>`);
 
     if (!currentTree) { svg.innerHTML = ''; return; }
@@ -1354,35 +1440,47 @@ const userEmail = session.email;
       const fromPos = nodePositions.get(nodeId);
       if (!fromPos) continue;
 
-      if (node.next) {
+      // Direct "next" (no edges) — bottom-center to top-center
+      if (node.next && !node.edges) {
         const toPos = nodePositions.get(node.next);
-        if (toPos) edgesSvg.push(drawEdge(fromPos, toPos, '#4b5563', 'ed-arrow'));
+        if (toPos) edgesSvg.push(drawEdge(fromPos, toPos, '#4b5563', 'ed-arrow', false, node, -1));
       }
 
+      // Named edges — from right-side edge handle to target's left-center input
       if (node.edges) {
-        for (const [eName, edge] of Object.entries(node.edges) as any) {
-          const target = edge.next || (edge.action === 'hangup' ? '__hangup__' : null);
-          if (!target) continue;
+        const edgeEntries = Object.entries(node.edges);
+        edgeEntries.forEach(([eName, edge]: [string, any], idx) => {
+          const target = edge.next || (edge.action === 'hangup' ? null : null);
+          if (!target) return;
           const toPos = nodePositions.get(target);
-          if (!toPos) continue;
+          if (!toPos) return;
 
           if (eName === '_fallback') {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', true));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', true, node, idx));
           } else if (edge.action === 'hangup') {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red'));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', false, node, idx));
+          } else if (edge.action === 'transfer' || edge.action === 'transfer_beth' || edge.action === 'transfer_tim') {
+            edgesSvg.push(drawEdge(fromPos, toPos, '#f59e0b', 'ed-arrow-amber', false, node, idx));
           } else {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#22c55e', 'ed-arrow-green'));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#22c55e', 'ed-arrow-green', false, node, idx));
           }
-        }
+        });
       }
     }
 
     svg.innerHTML = edgesSvg.join('');
   }
 
-  function drawEdge(from: {x:number,y:number}, to: {x:number,y:number}, color: string, marker: string, dashed = false) {
-    const x1 = from.x + NODE_W / 2;
-    const y1 = from.y + NODE_H;
+  function drawEdge(from: {x:number,y:number}, to: {x:number,y:number}, color: string, marker: string, dashed = false, sourceNode?: any, edgeIndex?: number) {
+    // If this is a per-edge connection, originate from the right side at the edge handle's Y
+    let x1: number, y1: number;
+    if (sourceNode && edgeIndex !== undefined && edgeIndex >= 0 && sourceNode.edges) {
+      x1 = from.x + NODE_W + 4; // Right edge of node + handle radius
+      y1 = from.y + getEdgeHandleY(sourceNode, edgeIndex);
+    } else {
+      x1 = from.x + NODE_W / 2;
+      y1 = from.y + getNodeHeight(sourceNode || {});
+    }
     const x2 = to.x + NODE_W / 2;
     const y2 = to.y;
 
@@ -1390,17 +1488,24 @@ const userEmail = session.email;
 
     // Self-loop: draw a small loop to the right side of the node
     if (Math.abs(from.x - to.x) < 1 && Math.abs(from.y - to.y) < 1) {
-      const loopX = from.x + NODE_W + 20;
-      const loopY1 = from.y + NODE_H * 0.3;
-      const loopY2 = from.y + NODE_H * 0.7;
-      return `<path d="M${from.x + NODE_W},${loopY1} C${loopX},${loopY1} ${loopX},${loopY2} ${from.x + NODE_W},${loopY2}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash} opacity="0.5"/>`;
+      const loopX = from.x + NODE_W + 30;
+      const loopY1 = y1 - 8;
+      const loopY2 = y1 + 8;
+      return `<path d="M${from.x + NODE_W + 4},${y1} C${loopX},${loopY1} ${loopX},${loopY2} ${from.x + NODE_W + 4},${y1 + 1}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash} opacity="0.6"/>`;
     }
     
-    if (Math.abs(x1 - x2) < 10) {
-      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash}/>`;
+    // Straight line for vertically aligned nodes (direct next, no edge handles)
+    if (edgeIndex === undefined || edgeIndex < 0) {
+      if (Math.abs(x1 - x2) < 10) {
+        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash}/>`;
+      }
+      const midY = (y1 + y2) / 2;
+      return `<path d="M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash}/>`;
     }
-    const midY = (y1 + y2) / 2;
-    return `<path d="M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash}/>`;
+
+    // Edge-handle connection: horizontal out then curve to target
+    const cpOffset = Math.max(40, Math.abs(x2 - x1) * 0.3);
+    return `<path d="M${x1},${y1} C${x1 + cpOffset},${y1} ${x2 - cpOffset},${y2} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash} opacity="0.7"/>`;
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -3408,8 +3513,9 @@ const userEmail = session.email;
     boxSelectedNodes.clear();
     const rect = { x, y, w, h };
     for (const [nodeId, pos] of nodePositions) {
+      const nh = getNodeHeight(currentTree[nodeId]);
       if (pos.x + NODE_W > rect.x && pos.x < rect.x + rect.w &&
-          pos.y + NODE_H > rect.y && pos.y < rect.y + rect.h) {
+          pos.y + nh > rect.y && pos.y < rect.y + rect.h) {
         boxSelectedNodes.add(nodeId);
       }
     }
@@ -3717,6 +3823,18 @@ const userEmail = session.email;
     background: #22c55e;
     border-color: #86efac;
     transform: translateX(-50%) scale(1.4);
+  }
+  /* Edge handle labels appear on hover */
+  [data-edge-handle] span {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  [data-node-id]:hover [data-edge-handle] span {
+    opacity: 1;
+  }
+  /* Subtle glow on edge handles during connection drag */
+  .connecting-active [data-edge-handle] > div {
+    box-shadow: 0 0 4px currentColor;
   }
 </style>
 
