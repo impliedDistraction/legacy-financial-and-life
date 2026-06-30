@@ -5,12 +5,12 @@ export const prerender = false;
 
 const SUPABASE_URL = import.meta.env.SUPABASE_URL?.trim();
 const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-const TABLE = 'recruitment_prospects';
 
 /**
  * GET /api/recruitment-stats
  * Returns aggregate engagement counts for the Sent & Tracking stats bar.
- * Counts prospects with tracking properties set in the JSONB `properties` column.
+ * Uses a single RPC (recruitment_engagement_stats) that scans the table once
+ * instead of 12 parallel count queries.
  */
 export const GET: APIRoute = async ({ request }) => {
   const session = await verifySessionCookie(request.headers.get('cookie'));
@@ -28,43 +28,27 @@ export const GET: APIRoute = async ({ request }) => {
     });
   }
 
-  const headers = {
-    apikey: SUPABASE_SERVICE_ROLE_KEY,
-    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-    'Content-Type': 'application/json',
-    Prefer: 'count=exact',
-  };
-
-  // Run all count queries in parallel
-  // Each query counts prospects where the relevant JSONB property exists and is not null
-  const ACTIVE_STATUSES = 'in.(sent,converted,scheduled,follow_up_1,follow_up_2,follow_up_exhausted)';
-  const queries = {
-    sent: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&select=id&limit=0`,
-    opened: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&properties->>email_opened_at=not.is.null&select=id&limit=0`,
-    clicked: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&properties->>email_clicked_at=not.is.null&select=id&limit=0`,
-    visited: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&properties->>join_page_visited_at=not.is.null&select=id&limit=0`,
-    chatted: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&properties->>chat_session_id=not.is.null&select=id&limit=0`,
-    interested: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&interaction_stage=eq.interested&select=id&limit=0`,
-    replied: `${SUPABASE_URL}/rest/v1/${TABLE}?status=${ACTIVE_STATUSES}&properties->>email_replied_at=not.is.null&select=id&limit=0`,
-    scheduled: `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.scheduled&select=id&limit=0`,
-    converted: `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.converted&select=id&limit=0`,
-    bounced: `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.bounced&select=id&limit=0`,
-    follow_up: `${SUPABASE_URL}/rest/v1/${TABLE}?status=in.(follow_up_1,follow_up_2)&select=id&limit=0`,
-    no_response: `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.follow_up_exhausted&select=id&limit=0`,
-  };
-
   try {
-    const results = await Promise.all(
-      Object.entries(queries).map(async ([key, url]) => {
-        const res = await fetch(url, { headers });
-        const total = res.ok
-          ? parseInt(res.headers.get('content-range')?.split('/')[1] || '0')
-          : 0;
-        return [key, total] as const;
-      })
-    );
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/recruitment_engagement_stats`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    });
 
-    const stats = Object.fromEntries(results);
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('recruitment_engagement_stats RPC failed:', res.status, text);
+      return new Response(JSON.stringify({ error: 'Failed to load stats' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const stats = await res.json();
 
     return new Response(JSON.stringify(stats), {
       status: 200,

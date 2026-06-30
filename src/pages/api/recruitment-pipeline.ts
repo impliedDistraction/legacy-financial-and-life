@@ -48,7 +48,7 @@ export const POST: APIRoute = async ({ request }) => {
     if (action === 'outreach') {
       // Fetch pending prospects and process them through AI
       const fetchRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.pending&processed_at=is.null&order=created_at.asc&limit=${Math.min(limit, 10)}&select=*`,
+        `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.pending&processed_at=is.null&order=created_at.asc&limit=${Math.min(limit, 10)}&select=id,name,email,phone,state,city,experience_level,current_agency,notes,source,campaign_id,campaign_name,properties`,
         { headers }
       );
       if (!fetchRes.ok) {
