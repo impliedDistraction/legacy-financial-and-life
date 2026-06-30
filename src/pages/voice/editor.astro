@@ -1368,8 +1368,10 @@ const userEmail = session.email;
       connectSource = null;
       connectTarget = null;
       connectEdgeName = null;
-      // Remove all hover highlights
+      // Remove all hover highlights and reset cursor
       document.querySelectorAll('.node-connect-target').forEach(el => el.classList.remove('node-connect-target'));
+      document.querySelectorAll('.drag-connect-target').forEach(el => el.classList.remove('drag-connect-target'));
+      document.getElementById('canvas')!.style.cursor = '';
       return;
     }
 
@@ -1381,6 +1383,9 @@ const userEmail = session.email;
       groupDragging = false;
       groupDragMembers = [];
       groupDragOffsets.clear();
+      // Clean up any drag-connect artifacts
+      document.querySelectorAll('.drag-connect-target').forEach(el => el.classList.remove('drag-connect-target'));
+      document.getElementById('canvas')!.style.cursor = '';
       if (wasDrag) {
         // Moved the node — re-render with new positions
         markDirty();
@@ -1432,15 +1437,23 @@ const userEmail = session.email;
     line.setAttribute('x2', String(startX));
     line.setAttribute('y2', String(startY));
     line.setAttribute('stroke', '#60a5fa');
-    line.setAttribute('stroke-width', '2');
-    line.setAttribute('stroke-dasharray', '6 3');
+    line.setAttribute('stroke-width', '2.5');
+    line.setAttribute('stroke-dasharray', '8 4');
+    line.setAttribute('stroke-linecap', 'round');
     line.id = 'temp-connect-line';
     svg.appendChild(line);
     connectLine = line;
 
-    // Show all input handles
+    // Show all input handles and change canvas cursor
     document.querySelectorAll('.node-handle-in').forEach(el => {
       (el as HTMLElement).style.opacity = '1';
+    });
+    document.getElementById('canvas')!.style.cursor = 'crosshair';
+    // Highlight potential targets
+    document.querySelectorAll('[data-node-id]').forEach(el => {
+      if ((el as HTMLElement).dataset.nodeId !== connectSource) {
+        (el as HTMLElement).classList.add('drag-connect-target');
+      }
     });
   }, true); // Capture phase to prevent node drag
 
@@ -1450,8 +1463,9 @@ const userEmail = session.email;
     
     const canvas = document.getElementById('canvas')!;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left + canvas.scrollLeft;
-    const y = e.clientY - rect.top + canvas.scrollTop;
+    // Convert to canvas-space coordinates (same space as node positions / SVG content)
+    const x = (e.clientX - rect.left + canvas.scrollLeft) / zoom;
+    const y = (e.clientY - rect.top + canvas.scrollTop) / zoom;
     
     connectLine.setAttribute('x2', String(x));
     connectLine.setAttribute('y2', String(y));
@@ -2132,6 +2146,12 @@ const userEmail = session.email;
       const nId = (el as HTMLElement).dataset.nodeId!;
       if (nId === sourceNodeId) return;
       (el as HTMLElement).classList.add('edge-connect-target');
+      // Add a floating callout label above each target
+      const callout = document.createElement('div');
+      callout.className = 'edge-connect-callout';
+      callout.textContent = '⬇ Click to connect';
+      callout.style.cssText = 'position:absolute; top:-20px; left:50%; transform:translateX(-50%); white-space:nowrap; font-size:9px; color:#86efac; background:rgba(0,0,0,0.7); padding:1px 6px; border-radius:4px; pointer-events:none; opacity:0; transition:opacity 0.2s;';
+      (el as HTMLElement).appendChild(callout);
     });
 
     // Show instruction banner
@@ -2141,8 +2161,8 @@ const userEmail = session.email;
     banner.style.cssText = 'backdrop-filter: blur(4px); animation: pulse 2s infinite;';
     banner.innerHTML = `
       <span class="w-2 h-2 rounded-full bg-green-400 animate-ping"></span>
-      <span>Click a target node to connect from <strong>${sourceNodeId.replace(/_/g, ' ')}</strong></span>
-      <button id="edge-connect-cancel" class="ml-2 px-2 py-0.5 bg-white/20 rounded text-[10px] hover:bg-white/30">Cancel (Esc)</button>
+      <span>Click a target node to connect from <strong>${sourceNodeId.replace(/_/g, ' ')}</strong>, or hover empty space to create a new node</span>
+      <button id="edge-connect-cancel" class="ml-2 px-2.5 py-0.5 bg-red-500/30 border border-red-400/40 rounded text-[10px] text-red-200 hover:bg-red-500/50 font-medium">✕ Cancel</button>
     `;
     document.body.appendChild(banner);
     
@@ -2257,9 +2277,10 @@ const userEmail = session.email;
     edgeConnectMode = false;
     edgeConnectSource = null;
     
-    // Remove visual classes
+    // Remove visual classes and callout labels
     document.querySelectorAll('.edge-connect-source').forEach(el => el.classList.remove('edge-connect-source'));
     document.querySelectorAll('.edge-connect-target').forEach(el => el.classList.remove('edge-connect-target'));
+    document.querySelectorAll('.edge-connect-callout').forEach(el => el.remove());
     
     // Clean up ghost node hover listeners
     const banner = document.getElementById('edge-connect-banner');
@@ -5095,6 +5116,21 @@ const userEmail = session.email;
   #edge-connect-ghost {
     transition: opacity 0.3s ease;
     pointer-events: auto;
+  }
+  /* Callout appears on hover over edge-connect targets */
+  .edge-connect-target:hover .edge-connect-callout {
+    opacity: 1 !important;
+  }
+  /* Drag-to-connect target highlight */
+  .drag-connect-target {
+    border-color: #60a5fa !important;
+    box-shadow: 0 0 6px rgba(96, 165, 250, 0.25);
+    transition: all 0.2s ease;
+  }
+  .drag-connect-target:hover,
+  .node-connect-target {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
   }
   /* Edge hitarea hover cursor */
   .edge-hitarea:hover + .edge-path {
