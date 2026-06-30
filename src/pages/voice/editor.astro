@@ -167,8 +167,8 @@ const userEmail = session.email;
     <!-- Center: Canvas -->
     <main class="flex-1 overflow-hidden relative" id="canvas-container">
       <div id="canvas" class="absolute inset-0 overflow-auto" style="cursor: grab;">
-        <svg id="canvas-svg" class="absolute" style="min-width: 2000px; min-height: 1500px;"></svg>
-        <div id="nodes-layer" class="absolute" style="min-width: 2000px; min-height: 1500px;"></div>
+        <svg id="canvas-svg" class="absolute" style="min-width: 4000px; min-height: 2000px;"></svg>
+        <div id="nodes-layer" class="absolute" style="min-width: 4000px; min-height: 2000px;"></div>
       </div>
       <!-- Zoom controls -->
       <div class="absolute bottom-4 right-4 flex gap-1 bg-gray-800 rounded-lg p-1 shadow-lg border border-gray-700">
@@ -871,6 +871,8 @@ const userEmail = session.email;
     renderCanvas();
     renderNodeList();
     runComplianceChecks();
+    // Auto-fit tree to viewport after initial render
+    requestAnimationFrame(() => fitToView());
   }
 
   function getTreeNodes(): string[] {
@@ -899,75 +901,65 @@ const userEmail = session.email;
     }
     nodePositions.clear();
     
-    // Topological layout: greetings at top, then follow `next` chains
-    const mainFlow: string[] = [];
+    // Left-to-right topological layout
     const visited = new Set<string>();
+    const layers: string[][] = []; // Each layer is a vertical column
 
-    function followChain(nodeId: string) {
+    function followChain(nodeId: string, depth: number) {
       if (visited.has(nodeId) || !currentTree[nodeId]) return;
       visited.add(nodeId);
-      mainFlow.push(nodeId);
+      while (layers.length <= depth) layers.push([]);
+      layers[depth].push(nodeId);
       
       const node = currentTree[nodeId];
-      if (node.next) followChain(node.next);
+      if (node.next) followChain(node.next, depth + 1);
       if (node.edges) {
         // Follow the "happy path" (first non-fallback edge with next)
         for (const [name, edge] of Object.entries(node.edges) as any) {
           if (name === '_fallback') continue;
           if (edge.next && !visited.has(edge.next)) {
-            followChain(edge.next);
+            followChain(edge.next, depth + 1);
             break;
+          }
+        }
+        // Also traverse other edge targets at same or +1 depth
+        for (const [name, edge] of Object.entries(node.edges) as any) {
+          if (name === '_fallback') continue;
+          if (edge.next && !visited.has(edge.next)) {
+            followChain(edge.next, depth + 1);
           }
         }
       }
     }
 
     // Start from greetings
-    if (currentTree.greeting_with_name) followChain('greeting_with_name');
-    if (currentTree.greeting_no_name) followChain('greeting_no_name');
+    if (currentTree.greeting_with_name) followChain('greeting_with_name', 0);
+    if (currentTree.greeting_no_name) followChain('greeting_no_name', 0);
     // Pick up orphans
     for (const n of nodes) {
-      if (!visited.has(n)) followChain(n);
+      if (!visited.has(n)) followChain(n, layers.length);
     }
 
-    // Position: main column + side branches
-    const centerX = 400;
-    let y = 40;
-    const greetings = mainFlow.filter(n => n.startsWith('greeting'));
-    const rest = mainFlow.filter(n => !n.startsWith('greeting'));
+    // Position: each layer is a column flowing left-to-right
+    const COL_GAP = NODE_W + 120; // Horizontal gap between columns
+    const ROW_GAP = 30; // Vertical gap between nodes in same column
+    const startX = 60;
+    const startY = 60;
 
-    // Greetings side by side
-    let gx = centerX - (greetings.length * (NODE_W + 30)) / 2;
-    for (const g of greetings) {
-      nodePositions.set(g, { x: gx, y });
-      gx += NODE_W + 60;
-    }
-    if (greetings.length > 0) y += getNodeHeight(currentTree[greetings[0]]) + 50;
-
-    // Terminal nodes on the right
-    const terminals: string[] = [];
-    const questioners: string[] = [];
-
-    for (const n of rest) {
-      const node = currentTree[n];
-      if (node.action === 'hangup' || n === '__hangup__' || n === 'opt_out') {
-        terminals.push(n);
-      } else {
-        questioners.push(n);
+    for (let col = 0; col < layers.length; col++) {
+      const layer = layers[col];
+      // Center the column vertically
+      let totalHeight = 0;
+      for (const nId of layer) {
+        totalHeight += getNodeHeight(currentTree[nId]) + ROW_GAP;
       }
-    }
+      totalHeight -= ROW_GAP;
+      let y = startY + Math.max(0, (300 - totalHeight) / 2); // rough vertical centering
 
-    // Main flow column
-    for (const n of questioners) {
-      nodePositions.set(n, { x: centerX, y });
-      y += getNodeHeight(currentTree[n]) + 40;
-    }
-
-    // Terminals to the right
-    let ty = 120;
-    for (const n of terminals) {
-      nodePositions.set(n, { x: centerX + NODE_W + 150, y: ty });
-      ty += getNodeHeight(currentTree[n]) + 30;
+      for (const nId of layer) {
+        nodePositions.set(nId, { x: startX + col * COL_GAP, y });
+        y += getNodeHeight(currentTree[nId]) + ROW_GAP;
+      }
     }
   }
 
@@ -1159,13 +1151,6 @@ const userEmail = session.email;
         e.preventDefault();
       });
 
-      // Click to select (only if mouse didn't travel far = not a drag)
-      div.addEventListener('click', (e: MouseEvent) => {
-        const dist = Math.abs(e.clientX - mouseDownPos.x) + Math.abs(e.clientY - mouseDownPos.y);
-        if (dist > 5) return; // Was a drag
-        selectNode(nodeId);
-      });
-
       nodesLayer.appendChild(div);
     }
   }
@@ -1251,15 +1236,19 @@ const userEmail = session.email;
 
     if (dragging) {
       const wasDrag = didDrag;
+      const clickedNodeId = dragging;
       dragging = null;
       didDrag = false;
       groupDragging = false;
       groupDragMembers = [];
       groupDragOffsets.clear();
-      // Only do a full re-render if we actually dragged (not a click)
       if (wasDrag) {
+        // Moved the node — re-render with new positions
         markDirty();
         renderCanvas();
+      } else {
+        // Was a click (no drag) — select the node
+        selectNode(clickedNodeId);
       }
     }
   });
@@ -1320,7 +1309,7 @@ const userEmail = session.email;
   document.addEventListener('mousemove', (e: MouseEvent) => {
     if (!connecting || !connectLine) return;
     
-    const canvas = document.getElementById('editor-canvas')!;
+    const canvas = document.getElementById('canvas')!;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left + canvas.scrollLeft;
     const y = e.clientY - rect.top + canvas.scrollTop;
@@ -1496,7 +1485,7 @@ const userEmail = session.email;
       const loopX = from.x + NODE_W + 30;
       const loopY1 = y1 - 10;
       const loopY2 = y1 + 10;
-      return `<path d="M${from.x + NODE_W + 4},${y1} C${loopX},${loopY1} ${loopX},${loopY2} ${from.x + NODE_W + 4},${y1 + 1}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash} opacity="0.5"/>`;
+      return `<path d="M${from.x + NODE_W + 4},${y1} C${loopX},${loopY1} ${loopX},${loopY2} ${from.x + NODE_W + 4},${y1 + 1}" fill="none" stroke="${color}" stroke-width="1" marker-end="url(#${marker})" ${dash} opacity="0.4" class="edge-path"/>`;
     }
     
     // Straight line for vertically aligned nodes (direct next, no edge handles)
@@ -1505,20 +1494,27 @@ const userEmail = session.email;
       const nx1 = from.x + NODE_W / 2;
       const ny1 = from.y + getNodeHeight(sourceNode || {});
       const midY = (ny1 + y2) / 2;
-      return `<path d="M${nx1},${ny1} C${nx1},${midY} ${x2},${midY} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash} opacity="0.6"/>`;
+      return `<path d="M${nx1},${ny1} C${nx1},${midY} ${x2},${midY} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="1.2" marker-end="url(#${marker})" ${dash} opacity="0.5" class="edge-path"/>`;
     }
 
     // Edge-handle connection: right-side handle → left-center of target
     const dx = Math.abs(x2 - x1);
     const cpOffset = Math.max(50, dx * 0.4);
     const pathId = `ep-${Math.round(x1)}-${Math.round(y1)}-${Math.round(x2)}-${Math.round(y2)}`;
-    let svg = `<path id="${pathId}" d="M${x1},${y1} C${x1 + cpOffset},${y1} ${x2 - cpOffset},${y2} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="1.5" marker-end="url(#${marker})" ${dash} opacity="0.7"/>`;
+    let svg = `<path id="${pathId}" d="M${x1},${y1} C${x1 + cpOffset},${y1} ${x2 - cpOffset},${y2} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="1.2" marker-end="url(#${marker})" ${dash} opacity="0.55" class="edge-path"/>`;
 
     // Add speak text label along the path
     if (speakText) {
       const truncated = speakText.length > 28 ? speakText.slice(0, 28) + '…' : speakText;
-      svg += `<text class="edge-speak-label" dy="-5" font-size="8" fill="${color}" opacity="0.7">
-        <textPath href="#${pathId}" startOffset="50%" text-anchor="middle">${truncated}</textPath>
+      // If path goes right-to-left or steeply downward, use a reversed path for text readability
+      const textGoesBackward = x2 < x1 - 20;
+      const textPathId = textGoesBackward ? `${pathId}-txt` : pathId;
+      if (textGoesBackward) {
+        // Hidden reversed path for text
+        svg += `<path id="${textPathId}" d="M${x2},${y2} C${x2 - cpOffset},${y2} ${x1 + cpOffset},${y1} ${x1},${y1}" fill="none" stroke="none"/>`;
+      }
+      svg += `<text class="edge-speak-label" dy="-5" font-size="8" fill="${color}" opacity="0.6">
+        <textPath href="#${textPathId}" startOffset="50%" text-anchor="middle">${truncated}</textPath>
       </text>`;
     }
     return svg;
@@ -2621,6 +2617,42 @@ const userEmail = session.email;
     nodesLayer.style.transformOrigin = 'top left';
     svg.style.transform = `scale(${zoom})`;
     svg.style.transformOrigin = 'top left';
+    // Toggle close-zoom indicator for CSS (shows edge labels)
+    if (zoom >= 0.8) {
+      svg.setAttribute('data-zoom-close', '');
+    } else {
+      svg.removeAttribute('data-zoom-close');
+    }
+  }
+
+  /** Fit tree to viewport with padding */
+  function fitToView() {
+    if (nodePositions.size === 0) return;
+    const canvasEl = document.getElementById('canvas')!;
+    const positions = [...nodePositions.entries()];
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [nodeId, pos] of positions) {
+      minX = Math.min(minX, pos.x);
+      minY = Math.min(minY, pos.y);
+      const node = currentTree[nodeId];
+      const nh = node ? getNodeHeight(node) : NODE_H;
+      maxX = Math.max(maxX, pos.x + NODE_W);
+      maxY = Math.max(maxY, pos.y + nh);
+    }
+    const treeW = maxX - minX + 100; // padding
+    const treeH = maxY - minY + 100;
+    const viewW = canvasEl.clientWidth;
+    const viewH = canvasEl.clientHeight;
+    // Fit zoom so tree fits in viewport (max 1.0, min 0.4)
+    const fitZoom = Math.min(1.0, Math.max(0.4, Math.min(viewW / treeW, viewH / treeH) * 0.9));
+    zoom = fitZoom;
+    applyZoom();
+    // Scroll to center the tree
+    canvasEl.scrollTo({
+      left: (minX - 50) * zoom,
+      top: (minY - 50) * zoom,
+      behavior: 'instant'
+    });
   }
 
   document.getElementById('btn-zoom-in')?.addEventListener('click', () => {
@@ -2634,18 +2666,60 @@ const userEmail = session.email;
   });
 
   document.getElementById('btn-zoom-reset')?.addEventListener('click', () => {
-    zoom = 1;
-    applyZoom();
+    fitToView();
   });
 
-  // Mouse wheel zoom
+  // Mouse wheel: Ctrl+wheel = zoom, plain wheel = scroll (native)
   document.getElementById('canvas')?.addEventListener('wheel', (e: WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       zoom = Math.max(0.3, Math.min(2, zoom - e.deltaY * 0.002));
       applyZoom();
     }
+    // Otherwise: let native scroll handle it (horizontal + vertical)
   }, { passive: false });
+
+  // Middle-mouse panning
+  let isPanning = false;
+  let panStartX = 0;
+  let panStartY = 0;
+  let panScrollStartX = 0;
+  let panScrollStartY = 0;
+
+  document.getElementById('canvas')?.addEventListener('mousedown', (e: MouseEvent) => {
+    // Middle mouse button (button=1) starts panning
+    if (e.button === 1) {
+      e.preventDefault();
+      e.stopPropagation();
+      isPanning = true;
+      panStartX = e.clientX;
+      panStartY = e.clientY;
+      const canvasEl = document.getElementById('canvas')!;
+      panScrollStartX = canvasEl.scrollLeft;
+      panScrollStartY = canvasEl.scrollTop;
+      canvasEl.style.cursor = 'grabbing';
+    }
+  });
+
+  // Prevent browser autoscroll on middle click
+  document.getElementById('canvas')?.addEventListener('auxclick', (e: MouseEvent) => {
+    if (e.button === 1) e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e: MouseEvent) => {
+    if (!isPanning) return;
+    const canvasEl = document.getElementById('canvas')!;
+    canvasEl.scrollLeft = panScrollStartX - (e.clientX - panStartX);
+    canvasEl.scrollTop = panScrollStartY - (e.clientY - panStartY);
+  });
+
+  document.addEventListener('mouseup', (e: MouseEvent) => {
+    if (isPanning) {
+      isPanning = false;
+      const canvasEl = document.getElementById('canvas')!;
+      canvasEl.style.cursor = 'grab';
+    }
+  });
 
   // ═══════════════════════════════════════════════════════════════
   // BULK TTS RENDER
@@ -3852,11 +3926,30 @@ const userEmail = session.email;
   .connecting-active [data-edge-handle] > div {
     box-shadow: 0 0 4px currentColor;
   }
-  /* Edge speak labels — subtle, visible on zoom */
+  /* Edge speak labels — hidden by default, visible on path hover */
   .edge-speak-label {
     font-family: ui-monospace, monospace;
     pointer-events: none;
     user-select: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  /* Show speak text when hovering nearby edge path */
+  .edge-path {
+    transition: opacity 0.15s ease, stroke-width 0.15s ease;
+    pointer-events: stroke;
+  }
+  .edge-path:hover {
+    opacity: 1 !important;
+    stroke-width: 2.5;
+  }
+  .edge-path:hover + path + .edge-speak-label,
+  .edge-path:hover + .edge-speak-label {
+    opacity: 1 !important;
+  }
+  /* Also show all labels when canvas is zoomed in close */
+  #canvas-svg[data-zoom-close] .edge-speak-label {
+    opacity: 0.6;
   }
 </style>
 
