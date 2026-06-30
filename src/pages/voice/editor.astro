@@ -1163,7 +1163,7 @@ const userEmail = session.email;
         ${node.action === 'transfer' || node.action === 'transfer_beth' || node.action === 'transfer_tim' ? 'bg-green-900/60 border-green-500' : 
           node.action === 'hangup' ? 'bg-red-900/40 border-red-500' :
           node.edges ? 'bg-blue-900/30 border-blue-600' : 'bg-gray-700'}`;
-      div.style.cssText = `left:${pos.x}px; top:${pos.y}px; width:${NODE_W}px; min-height:${nodeH}px;`;
+      div.style.cssText = `left:${pos.x}px; top:${pos.y}px; width:${NODE_W}px; min-height:${nodeH + 20}px;`;
       div.dataset.nodeId = nodeId;
 
       // Node content
@@ -1238,8 +1238,9 @@ const userEmail = session.email;
       // Drag to reposition
       div.addEventListener('mousedown', (e: MouseEvent) => {
         if (e.button !== 0) return;
-        // Don't start node drag if clicking on a connection handle
+        // Don't start node drag if clicking on a connection handle or add-edge button
         if ((e.target as HTMLElement).closest('[data-handle]')) return;
+        if ((e.target as HTMLElement).closest('[data-add-edge-btn]')) return;
         
         // Convert mouse to canvas-space coordinates
         const canvasEl = document.getElementById('canvas')!;
@@ -2173,6 +2174,83 @@ const userEmail = session.email;
     };
     // Use a slight delay so the current click event doesn't fire
     setTimeout(() => document.addEventListener('click', clickHandler, true), 50);
+
+    // ── Ghost node: shows "Create new node here" on empty canvas hover ──
+    let ghostNode: HTMLElement | null = null;
+    let ghostHoverTimer: ReturnType<typeof setTimeout> | null = null;
+    const GHOST_DELAY = 400; // ms of hovering in empty space before ghost appears
+
+    const nodesLayer = document.getElementById('nodes-layer')!;
+    const canvasEl = document.getElementById('canvas')!;
+
+    function getCanvasCoords(e: MouseEvent) {
+      const rect = canvasEl.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left + canvasEl.scrollLeft) / zoom,
+        y: (e.clientY - rect.top + canvasEl.scrollTop) / zoom,
+      };
+    }
+
+    function removeGhost() {
+      if (ghostHoverTimer) { clearTimeout(ghostHoverTimer); ghostHoverTimer = null; }
+      if (ghostNode) { ghostNode.remove(); ghostNode = null; }
+    }
+
+    function showGhostNode(x: number, y: number) {
+      removeGhost();
+      ghostNode = document.createElement('div');
+      ghostNode.id = 'edge-connect-ghost';
+      ghostNode.className = 'absolute rounded-lg border-2 border-dashed border-green-500/60 bg-green-900/20 cursor-pointer flex items-center justify-center transition-opacity';
+      ghostNode.style.cssText = `left:${x}px; top:${y}px; width:${NODE_W}px; height:${NODE_H}px; opacity:0;`;
+      ghostNode.innerHTML = `
+        <div class="text-center pointer-events-none">
+          <div class="text-green-400 text-lg mb-0.5">+</div>
+          <div class="text-[9px] text-green-300/80 font-medium">New node here</div>
+        </div>
+      `;
+      nodesLayer.appendChild(ghostNode);
+      // Fade in
+      requestAnimationFrame(() => { if (ghostNode) ghostNode.style.opacity = '1'; });
+      
+      // Click ghost → open wizard with __new__ target and position info
+      ghostNode.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const source = edgeConnectSource!;
+        const newX = x;
+        const newY = y;
+        exitEdgeConnectMode();
+        document.removeEventListener('click', clickHandler, true);
+        document.removeEventListener('keydown', escHandler);
+        openAddEdgeWizardWithNewNode(source, newX, newY);
+      });
+    }
+
+    const ghostMoveHandler = (e: MouseEvent) => {
+      if (!edgeConnectMode) return;
+      // Only on empty canvas (not over a node)
+      const overNode = (e.target as HTMLElement).closest('[data-node-id]');
+      const overWizard = (e.target as HTMLElement).closest('#add-edge-wizard');
+      if (overNode || overWizard) {
+        removeGhost();
+        return;
+      }
+      // Reset timer on each move
+      if (ghostHoverTimer) clearTimeout(ghostHoverTimer);
+      removeGhost();
+      ghostHoverTimer = setTimeout(() => {
+        if (!edgeConnectMode) return;
+        const coords = getCanvasCoords(e);
+        // Snap to grid-ish position (center the ghost on cursor)
+        showGhostNode(coords.x - NODE_W / 2, coords.y - NODE_H / 2);
+      }, GHOST_DELAY);
+    };
+
+    nodesLayer.addEventListener('mousemove', ghostMoveHandler);
+    // Store cleanup references on the banner so exitEdgeConnectMode can remove them
+    (banner as any).__ghostCleanup = () => {
+      removeGhost();
+      nodesLayer.removeEventListener('mousemove', ghostMoveHandler);
+    };
   }
 
   function exitEdgeConnectMode() {
@@ -2183,8 +2261,13 @@ const userEmail = session.email;
     document.querySelectorAll('.edge-connect-source').forEach(el => el.classList.remove('edge-connect-source'));
     document.querySelectorAll('.edge-connect-target').forEach(el => el.classList.remove('edge-connect-target'));
     
+    // Clean up ghost node hover listeners
+    const banner = document.getElementById('edge-connect-banner');
+    if (banner && (banner as any).__ghostCleanup) (banner as any).__ghostCleanup();
+    document.getElementById('edge-connect-ghost')?.remove();
+    
     // Remove banner
-    document.getElementById('edge-connect-banner')?.remove();
+    banner?.remove();
   }
 
   /** Add-edge wizard: opens with optional pre-selected target */
@@ -2381,6 +2464,60 @@ const userEmail = session.email;
     
     // Focus name input
     (document.getElementById('wizard-name') as HTMLInputElement).focus();
+  }
+
+  /** Variant: creates a new node at given position, then opens edge wizard connected to it */
+  function openAddEdgeWizardWithNewNode(sourceNodeId: string, x: number, y: number) {
+    // Prompt for new node name
+    const modal = document.createElement('div');
+    modal.id = 'new-node-connect-modal';
+    modal.className = 'fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm';
+    modal.innerHTML = `
+      <div class="bg-gray-900 border border-gray-600 rounded-xl shadow-2xl p-5 w-80">
+        <h4 class="text-sm font-semibold text-gray-200 mb-3">Create & Connect New Node</h4>
+        <div class="mb-3">
+          <label class="text-[10px] text-gray-500 uppercase tracking-wider">Node ID (snake_case)</label>
+          <input id="new-node-id-input" type="text" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-200 font-mono mt-0.5" placeholder="e.g., confirm_interest" autofocus />
+        </div>
+        <div class="mb-3">
+          <label class="text-[10px] text-gray-500 uppercase tracking-wider">Initial speak text (optional)</label>
+          <input id="new-node-speak-input" type="text" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-300 mt-0.5" placeholder="What the agent says in this node..." />
+        </div>
+        <div class="flex gap-2">
+          <button id="new-node-cancel" class="flex-1 px-3 py-1.5 bg-gray-700 text-gray-300 text-xs rounded hover:bg-gray-600">Cancel</button>
+          <button id="new-node-create" class="flex-1 px-3 py-1.5 bg-green-700 text-white text-xs font-medium rounded hover:bg-green-600">Create Node</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    const nameInput = document.getElementById('new-node-id-input') as HTMLInputElement;
+    nameInput.focus();
+
+    const doCreate = () => {
+      const newId = nameInput.value.trim().replace(/\s+/g, '_').toLowerCase();
+      if (!newId) { nameInput.focus(); return; }
+      if (currentTree[newId]) { nameInput.style.borderColor = '#ef4444'; nameInput.placeholder = 'Already exists!'; return; }
+
+      const speakText = (document.getElementById('new-node-speak-input') as HTMLInputElement).value.trim();
+      
+      // Create the node in the tree
+      currentTree[newId] = { speak: [speakText || ''], action: '' };
+      // Position it at the clicked location
+      nodePositions.set(newId, { x, y });
+
+      modal.remove();
+      markDirty();
+      renderCanvas();
+
+      // Now open the edge wizard with the new node as pre-selected target
+      openAddEdgeWizard(sourceNodeId, newId);
+    };
+
+    document.getElementById('new-node-create')?.addEventListener('click', doCreate);
+    nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doCreate(); });
+    document.getElementById('new-node-cancel')?.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   }
 
   let intentLibrary: Record<string, any> = {};
@@ -4950,6 +5087,14 @@ const userEmail = session.email;
   @keyframes source-pulse {
     0%, 100% { box-shadow: 0 0 8px rgba(34, 197, 94, 0.3); }
     50% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.6); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  #edge-connect-ghost {
+    transition: opacity 0.3s ease;
+    pointer-events: auto;
   }
   /* Edge hitarea hover cursor */
   .edge-hitarea:hover + .edge-path {
