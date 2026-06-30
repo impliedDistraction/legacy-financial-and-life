@@ -164,14 +164,58 @@ const userEmail = session.email;
       </div>
     </aside>
 
-    <!-- Center: Canvas -->
-    <main class="flex-1 overflow-hidden relative" id="canvas-container">
-      <div id="canvas" class="absolute inset-0 overflow-auto" style="cursor: grab;">
+    <!-- Center: Canvas + Bottom Panel -->
+    <main class="flex-1 overflow-hidden relative flex flex-col" id="canvas-container">
+      <div id="canvas" class="flex-1 overflow-auto relative" style="cursor: grab;">
         <svg id="canvas-svg" class="absolute" style="min-width: 4000px; min-height: 2000px;"></svg>
         <div id="nodes-layer" class="absolute" style="min-width: 4000px; min-height: 2000px;"></div>
       </div>
+      <!-- Bottom Panel: Minimap + Stats -->
+      <div id="bottom-panel" class="h-32 bg-gray-850 border-t border-gray-700 flex flex-shrink-0" style="background: #1a1d23;">
+        <!-- Minimap -->
+        <div class="w-56 border-r border-gray-700 p-1.5 flex flex-col">
+          <div class="text-[9px] text-gray-500 font-semibold uppercase tracking-wider mb-1 px-1">Minimap</div>
+          <div class="flex-1 relative overflow-hidden rounded bg-gray-900/50" id="minimap-container">
+            <canvas id="minimap-canvas" class="w-full h-full" style="image-rendering: pixelated;"></canvas>
+            <div id="minimap-viewport" class="absolute border border-brand-400/50 bg-brand-400/10 rounded-sm pointer-events-none" style="display:none;"></div>
+          </div>
+        </div>
+        <!-- Stats -->
+        <div class="flex-1 p-2 overflow-auto">
+          <div class="flex gap-4 items-start h-full">
+            <!-- Tree Stats -->
+            <div class="flex flex-col gap-1.5">
+              <div class="text-[9px] text-gray-500 font-semibold uppercase tracking-wider">Tree Stats</div>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                <div class="text-gray-500">Nodes</div><div class="text-gray-200 font-mono" id="stat-nodes">0</div>
+                <div class="text-gray-500">Edges</div><div class="text-gray-200 font-mono" id="stat-edges">0</div>
+                <div class="text-gray-500">Groups</div><div class="text-gray-200 font-mono" id="stat-groups">0</div>
+                <div class="text-gray-500">Max depth</div><div class="text-gray-200 font-mono" id="stat-depth">0</div>
+              </div>
+            </div>
+            <!-- Path Stats -->
+            <div class="flex flex-col gap-1.5">
+              <div class="text-[9px] text-gray-500 font-semibold uppercase tracking-wider">Coverage</div>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                <div class="text-gray-500">Terminals</div><div class="text-gray-200 font-mono" id="stat-terminals">0</div>
+                <div class="text-gray-500">Dead ends</div><div class="text-red-400 font-mono" id="stat-deadends">0</div>
+                <div class="text-gray-500">Orphans</div><div class="text-amber-400 font-mono" id="stat-orphans">0</div>
+                <div class="text-gray-500">Transfers</div><div class="text-green-400 font-mono" id="stat-transfers">0</div>
+              </div>
+            </div>
+            <!-- Zoom & Position -->
+            <div class="flex flex-col gap-1.5">
+              <div class="text-[9px] text-gray-500 font-semibold uppercase tracking-wider">View</div>
+              <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                <div class="text-gray-500">Zoom</div><div class="text-gray-200 font-mono" id="stat-zoom">100%</div>
+                <div class="text-gray-500">Selected</div><div class="text-brand-300 font-mono truncate max-w-[80px]" id="stat-selected">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <!-- Zoom controls -->
-      <div class="absolute bottom-4 right-4 flex gap-1 bg-gray-800 rounded-lg p-1 shadow-lg border border-gray-700">
+      <div class="absolute bottom-36 right-4 flex gap-1 bg-gray-800 rounded-lg p-1 shadow-lg border border-gray-700 z-10">
         <button id="btn-zoom-in" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded">+</button>
         <button id="btn-zoom-reset" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded text-xs">1:1</button>
         <button id="btn-zoom-out" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded">−</button>
@@ -687,24 +731,62 @@ const userEmail = session.email;
   const NODE_H = 64;
   const EDGE_HANDLE_H = 16; // Height per edge handle on right side
 
-  /** Compute rendered height of a node: base + edge handles area */
-  function getNodeHeight(node: any): number {
-    if (!node?.edges) return NODE_H;
-    const edgeCount = Object.keys(node.edges).length;
-    if (edgeCount <= 1) return NODE_H;
-    // Base height + extra for each edge beyond the first
-    return NODE_H + (edgeCount - 1) * EDGE_HANDLE_H;
+  /** Build a map of nodeId → array of incoming edges [{from, edgeName}] */
+  function computeIncomingEdges(): Map<string, Array<{from: string, edgeName: string}>> {
+    const incoming = new Map<string, Array<{from: string, edgeName: string}>>();
+    if (!currentTree) return incoming;
+    for (const [nodeId, node] of Object.entries(currentTree) as any) {
+      if (nodeId.startsWith('_')) continue;
+      if (node.next && !node.edges) {
+        if (!incoming.has(node.next)) incoming.set(node.next, []);
+        incoming.get(node.next)!.push({ from: nodeId, edgeName: '_next' });
+      }
+      if (node.edges) {
+        for (const [eName, edge] of Object.entries(node.edges) as any) {
+          if (edge.next) {
+            if (!incoming.has(edge.next)) incoming.set(edge.next, []);
+            incoming.get(edge.next)!.push({ from: nodeId, edgeName: eName });
+          }
+        }
+      }
+    }
+    return incoming;
+  }
+
+  // Cached incoming edges (rebuilt on renderCanvas)
+  let incomingEdgesMap: Map<string, Array<{from: string, edgeName: string}>> = new Map();
+
+  /** Compute rendered height of a node: base + max(outgoing, incoming) handles */
+  function getNodeHeight(node: any, nodeId?: string): number {
+    const outCount = node?.edges ? Object.keys(node.edges).length : 0;
+    const inCount = nodeId ? (incomingEdgesMap.get(nodeId)?.length || 0) : 0;
+    const handleCount = Math.max(outCount, inCount);
+    if (handleCount <= 1) return NODE_H;
+    return NODE_H + (handleCount - 1) * EDGE_HANDLE_H;
   }
 
   /** Get the Y offset for a specific edge handle on a node */
-  function getEdgeHandleY(node: any, edgeIndex: number): number {
+  function getEdgeHandleY(node: any, edgeIndex: number, nodeId?: string): number {
     const totalEdges = node?.edges ? Object.keys(node.edges).length : 0;
     if (totalEdges === 0) return NODE_H / 2;
-    const nodeH = getNodeHeight(node);
+    const nodeH = getNodeHeight(node, nodeId);
     const handleAreaTop = NODE_H - 8; // Start handles below the node header
     const handleAreaHeight = nodeH - handleAreaTop;
     const spacing = totalEdges > 1 ? handleAreaHeight / (totalEdges) : handleAreaHeight / 2;
     return handleAreaTop + spacing * (edgeIndex + 0.5);
+  }
+
+  /** Get the Y offset for a specific incoming edge handle on the left side */
+  function getIncomingHandleY(nodeId: string, incomingIndex: number): number {
+    const inEdges = incomingEdgesMap.get(nodeId) || [];
+    const totalIn = inEdges.length;
+    if (totalIn === 0) return NODE_H / 2;
+    const node = currentTree[nodeId];
+    const nodeH = getNodeHeight(node, nodeId);
+    const handleAreaTop = NODE_H - 8;
+    const handleAreaHeight = nodeH - handleAreaTop;
+    const spacing = totalIn > 1 ? handleAreaHeight / totalIn : handleAreaHeight / 2;
+    return handleAreaTop + spacing * (incomingIndex + 0.5);
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -884,6 +966,9 @@ const userEmail = session.email;
     nodePositions.clear();
     const nodes = getTreeNodes();
     
+    // Pre-compute incoming edges so getNodeHeight works correctly during layout
+    incomingEdgesMap = computeIncomingEdges();
+
     // Restore saved positions from tree metadata if available
     const savedPositions = currentTree?._meta?.positions;
     if (savedPositions && typeof savedPositions === 'object') {
@@ -951,14 +1036,14 @@ const userEmail = session.email;
       // Center the column vertically
       let totalHeight = 0;
       for (const nId of layer) {
-        totalHeight += getNodeHeight(currentTree[nId]) + ROW_GAP;
+        totalHeight += getNodeHeight(currentTree[nId], nId) + ROW_GAP;
       }
       totalHeight -= ROW_GAP;
       let y = startY + Math.max(0, (300 - totalHeight) / 2); // rough vertical centering
 
       for (const nId of layer) {
         nodePositions.set(nId, { x: startX + col * COL_GAP, y });
-        y += getNodeHeight(currentTree[nId]) + ROW_GAP;
+        y += getNodeHeight(currentTree[nId], nId) + ROW_GAP;
       }
     }
   }
@@ -972,6 +1057,9 @@ const userEmail = session.email;
     nodesLayer.innerHTML = '';
 
     if (!currentTree) return;
+
+    // Rebuild incoming edges map
+    incomingEdgesMap = computeIncomingEdges();
 
     // Draw group containers (behind everything)
     if (currentTree._groups) {
@@ -987,7 +1075,7 @@ const userEmail = session.email;
         const maxX = Math.max(...positions.map((p: any) => p.x)) + NODE_W + padding;
         const maxY = Math.max(...memberNodes.map((n: string) => {
           const p = nodePositions.get(n)!;
-          return p.y + getNodeHeight(currentTree[n]);
+          return p.y + getNodeHeight(currentTree[n], n);
         })) + padding;
 
         const groupDiv = document.createElement('div');
@@ -1031,7 +1119,7 @@ const userEmail = session.email;
       if (node.next && !node.edges) {
         const toPos = nodePositions.get(node.next);
         if (toPos) {
-          edgesSvg.push(drawEdge(fromPos, toPos, '#4b5563', 'ed-arrow', false, node, -1, undefined, node.next));
+          edgesSvg.push(drawEdge(fromPos, toPos, '#4b5563', 'ed-arrow', false, node, -1, undefined, node.next, nodeId));
         }
       }
 
@@ -1046,13 +1134,13 @@ const userEmail = session.email;
 
           const speak = Array.isArray(edge.speak) ? edge.speak[0] : undefined;
           if (eName === '_fallback') {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', true, node, idx, speak, target));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', true, node, idx, speak, target, nodeId));
           } else if (edge.action === 'hangup') {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', false, node, idx, speak, target));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', false, node, idx, speak, target, nodeId));
           } else if (edge.action === 'transfer' || edge.action === 'transfer_beth' || edge.action === 'transfer_tim') {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#f59e0b', 'ed-arrow-amber', false, node, idx, speak, target));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#f59e0b', 'ed-arrow-amber', false, node, idx, speak, target, nodeId));
           } else {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#22c55e', 'ed-arrow-green', false, node, idx, speak, target));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#22c55e', 'ed-arrow-green', false, node, idx, speak, target, nodeId));
           }
         });
       }
@@ -1065,7 +1153,7 @@ const userEmail = session.email;
       const node = currentTree[nodeId];
       if (!node) continue;
 
-      const nodeH = getNodeHeight(node);
+      const nodeH = getNodeHeight(node, nodeId);
       const div = document.createElement('div');
       div.className = `absolute rounded-lg border-2 shadow-md cursor-pointer transition-all select-none
         ${selectedNode === nodeId ? 'ring-2 ring-brand-400 border-brand-500' : 'border-gray-600 hover:border-gray-400'}
@@ -1081,12 +1169,12 @@ const userEmail = session.email;
       const hasConverse = node.converse?.mode;
       const speakPreview = Array.isArray(node.speak) ? (node.speak[0] || '').slice(0, 35) : '';
       
-      // Build edge handles HTML for the right side
+      // Build outgoing edge handles HTML (right side)
       let edgeHandlesHtml = '';
       if (node.edges) {
         const edgeEntries = Object.entries(node.edges);
         edgeEntries.forEach(([eName, edge]: [string, any], idx) => {
-          const handleY = getEdgeHandleY(node, idx);
+          const handleY = getEdgeHandleY(node, idx, nodeId);
           const isFallback = eName === '_fallback';
           const isAction = edge.action === 'hangup' || edge.action === 'transfer';
           const dotColor = isFallback ? 'bg-red-500' : isAction ? 'bg-amber-500' : 'bg-green-500';
@@ -1098,6 +1186,25 @@ const userEmail = session.email;
               <div class="w-3 h-3 rounded-full ${dotColor} border border-gray-900 hover:scale-150 hover:border-white transition-all cursor-crosshair z-10 flex-shrink-0" data-handle="out" data-source="${nodeId}" data-edge-name="${eName}" title="${eName} → ${edge.next || edge.action || '?'}"></div>
             </div>`;
         });
+      }
+
+      // Build incoming edge handles HTML (left side)
+      let incomingHandlesHtml = '';
+      const inEdges = incomingEdgesMap.get(nodeId) || [];
+      if (inEdges.length > 0) {
+        inEdges.forEach((inc, idx) => {
+          const handleY = getIncomingHandleY(nodeId, idx);
+          const fromLabel = inc.from.replace(/_/g, ' ').slice(0, 10);
+          const edgeLabel = inc.edgeName === '_next' ? '→' : inc.edgeName === '_fallback' ? '✗' : inc.edgeName.slice(0, 8);
+          incomingHandlesHtml += `
+            <div class="absolute flex items-center gap-0.5" style="left: -6px; top: ${handleY - 6}px;" data-incoming-handle="${idx}" data-incoming-from="${inc.from}">
+              <div class="w-3 h-3 rounded-full bg-blue-500 border border-gray-900 hover:scale-150 hover:border-white transition-all cursor-pointer z-10 flex-shrink-0 node-handle node-handle-in" data-handle="in" data-target="${nodeId}"></div>
+              <span class="text-[8px] text-blue-400 font-mono truncate max-w-[60px] pl-0.5 pointer-events-none select-none">${edgeLabel}</span>
+            </div>`;
+        });
+      } else {
+        // Single generic input handle for nodes with no incoming edges yet
+        incomingHandlesHtml = `<div class="node-handle node-handle-in absolute top-1/2 -left-2 -translate-y-1/2 w-3 h-3 rounded-full bg-gray-700 border-2 border-gray-500 hover:bg-green-500 hover:border-green-300 hover:scale-125 transition-all cursor-crosshair z-10 opacity-0 hover:opacity-100" data-handle="in" data-target="${nodeId}"></div>`;
       }
 
       div.innerHTML = `
@@ -1114,10 +1221,9 @@ const userEmail = session.email;
           </div>
         </div>
         ${edgeHandlesHtml}
+        ${incomingHandlesHtml}
         <!-- Connection handle (default output port — used if no edges) -->
         ${!node.edges ? `<div class="node-handle node-handle-out absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gray-600 border-2 border-gray-400 hover:bg-brand-500 hover:border-brand-300 hover:scale-125 transition-all cursor-crosshair z-10" data-handle="out" data-source="${nodeId}" title="Drag to connect"></div>` : ''}
-        <!-- Connection handle (input port — left side) -->
-        <div class="node-handle node-handle-in absolute top-1/2 -left-2 -translate-y-1/2 w-3 h-3 rounded-full bg-gray-700 border-2 border-gray-500 hover:bg-green-500 hover:border-green-300 hover:scale-125 transition-all cursor-crosshair z-10 opacity-0 hover:opacity-100" data-handle="in" data-target="${nodeId}"></div>
       `;
 
       // Drag to reposition
@@ -1153,6 +1259,9 @@ const userEmail = session.email;
 
       nodesLayer.appendChild(div);
     }
+
+    // Update bottom panel (minimap + stats)
+    requestAnimationFrame(updateBottomPanel);
   }
 
   // Global mouse handlers for dragging — registered ONCE outside renderCanvas
@@ -1275,14 +1384,14 @@ const userEmail = session.email;
       const edgeIdx = edgeEntries.indexOf(connectEdgeName);
       if (edgeIdx >= 0) {
         startX = sourcePos.x + NODE_W + 4;
-        startY = sourcePos.y + getEdgeHandleY(currentTree[connectSource], edgeIdx);
+        startY = sourcePos.y + getEdgeHandleY(currentTree[connectSource], edgeIdx, connectSource);
       } else {
         startX = sourcePos.x + NODE_W / 2;
-        startY = sourcePos.y + getNodeHeight(currentTree[connectSource]);
+        startY = sourcePos.y + getNodeHeight(currentTree[connectSource], connectSource);
       }
     } else {
       startX = sourcePos.x + NODE_W / 2;
-      startY = sourcePos.y + getNodeHeight(currentTree[connectSource]);
+      startY = sourcePos.y + getNodeHeight(currentTree[connectSource], connectSource);
     }
     
     // Create a temporary SVG line from the source
@@ -1425,6 +1534,9 @@ const userEmail = session.email;
 
     if (!currentTree) { svg.innerHTML = ''; return; }
 
+    // Ensure incoming edges map is current
+    incomingEdgesMap = computeIncomingEdges();
+
     for (const [nodeId, node] of Object.entries(currentTree) as any) {
       if (nodeId.startsWith('_')) continue;
       const fromPos = nodePositions.get(nodeId);
@@ -1433,7 +1545,7 @@ const userEmail = session.email;
       // Direct "next" (no edges) — bottom-center to left-center
       if (node.next && !node.edges) {
         const toPos = nodePositions.get(node.next);
-        if (toPos) edgesSvg.push(drawEdge(fromPos, toPos, '#4b5563', 'ed-arrow', false, node, -1, undefined, node.next));
+        if (toPos) edgesSvg.push(drawEdge(fromPos, toPos, '#4b5563', 'ed-arrow', false, node, -1, undefined, node.next, nodeId));
       }
 
       // Named edges — from right-side edge handle to target's left-center input
@@ -1447,13 +1559,13 @@ const userEmail = session.email;
 
           const speak = Array.isArray(edge.speak) ? edge.speak[0] : undefined;
           if (eName === '_fallback') {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', true, node, idx, speak, target));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', true, node, idx, speak, target, nodeId));
           } else if (edge.action === 'hangup') {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', false, node, idx, speak, target));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#ef4444', 'ed-arrow-red', false, node, idx, speak, target, nodeId));
           } else if (edge.action === 'transfer' || edge.action === 'transfer_beth' || edge.action === 'transfer_tim') {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#f59e0b', 'ed-arrow-amber', false, node, idx, speak, target));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#f59e0b', 'ed-arrow-amber', false, node, idx, speak, target, nodeId));
           } else {
-            edgesSvg.push(drawEdge(fromPos, toPos, '#22c55e', 'ed-arrow-green', false, node, idx, speak, target));
+            edgesSvg.push(drawEdge(fromPos, toPos, '#22c55e', 'ed-arrow-green', false, node, idx, speak, target, nodeId));
           }
         });
       }
@@ -1462,21 +1574,37 @@ const userEmail = session.email;
     svg.innerHTML = edgesSvg.join('');
   }
 
-  function drawEdge(from: {x:number,y:number}, to: {x:number,y:number}, color: string, marker: string, dashed = false, sourceNode?: any, edgeIndex?: number, speakText?: string, targetNodeId?: string) {
+  function drawEdge(from: {x:number,y:number}, to: {x:number,y:number}, color: string, marker: string, dashed = false, sourceNode?: any, edgeIndex?: number, speakText?: string, targetNodeId?: string, sourceNodeId?: string) {
     // If this is a per-edge connection, originate from the right side at the edge handle's Y
     let x1: number, y1: number;
     if (sourceNode && edgeIndex !== undefined && edgeIndex >= 0 && sourceNode.edges) {
       x1 = from.x + NODE_W + 4; // Right edge of node + handle radius
-      y1 = from.y + getEdgeHandleY(sourceNode, edgeIndex);
+      y1 = from.y + getEdgeHandleY(sourceNode, edgeIndex, sourceNodeId);
     } else {
       x1 = from.x + NODE_W / 2;
-      y1 = from.y + getNodeHeight(sourceNode || {});
+      y1 = from.y + getNodeHeight(sourceNode || {}, sourceNodeId);
     }
-    // Target: left-center of destination node
+    // Target: left side of destination node, at specific incoming handle if available
     const tNode = targetNodeId ? currentTree[targetNodeId] : null;
-    const targetH = tNode ? getNodeHeight(tNode) : NODE_H;
+    const targetH = tNode ? getNodeHeight(tNode, targetNodeId) : NODE_H;
     const x2 = to.x - 4; // Left edge of target node
-    const y2 = to.y + targetH / 2;
+
+    // Find the specific incoming handle index for this edge
+    let y2: number;
+    if (targetNodeId) {
+      const inEdges = incomingEdgesMap.get(targetNodeId) || [];
+      const edgeName = (sourceNode?.edges && edgeIndex !== undefined && edgeIndex >= 0) 
+        ? Object.keys(sourceNode.edges)[edgeIndex] 
+        : '_next';
+      const inIdx = inEdges.findIndex(ie => ie.from === sourceNodeId && ie.edgeName === edgeName);
+      if (inIdx >= 0 && inEdges.length > 0) {
+        y2 = to.y + getIncomingHandleY(targetNodeId, inIdx);
+      } else {
+        y2 = to.y + targetH / 2;
+      }
+    } else {
+      y2 = to.y + targetH / 2;
+    }
 
     const dash = dashed ? 'stroke-dasharray="5 3"' : '';
 
@@ -1492,7 +1620,7 @@ const userEmail = session.email;
     if (edgeIndex === undefined || edgeIndex < 0) {
       // For direct "next" edges, go bottom-center → left-center
       const nx1 = from.x + NODE_W / 2;
-      const ny1 = from.y + getNodeHeight(sourceNode || {});
+      const ny1 = from.y + getNodeHeight(sourceNode || {}, sourceNodeId);
       const midY = (ny1 + y2) / 2;
       return `<path d="M${nx1},${ny1} C${nx1},${midY} ${x2},${midY} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="1.2" marker-end="url(#${marker})" ${dash} opacity="0.5" class="edge-path"/>`;
     }
@@ -1523,6 +1651,9 @@ const userEmail = session.email;
   // ═══════════════════════════════════════════════════════════════
   // NODE LIST (left panel)
   // ═══════════════════════════════════════════════════════════════
+  // Track which nodes are expanded in the list
+  const expandedListNodes = new Set<string>();
+
   function renderNodeList() {
     const list = document.getElementById('node-list')!;
     const nodes = getTreeNodes();
@@ -1533,6 +1664,53 @@ const userEmail = session.email;
       for (const [gName, g] of Object.entries(currentTree._groups) as any) {
         for (const n of (g.nodes || [])) { nodeGroupMap[n] = gName; }
       }
+    }
+
+    /** Render a single node item with expandable edges */
+    function renderNodeItem(id: string): string {
+      const node = currentTree[id];
+      if (!node) return '';
+      const icon = node.action === 'transfer' ? '📲' : node.action === 'hangup' ? '📴' : node.edges ? '❓' : '💬';
+      const isSelected = selectedNode === id;
+      const hasEdges = node.edges && Object.keys(node.edges).length > 0;
+      const hasNext = !!node.next && !node.edges;
+      const isExpanded = expandedListNodes.has(id);
+      const expandable = hasEdges || hasNext;
+      const chevron = expandable ? (isExpanded ? '▾' : '▸') : '';
+
+      let itemHtml = `<div class="px-2 py-1 rounded cursor-pointer text-xs flex items-center gap-1.5 ${isSelected ? 'bg-brand-600/30 text-brand-200' : 'text-gray-300 hover:bg-gray-700'}" data-list-node="${id}">
+        <span class="text-[9px] text-gray-500 w-3 text-center flex-shrink-0" data-list-toggle="${id}">${chevron}</span>
+        <span>${icon}</span>
+        <span class="truncate flex-1">${id.replace(/_/g, ' ')}</span>
+        ${hasEdges ? `<span class="text-[9px] text-gray-500">${Object.keys(node.edges).length}</span>` : ''}
+      </div>`;
+
+      // Expanded edge sub-items
+      if (isExpanded && expandable) {
+        itemHtml += `<div class="ml-5 border-l border-gray-700/50 pl-1.5 space-y-0.5 mb-1">`;
+        if (hasEdges) {
+          for (const [eName, edge] of Object.entries(node.edges) as any) {
+            const isFallback = eName === '_fallback';
+            const target = edge.next || edge.action || '—';
+            const edgeColor = isFallback ? 'text-red-400' : edge.action === 'hangup' ? 'text-red-400' : edge.action === 'transfer' ? 'text-amber-400' : 'text-green-400';
+            const dot = isFallback ? '○' : '●';
+            const speak = Array.isArray(edge.speak) ? edge.speak[0]?.slice(0, 20) : '';
+            itemHtml += `<div class="px-1.5 py-0.5 rounded cursor-pointer text-[10px] flex items-center gap-1.5 hover:bg-gray-700/50 ${edgeColor}" data-list-edge="${id}:${eName}" title="${eName} → ${target}${speak ? '\n' + speak : ''}">
+              <span class="flex-shrink-0">${dot}</span>
+              <span class="truncate flex-1 font-mono">${eName === '_fallback' ? 'fallback' : eName}</span>
+              <span class="text-[9px] text-gray-500 truncate max-w-[60px]">→ ${target.replace(/_/g, ' ').slice(0, 12)}</span>
+            </div>`;
+          }
+        } else if (hasNext) {
+          itemHtml += `<div class="px-1.5 py-0.5 rounded cursor-pointer text-[10px] flex items-center gap-1.5 hover:bg-gray-700/50 text-gray-400" data-list-edge="${id}:_next" title="next → ${node.next}">
+            <span class="flex-shrink-0">→</span>
+            <span class="truncate flex-1">next</span>
+            <span class="text-[9px] text-gray-500 truncate max-w-[60px]">${node.next.replace(/_/g, ' ').slice(0, 12)}</span>
+          </div>`;
+        }
+        itemHtml += `</div>`;
+      }
+      return itemHtml;
     }
 
     // Render groups first, then ungrouped nodes
@@ -1552,13 +1730,7 @@ const userEmail = session.email;
           </div>
           <div class="ml-3 border-l border-gray-700 pl-1.5 space-y-0.5 mt-0.5">`;
         for (const id of members) {
-          const node = currentTree[id];
-          const icon = node.action === 'transfer' ? '📲' : node.action === 'hangup' ? '📴' : node.edges ? '❓' : '💬';
-          const isSelected = selectedNode === id;
-          html += `<div class="px-2 py-1 rounded cursor-pointer text-xs flex items-center gap-2 ${isSelected ? 'bg-brand-600/30 text-brand-200' : 'text-gray-300 hover:bg-gray-700'}" data-list-node="${id}">
-            <span>${icon}</span>
-            <span class="truncate">${id.replace(/_/g, ' ')}</span>
-          </div>`;
+          html += renderNodeItem(id);
         }
         html += `</div></div>`;
       }
@@ -1570,21 +1742,66 @@ const userEmail = session.email;
       html += `<div class="mt-2 mb-1"><div class="px-2 py-1 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Ungrouped</div></div>`;
     }
     for (const id of ungrouped) {
-      const node = currentTree[id];
-      const icon = node.action === 'transfer' ? '📲' : node.action === 'hangup' ? '📴' : node.edges ? '❓' : '💬';
-      const isSelected = selectedNode === id;
-      html += `<div class="px-2 py-1.5 rounded cursor-pointer text-xs flex items-center gap-2 ${isSelected ? 'bg-brand-600/30 text-brand-200' : 'text-gray-300 hover:bg-gray-700'}" data-list-node="${id}">
-        <span>${icon}</span>
-        <span class="truncate">${id.replace(/_/g, ' ')}</span>
-      </div>`;
+      html += renderNodeItem(id);
     }
 
     list.innerHTML = html;
 
     // Node click handlers
     list.querySelectorAll('[data-list-node]').forEach(el => {
-      el.addEventListener('click', () => {
-        selectNode(el.getAttribute('data-list-node')!);
+      el.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        // If clicking the toggle chevron, just expand/collapse
+        if (target.dataset.listToggle) {
+          e.stopPropagation();
+          const nId = target.dataset.listToggle;
+          if (expandedListNodes.has(nId)) {
+            expandedListNodes.delete(nId);
+          } else {
+            expandedListNodes.add(nId);
+          }
+          renderNodeList();
+          return;
+        }
+        const nodeId = el.getAttribute('data-list-node')!;
+        // Auto-expand when selecting
+        expandedListNodes.add(nodeId);
+        selectNode(nodeId);
+      });
+    });
+
+    // Edge click handlers
+    list.querySelectorAll('[data-list-edge]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const [nodeId, edgeName] = (el as HTMLElement).dataset.listEdge!.split(':');
+        selectNode(nodeId);
+        
+        // Highlight the edge on canvas
+        const svg = document.getElementById('canvas-svg')!;
+        svg.querySelectorAll('.edge-path').forEach(p => (p as SVGElement).style.opacity = '0.15');
+        
+        // Find and highlight the matching edge handle
+        const handleEl = document.querySelector(`[data-edge-handle="${edgeName}"][data-edge-source="${nodeId}"]`) as HTMLElement;
+        if (handleEl) {
+          handleEl.style.transform = 'scale(1.3)';
+          setTimeout(() => { handleEl.style.transform = ''; }, 1500);
+        }
+
+        // Flash the target node
+        const node = currentTree[nodeId];
+        if (node?.edges?.[edgeName]?.next) {
+          const targetEl = document.querySelector(`[data-node-id="${node.edges[edgeName].next}"]`) as HTMLElement;
+          if (targetEl) {
+            targetEl.style.outline = '2px solid #22c55e';
+            setTimeout(() => { targetEl.style.outline = ''; }, 1500);
+          }
+        }
+        
+        // Restore edge opacity after flash
+        setTimeout(() => {
+          svg.querySelectorAll('.edge-path').forEach(p => (p as SVGElement).style.opacity = '');
+        }, 1500);
       });
     });
 
@@ -2623,6 +2840,9 @@ const userEmail = session.email;
     } else {
       svg.removeAttribute('data-zoom-close');
     }
+    // Update zoom display in stats
+    const zoomEl = document.getElementById('stat-zoom');
+    if (zoomEl) zoomEl.textContent = Math.round(zoom * 100) + '%';
   }
 
   /** Fit tree to viewport with padding */
@@ -2635,7 +2855,7 @@ const userEmail = session.email;
       minX = Math.min(minX, pos.x);
       minY = Math.min(minY, pos.y);
       const node = currentTree[nodeId];
-      const nh = node ? getNodeHeight(node) : NODE_H;
+      const nh = node ? getNodeHeight(node, nodeId) : NODE_H;
       maxX = Math.max(maxX, pos.x + NODE_W);
       maxY = Math.max(maxY, pos.y + nh);
     }
@@ -2669,14 +2889,26 @@ const userEmail = session.email;
     fitToView();
   });
 
-  // Mouse wheel: Ctrl+wheel = zoom, plain wheel = scroll (native)
+  // Mouse wheel: plain wheel = zoom, Shift+wheel = horizontal scroll
   document.getElementById('canvas')?.addEventListener('wheel', (e: WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      zoom = Math.max(0.3, Math.min(2, zoom - e.deltaY * 0.002));
-      applyZoom();
+    if (e.shiftKey) {
+      // Shift+wheel → horizontal scroll (native)
+      return;
     }
-    // Otherwise: let native scroll handle it (horizontal + vertical)
+    e.preventDefault();
+    const canvasEl = document.getElementById('canvas')!;
+    const rect = canvasEl.getBoundingClientRect();
+    // Mouse position relative to canvas content (before zoom)
+    const mouseX = (e.clientX - rect.left + canvasEl.scrollLeft) / zoom;
+    const mouseY = (e.clientY - rect.top + canvasEl.scrollTop) / zoom;
+    
+    const oldZoom = zoom;
+    zoom = Math.max(0.3, Math.min(2, zoom - e.deltaY * 0.002));
+    applyZoom();
+    
+    // Adjust scroll to keep content under cursor stable
+    canvasEl.scrollLeft = mouseX * zoom - (e.clientX - rect.left);
+    canvasEl.scrollTop = mouseY * zoom - (e.clientY - rect.top);
   }, { passive: false });
 
   // Middle-mouse panning
@@ -2719,6 +2951,187 @@ const userEmail = session.email;
       const canvasEl = document.getElementById('canvas')!;
       canvasEl.style.cursor = 'grab';
     }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // BOTTOM PANEL: MINIMAP + STATS
+  // ═══════════════════════════════════════════════════════════════
+  function updateBottomPanel() {
+    updateStats();
+    renderMinimap();
+  }
+
+  function updateStats() {
+    if (!currentTree) return;
+    const nodes = Object.keys(currentTree).filter(k => !k.startsWith('_'));
+    let edgeCount = 0;
+    let terminals = 0;
+    let deadEnds = 0;
+    let transfers = 0;
+    const reachable = new Set<string>();
+
+    for (const nodeId of nodes) {
+      const node = currentTree[nodeId];
+      if (node.edges) {
+        edgeCount += Object.keys(node.edges).length;
+        for (const edge of Object.values(node.edges) as any[]) {
+          if (edge.next) reachable.add(edge.next);
+        }
+      }
+      if (node.next) { edgeCount++; reachable.add(node.next); }
+      if (node.action === 'hangup') terminals++;
+      if (node.action === 'transfer' || node.action === 'transfer_beth' || node.action === 'transfer_tim') transfers++;
+      if (!node.next && !node.edges && !node.action) deadEnds++;
+    }
+
+    // Orphans: nodes not reachable by any edge (except root/greeting nodes)
+    const rootNames = ['greeting', 'greeting_with_name', 'greeting_no_name', 'start', 'root'];
+    const orphans = nodes.filter(n => !reachable.has(n) && !rootNames.includes(n));
+
+    // Max depth from layout layers
+    const depths = new Map<string, number>();
+    function getDepth(nodeId: string, visited = new Set<string>()): number {
+      if (visited.has(nodeId) || depths.has(nodeId)) return depths.get(nodeId) || 0;
+      visited.add(nodeId);
+      const node = currentTree[nodeId];
+      if (!node) return 0;
+      let maxChild = 0;
+      if (node.edges) {
+        for (const edge of Object.values(node.edges) as any[]) {
+          if (edge.next && !visited.has(edge.next)) maxChild = Math.max(maxChild, getDepth(edge.next, visited) + 1);
+        }
+      }
+      if (node.next && !visited.has(node.next)) maxChild = Math.max(maxChild, getDepth(node.next, visited) + 1);
+      depths.set(nodeId, maxChild);
+      return maxChild;
+    }
+    let maxDepth = 0;
+    for (const n of nodes) maxDepth = Math.max(maxDepth, getDepth(n));
+
+    const groups = currentTree._groups ? Object.keys(currentTree._groups).length : 0;
+
+    const el = (id: string) => document.getElementById(id);
+    if (el('stat-nodes')) el('stat-nodes')!.textContent = String(nodes.length);
+    if (el('stat-edges')) el('stat-edges')!.textContent = String(edgeCount);
+    if (el('stat-groups')) el('stat-groups')!.textContent = String(groups);
+    if (el('stat-depth')) el('stat-depth')!.textContent = String(maxDepth);
+    if (el('stat-terminals')) el('stat-terminals')!.textContent = String(terminals);
+    if (el('stat-deadends')) el('stat-deadends')!.textContent = String(deadEnds);
+    if (el('stat-orphans')) el('stat-orphans')!.textContent = String(orphans.length);
+    if (el('stat-transfers')) el('stat-transfers')!.textContent = String(transfers);
+    if (el('stat-zoom')) el('stat-zoom')!.textContent = Math.round(zoom * 100) + '%';
+    if (el('stat-selected')) el('stat-selected')!.textContent = selectedNode ? selectedNode.replace(/_/g, ' ') : '—';
+  }
+
+  function renderMinimap() {
+    const canvas = document.getElementById('minimap-canvas') as HTMLCanvasElement;
+    const container = document.getElementById('minimap-container')!;
+    const viewport = document.getElementById('minimap-viewport')!;
+    if (!canvas || !container || nodePositions.size === 0) return;
+
+    const cRect = container.getBoundingClientRect();
+    canvas.width = cRect.width;
+    canvas.height = cRect.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Find bounds
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [nodeId, pos] of nodePositions) {
+      const node = currentTree[nodeId];
+      const nh = node ? getNodeHeight(node, nodeId) : NODE_H;
+      minX = Math.min(minX, pos.x);
+      minY = Math.min(minY, pos.y);
+      maxX = Math.max(maxX, pos.x + NODE_W);
+      maxY = Math.max(maxY, pos.y + nh);
+    }
+    const pad = 40;
+    minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+    const treeW = maxX - minX;
+    const treeH = maxY - minY;
+    const scale = Math.min(canvas.width / treeW, canvas.height / treeH);
+    const offX = (canvas.width - treeW * scale) / 2;
+    const offY = (canvas.height - treeH * scale) / 2;
+
+    // Draw edges (thin lines)
+    ctx.strokeStyle = '#4b5563';
+    ctx.lineWidth = 0.5;
+    if (currentTree) {
+      for (const [nodeId, node] of Object.entries(currentTree) as any) {
+        if (nodeId.startsWith('_')) continue;
+        const fromPos = nodePositions.get(nodeId);
+        if (!fromPos) continue;
+        const targets: string[] = [];
+        if (node.next) targets.push(node.next);
+        if (node.edges) {
+          for (const edge of Object.values(node.edges) as any[]) {
+            if (edge.next) targets.push(edge.next);
+          }
+        }
+        for (const t of targets) {
+          const toPos = nodePositions.get(t);
+          if (!toPos) continue;
+          ctx.beginPath();
+          ctx.moveTo(offX + (fromPos.x + NODE_W - minX) * scale, offY + (fromPos.y + NODE_H / 2 - minY) * scale);
+          ctx.lineTo(offX + (toPos.x - minX) * scale, offY + (toPos.y + NODE_H / 2 - minY) * scale);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw nodes (tiny rectangles)
+    for (const [nodeId, pos] of nodePositions) {
+      const node = currentTree[nodeId];
+      const nh = node ? getNodeHeight(node, nodeId) : NODE_H;
+      const rx = offX + (pos.x - minX) * scale;
+      const ry = offY + (pos.y - minY) * scale;
+      const rw = NODE_W * scale;
+      const rh = nh * scale;
+
+      if (nodeId === selectedNode) {
+        ctx.fillStyle = '#3b82f6';
+      } else if (node?.action === 'transfer' || node?.action === 'transfer_beth' || node?.action === 'transfer_tim') {
+        ctx.fillStyle = '#22c55e';
+      } else if (node?.action === 'hangup') {
+        ctx.fillStyle = '#ef4444';
+      } else if (node?.edges) {
+        ctx.fillStyle = '#6366f1';
+      } else {
+        ctx.fillStyle = '#6b7280';
+      }
+      ctx.fillRect(rx, ry, Math.max(rw, 2), Math.max(rh, 1));
+    }
+
+    // Draw viewport indicator
+    const canvasEl = document.getElementById('canvas')!;
+    const vpX = offX + (canvasEl.scrollLeft / zoom - minX) * scale;
+    const vpY = offY + (canvasEl.scrollTop / zoom - minY) * scale;
+    const vpW = (canvasEl.clientWidth / zoom) * scale;
+    const vpH = (canvasEl.clientHeight / zoom) * scale;
+    viewport.style.display = 'block';
+    viewport.style.left = vpX + 'px';
+    viewport.style.top = vpY + 'px';
+    viewport.style.width = vpW + 'px';
+    viewport.style.height = vpH + 'px';
+
+    // Click on minimap scrolls canvas
+    canvas.onclick = (e) => {
+      const cr = canvas.getBoundingClientRect();
+      const mx = e.clientX - cr.left;
+      const my = e.clientY - cr.top;
+      const worldX = (mx - offX) / scale + minX;
+      const worldY = (my - offY) / scale + minY;
+      canvasEl.scrollTo({
+        left: worldX * zoom - canvasEl.clientWidth / 2,
+        top: worldY * zoom - canvasEl.clientHeight / 2,
+        behavior: 'smooth'
+      });
+    };
+  }
+
+  // Update minimap on scroll
+  document.getElementById('canvas')?.addEventListener('scroll', () => {
+    requestAnimationFrame(renderMinimap);
   });
 
   // ═══════════════════════════════════════════════════════════════
@@ -3603,7 +4016,7 @@ const userEmail = session.email;
     boxSelectedNodes.clear();
     const rect = { x, y, w, h };
     for (const [nodeId, pos] of nodePositions) {
-      const nh = getNodeHeight(currentTree[nodeId]);
+      const nh = getNodeHeight(currentTree[nodeId], nodeId);
       if (pos.x + NODE_W > rect.x && pos.x < rect.x + rect.w &&
           pos.y + nh > rect.y && pos.y < rect.y + rect.h) {
         boxSelectedNodes.add(nodeId);
