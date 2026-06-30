@@ -216,9 +216,12 @@ const userEmail = session.email;
       </div>
       <!-- Zoom controls -->
       <div class="absolute bottom-36 right-4 flex gap-1 bg-gray-800 rounded-lg p-1 shadow-lg border border-gray-700 z-10">
-        <button id="btn-zoom-in" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded">+</button>
-        <button id="btn-zoom-reset" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded text-xs">1:1</button>
-        <button id="btn-zoom-out" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded">−</button>
+        <button id="btn-zoom-in" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded" title="Zoom in">+</button>
+        <button id="btn-zoom-reset" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded text-xs" title="Fit to view">1:1</button>
+        <button id="btn-zoom-out" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded" title="Zoom out">−</button>
+        <div class="w-px h-5 bg-gray-600 self-center"></div>
+        <button id="btn-center-tree" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded text-xs" title="Center tree on canvas">⊡</button>
+        <button id="btn-center-selection" class="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-gray-700 rounded text-xs hidden" title="Center selection">⊞</button>
       </div>
     </main>
 
@@ -1221,25 +1224,47 @@ const userEmail = session.email;
           </div>
         </div>
         ${edgeHandlesHtml}
+        <!-- Add-edge button (right side, below last edge handle) -->
+        <div class="absolute flex items-center" style="right: -6px; bottom: -8px;" data-add-edge-btn="${nodeId}">
+          <div class="w-3.5 h-3.5 rounded-full bg-gray-600 border border-dashed border-gray-400 hover:bg-brand-500 hover:border-brand-300 hover:scale-150 transition-all cursor-pointer z-10 flex items-center justify-center" title="Add edge">
+            <span class="text-[8px] text-gray-300 font-bold leading-none">+</span>
+          </div>
+        </div>
         ${incomingHandlesHtml}
         <!-- Connection handle (default output port — used if no edges) -->
         ${!node.edges ? `<div class="node-handle node-handle-out absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-gray-600 border-2 border-gray-400 hover:bg-brand-500 hover:border-brand-300 hover:scale-125 transition-all cursor-crosshair z-10" data-handle="out" data-source="${nodeId}" title="Drag to connect"></div>` : ''}
       `;
 
       // Drag to reposition
-      let mouseDownPos = { x: 0, y: 0 };
       div.addEventListener('mousedown', (e: MouseEvent) => {
         if (e.button !== 0) return;
         // Don't start node drag if clicking on a connection handle
         if ((e.target as HTMLElement).closest('[data-handle]')) return;
+        
+        // Convert mouse to canvas-space coordinates
+        const canvasEl = document.getElementById('canvas')!;
+        const rect = canvasEl.getBoundingClientRect();
+        const mouseCanvasX = (e.clientX - rect.left + canvasEl.scrollLeft) / zoom;
+        const mouseCanvasY = (e.clientY - rect.top + canvasEl.scrollTop) / zoom;
+        
         const currentPos = nodePositions.get(nodeId)!;
         dragging = nodeId;
         didDrag = false;
-        dragStart = { x: e.clientX - currentPos.x, y: e.clientY - currentPos.y };
-        mouseDownPos = { x: e.clientX, y: e.clientY };
+        // Store offset in canvas-space: distance from mouse to node origin
+        dragStart = { x: mouseCanvasX - currentPos.x, y: mouseCanvasY - currentPos.y };
 
+        // If this node is part of a box selection, drag all selected nodes
+        if (boxSelectedNodes.size > 1 && boxSelectedNodes.has(nodeId)) {
+          groupDragging = true;
+          groupDragMembers = [...boxSelectedNodes].filter(n => n !== nodeId && nodePositions.has(n));
+          groupDragOffsets.clear();
+          for (const memberId of groupDragMembers) {
+            const mPos = nodePositions.get(memberId)!;
+            groupDragOffsets.set(memberId, { x: mouseCanvasX - mPos.x, y: mouseCanvasY - mPos.y });
+          }
+        }
         // If this node is in a group and shift is NOT held, drag the group
-        if (!e.shiftKey && currentTree._groups) {
+        else if (!e.shiftKey && currentTree._groups) {
           for (const [, group] of Object.entries(currentTree._groups) as any) {
             if ((group.nodes || []).includes(nodeId)) {
               groupDragging = true;
@@ -1247,7 +1272,7 @@ const userEmail = session.email;
               groupDragOffsets.clear();
               for (const memberId of groupDragMembers) {
                 const mPos = nodePositions.get(memberId)!;
-                groupDragOffsets.set(memberId, { x: e.clientX - mPos.x, y: e.clientY - mPos.y });
+                groupDragOffsets.set(memberId, { x: mouseCanvasX - mPos.x, y: mouseCanvasY - mPos.y });
               }
               break;
             }
@@ -1270,32 +1295,36 @@ const userEmail = session.email;
   document.addEventListener('mousemove', (e: MouseEvent) => {
     if (!dragging) return;
     didDrag = true;
-    const newX = e.clientX - dragStart.x;
-    const newY = e.clientY - dragStart.y;
-    nodePositions.set(dragging, { x: Math.max(0, newX), y: Math.max(0, newY) });
     
-    // Throttle: update only the dragged node's position directly (no full re-render)
+    // Convert mouse to canvas-space
+    const canvasEl = document.getElementById('canvas')!;
+    const rect = canvasEl.getBoundingClientRect();
+    const mouseCanvasX = (e.clientX - rect.left + canvasEl.scrollLeft) / zoom;
+    const mouseCanvasY = (e.clientY - rect.top + canvasEl.scrollTop) / zoom;
+    
+    const newX = Math.max(0, mouseCanvasX - dragStart.x);
+    const newY = Math.max(0, mouseCanvasY - dragStart.y);
+    nodePositions.set(dragging, { x: newX, y: newY });
+    
+    // Direct DOM update for responsiveness (no full re-render)
     const draggedEl = document.querySelector(`[data-node-id="${dragging}"]`) as HTMLElement;
     if (draggedEl) {
-      draggedEl.style.left = `${Math.max(0, newX)}px`;
-      draggedEl.style.top = `${Math.max(0, newY)}px`;
+      draggedEl.style.left = `${newX}px`;
+      draggedEl.style.top = `${newY}px`;
     }
 
-    // Also move all group members if dragging a group header
+    // Also move all group/selection members
     if (groupDragging && groupDragMembers.length > 0) {
       for (const memberId of groupDragMembers) {
-        if (memberId === dragging) continue;
-        const mPos = nodePositions.get(memberId);
-        if (!mPos) continue;
         const offset = groupDragOffsets.get(memberId);
         if (!offset) continue;
-        const mx = e.clientX - offset.x;
-        const my = e.clientY - offset.y;
-        nodePositions.set(memberId, { x: Math.max(0, mx), y: Math.max(0, my) });
+        const mx = Math.max(0, mouseCanvasX - offset.x);
+        const my = Math.max(0, mouseCanvasY - offset.y);
+        nodePositions.set(memberId, { x: mx, y: my });
         const memberEl = document.querySelector(`[data-node-id="${memberId}"]`) as HTMLElement;
         if (memberEl) {
-          memberEl.style.left = `${Math.max(0, mx)}px`;
-          memberEl.style.top = `${Math.max(0, my)}px`;
+          memberEl.style.left = `${mx}px`;
+          memberEl.style.top = `${my}px`;
         }
       }
     }
@@ -1629,7 +1658,12 @@ const userEmail = session.email;
     const dx = Math.abs(x2 - x1);
     const cpOffset = Math.max(50, dx * 0.4);
     const pathId = `ep-${Math.round(x1)}-${Math.round(y1)}-${Math.round(x2)}-${Math.round(y2)}`;
-    let svg = `<path id="${pathId}" d="M${x1},${y1} C${x1 + cpOffset},${y1} ${x2 - cpOffset},${y2} ${x2},${y2}" fill="none" stroke="${color}" stroke-width="1.2" marker-end="url(#${marker})" ${dash} opacity="0.55" class="edge-path"/>`;
+    const edgeName = (sourceNode?.edges && edgeIndex !== undefined && edgeIndex >= 0) ? Object.keys(sourceNode.edges)[edgeIndex] : '_next';
+    const pathD = `M${x1},${y1} C${x1 + cpOffset},${y1} ${x2 - cpOffset},${y2} ${x2},${y2}`;
+    // Invisible wide hit-area path for click detection
+    let svg = `<path d="${pathD}" fill="none" stroke="transparent" stroke-width="12" class="edge-hitarea" data-edge-source="${sourceNodeId || ''}" data-edge-name="${edgeName}" style="cursor:pointer;"/>`;
+    // Visible path
+    svg += `<path id="${pathId}" d="${pathD}" fill="none" stroke="${color}" stroke-width="1.2" marker-end="url(#${marker})" ${dash} opacity="0.55" class="edge-path" data-edge-source="${sourceNodeId || ''}" data-edge-name="${edgeName}" style="pointer-events:none;"/>`;
 
     // Add speak text label along the path
     if (speakText) {
@@ -1776,32 +1810,7 @@ const userEmail = session.email;
         e.stopPropagation();
         const [nodeId, edgeName] = (el as HTMLElement).dataset.listEdge!.split(':');
         selectNode(nodeId);
-        
-        // Highlight the edge on canvas
-        const svg = document.getElementById('canvas-svg')!;
-        svg.querySelectorAll('.edge-path').forEach(p => (p as SVGElement).style.opacity = '0.15');
-        
-        // Find and highlight the matching edge handle
-        const handleEl = document.querySelector(`[data-edge-handle="${edgeName}"][data-edge-source="${nodeId}"]`) as HTMLElement;
-        if (handleEl) {
-          handleEl.style.transform = 'scale(1.3)';
-          setTimeout(() => { handleEl.style.transform = ''; }, 1500);
-        }
-
-        // Flash the target node
-        const node = currentTree[nodeId];
-        if (node?.edges?.[edgeName]?.next) {
-          const targetEl = document.querySelector(`[data-node-id="${node.edges[edgeName].next}"]`) as HTMLElement;
-          if (targetEl) {
-            targetEl.style.outline = '2px solid #22c55e';
-            setTimeout(() => { targetEl.style.outline = ''; }, 1500);
-          }
-        }
-        
-        // Restore edge opacity after flash
-        setTimeout(() => {
-          svg.querySelectorAll('.edge-path').forEach(p => (p as SVGElement).style.opacity = '');
-        }, 1500);
+        highlightEdge(nodeId, edgeName);
       });
     });
 
@@ -1888,8 +1897,329 @@ const userEmail = session.email;
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // EDGE HIGHLIGHTING (shared by left panel, canvas click, right panel)
+  // ═══════════════════════════════════════════════════════════════
+  let edgeHighlightTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  function highlightEdge(nodeId: string, edgeName: string) {
+    const svg = document.getElementById('canvas-svg')!;
+    const node = currentTree[nodeId];
+    if (!node) return;
+    
+    // Clear any previous highlight timeout
+    if (edgeHighlightTimeout) clearTimeout(edgeHighlightTimeout);
+    
+    // Dim all edges
+    svg.querySelectorAll('.edge-path').forEach(p => {
+      (p as SVGElement).style.opacity = '0.12';
+      (p as SVGElement).style.strokeWidth = '';
+    });
+    
+    // Show all speak labels briefly
+    svg.querySelectorAll('.edge-speak-label').forEach(t => {
+      (t as SVGElement).style.opacity = '0';
+    });
+    
+    // Find and highlight the matching SVG path
+    // The path is identified by source handle position. Find the edge index
+    let edgeIndex = -1;
+    if (node.edges) {
+      const keys = Object.keys(node.edges);
+      edgeIndex = keys.indexOf(edgeName);
+    }
+    
+    const fromPos = nodePositions.get(nodeId);
+    const target = edgeName === '_next' ? node.next : node.edges?.[edgeName]?.next;
+    const toPos = target ? nodePositions.get(target) : null;
+    
+    if (fromPos && toPos && edgeIndex >= 0) {
+      // Compute expected source x1,y1 to match path id
+      const x1 = Math.round(fromPos.x + NODE_W + 4);
+      const y1 = Math.round(fromPos.y + getEdgeHandleY(node, edgeIndex, nodeId));
+      
+      // Find path by ID prefix pattern
+      const pathPrefix = `ep-${x1}-${y1}`;
+      const matchingPath = svg.querySelector(`[id^="${pathPrefix}"]`) as SVGElement;
+      if (matchingPath) {
+        matchingPath.style.opacity = '1';
+        matchingPath.style.strokeWidth = '2.5';
+        // Show speak label for this path
+        const pathId = matchingPath.id;
+        const textEl = matchingPath.nextElementSibling as SVGElement;
+        if (textEl?.classList.contains('edge-speak-label')) {
+          textEl.style.opacity = '1';
+        }
+      }
+    }
+    
+    // Highlight source handle on node
+    const handleEl = document.querySelector(`[data-edge-handle="${edgeName}"][data-edge-source="${nodeId}"]`) as HTMLElement;
+    if (handleEl) {
+      handleEl.style.transform = 'scale(1.4)';
+      handleEl.style.zIndex = '50';
+    }
+    
+    // Flash the target node
+    if (target) {
+      const targetEl = document.querySelector(`[data-node-id="${target}"]`) as HTMLElement;
+      if (targetEl) {
+        targetEl.style.outline = '2px solid #22c55e';
+        targetEl.style.outlineOffset = '2px';
+      }
+    }
+    
+    // Scroll right panel edge editor to this edge
+    const edgeDiv = document.querySelector(`#edges-container [data-edge-name="${edgeName}"]`) as HTMLElement;
+    if (edgeDiv) {
+      edgeDiv.style.outline = '2px solid #818cf8';
+      edgeDiv.style.outlineOffset = '1px';
+      edgeDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    
+    // Restore after 2.5 seconds
+    edgeHighlightTimeout = setTimeout(() => {
+      svg.querySelectorAll('.edge-path').forEach(p => {
+        (p as SVGElement).style.opacity = '';
+        (p as SVGElement).style.strokeWidth = '';
+      });
+      svg.querySelectorAll('.edge-speak-label').forEach(t => {
+        (t as SVGElement).style.opacity = '';
+      });
+      if (handleEl) {
+        handleEl.style.transform = '';
+        handleEl.style.zIndex = '';
+      }
+      if (target) {
+        const targetEl = document.querySelector(`[data-node-id="${target}"]`) as HTMLElement;
+        if (targetEl) {
+          targetEl.style.outline = '';
+          targetEl.style.outlineOffset = '';
+        }
+      }
+      if (edgeDiv) {
+        edgeDiv.style.outline = '';
+        edgeDiv.style.outlineOffset = '';
+      }
+    }, 2500);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // INTENT LIBRARY (loaded once for Smart Match)
   // ═══════════════════════════════════════════════════════════════
+  // Click on SVG edge paths (delegated handler)
+  document.getElementById('canvas-svg')?.addEventListener('click', (e) => {
+    const hitarea = (e.target as SVGElement).closest('.edge-hitarea') as SVGElement;
+    if (!hitarea) return;
+    const sourceId = hitarea.dataset.edgeSource;
+    const edgeName = hitarea.dataset.edgeName;
+    if (sourceId && edgeName) {
+      // Select the source node first, then highlight the edge
+      selectNode(sourceId);
+      setTimeout(() => highlightEdge(sourceId, edgeName), 50);
+    }
+  });
+
+  // Click on "Add Edge" button (delegated on nodes layer)
+  document.getElementById('nodes-layer')?.addEventListener('click', (e) => {
+    const addBtn = (e.target as HTMLElement).closest('[data-add-edge-btn]') as HTMLElement;
+    if (!addBtn) return;
+    e.stopPropagation();
+    const nodeId = addBtn.dataset.addEdgeBtn!;
+    openAddEdgeWizard(nodeId);
+  });
+
+  /** Add-edge wizard: guides through creating a new edge with regex help */
+  function openAddEdgeWizard(nodeId: string) {
+    // Remove any existing wizard
+    document.getElementById('add-edge-wizard')?.remove();
+    
+    const node = currentTree[nodeId];
+    if (!node) return;
+    
+    // Position wizard near the node
+    const pos = nodePositions.get(nodeId);
+    if (!pos) return;
+    
+    const allNodes = getTreeNodes().filter(n => n !== nodeId);
+    const intentOpts = getIntentOptions();
+    
+    const wizard = document.createElement('div');
+    wizard.id = 'add-edge-wizard';
+    wizard.className = 'absolute z-50 bg-gray-900 border border-gray-600 rounded-xl shadow-2xl p-4 w-72';
+    wizard.style.cssText = `left:${pos.x + NODE_W + 20}px; top:${pos.y}px;`;
+    
+    wizard.innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="text-sm font-semibold text-gray-200">Add Edge</h4>
+        <button class="text-gray-400 hover:text-white text-lg" id="wizard-close">✕</button>
+      </div>
+      
+      <!-- Step 1: Edge name -->
+      <div class="space-y-2">
+        <div>
+          <label class="text-[10px] text-gray-500 uppercase tracking-wider">Edge Name</label>
+          <input id="wizard-name" type="text" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 font-mono mt-0.5" placeholder="e.g., yes, no, confused" />
+          <div class="text-[9px] text-gray-500 mt-0.5">Short label for this response path</div>
+        </div>
+        
+        <!-- Step 2: Match mode -->
+        <div>
+          <label class="text-[10px] text-gray-500 uppercase tracking-wider">How to Match</label>
+          <div class="flex gap-1 mt-1">
+            <button class="wizard-mode-btn px-2 py-1 text-[10px] rounded bg-purple-700 text-white" data-mode="intent">Intent</button>
+            <button class="wizard-mode-btn px-2 py-1 text-[10px] rounded bg-gray-800 text-gray-400 hover:text-gray-200" data-mode="regex">Regex</button>
+            <button class="wizard-mode-btn px-2 py-1 text-[10px] rounded bg-gray-800 text-gray-400 hover:text-gray-200" data-mode="function">Function</button>
+          </div>
+        </div>
+        
+        <!-- Intent panel -->
+        <div id="wizard-panel-intent">
+          <select id="wizard-intent" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-[10px] text-gray-300">
+            <option value="">— Select intent —</option>
+            ${intentOpts}
+          </select>
+          <div id="wizard-intent-preview" class="text-[9px] text-gray-500 font-mono mt-1 truncate"></div>
+        </div>
+        
+        <!-- Regex panel (hidden) -->
+        <div id="wizard-panel-regex" class="hidden">
+          <input id="wizard-regex" type="text" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-[10px] font-mono text-gray-300" placeholder="\\b(yes|yeah|sure)\\b" />
+          <button id="wizard-expand-regex" class="mt-1 px-2 py-0.5 bg-amber-800 text-amber-200 text-[9px] rounded hover:bg-amber-700">🧠 Expand with AI</button>
+        </div>
+        
+        <!-- Function panel (hidden) -->
+        <div id="wizard-panel-function" class="hidden">
+          <select id="wizard-fn" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-[10px] text-gray-300">
+            <option value="">—</option>
+            <option value="isAffirmative">isAffirmative</option>
+            <option value="isNegative">isNegative</option>
+            <option value="isConversational">isConversational</option>
+            <option value="isSentimentPositive">isSentimentPositive</option>
+            <option value="isSentimentNegative">isSentimentNegative</option>
+          </select>
+        </div>
+        
+        <!-- Step 3: Target -->
+        <div>
+          <label class="text-[10px] text-gray-500 uppercase tracking-wider">Target Node</label>
+          <select id="wizard-target" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-300 mt-0.5">
+            <option value="">— Select or create —</option>
+            ${allNodes.map(n => `<option value="${n}">${n.replace(/_/g, ' ')}</option>`).join('')}
+            <option value="__new__">+ Create new node...</option>
+          </select>
+        </div>
+        
+        <!-- Step 4: Speak (optional) -->
+        <div>
+          <label class="text-[10px] text-gray-500 uppercase tracking-wider">Speak (optional)</label>
+          <input id="wizard-speak" type="text" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-[10px] text-gray-300 mt-0.5" placeholder="What the agent says on this edge..." />
+        </div>
+        
+        <!-- Create button -->
+        <button id="wizard-create" class="w-full mt-2 px-3 py-1.5 bg-brand-600 text-white text-xs font-medium rounded hover:bg-brand-700">Create Edge</button>
+      </div>
+    `;
+    
+    document.getElementById('nodes-layer')!.appendChild(wizard);
+    
+    // Mode switching
+    wizard.querySelectorAll('.wizard-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        wizard.querySelectorAll('.wizard-mode-btn').forEach(b => {
+          b.className = 'wizard-mode-btn px-2 py-1 text-[10px] rounded bg-gray-800 text-gray-400 hover:text-gray-200';
+        });
+        (btn as HTMLElement).className = 'wizard-mode-btn px-2 py-1 text-[10px] rounded bg-purple-700 text-white';
+        const mode = (btn as HTMLElement).dataset.mode!;
+        document.getElementById('wizard-panel-intent')!.classList.toggle('hidden', mode !== 'intent');
+        document.getElementById('wizard-panel-regex')!.classList.toggle('hidden', mode !== 'regex');
+        document.getElementById('wizard-panel-function')!.classList.toggle('hidden', mode !== 'function');
+      });
+    });
+    
+    // Intent select → preview regex
+    document.getElementById('wizard-intent')?.addEventListener('change', (e) => {
+      const intent = (e.target as HTMLSelectElement).value;
+      if (intent && intentLibrary[intent]) {
+        const regex = intentLibrary[intent].regex || intentLibrary[intent].match_regex || '';
+        document.getElementById('wizard-intent-preview')!.textContent = regex ? `/${regex}/` : '';
+      }
+    });
+    
+    // AI expand regex
+    document.getElementById('wizard-expand-regex')?.addEventListener('click', async () => {
+      const regexInput = document.getElementById('wizard-regex') as HTMLInputElement;
+      const name = (document.getElementById('wizard-name') as HTMLInputElement).value;
+      if (!name) { regexInput.placeholder = 'Enter edge name first'; return; }
+      const btn = document.getElementById('wizard-expand-regex') as HTMLButtonElement;
+      btn.disabled = true; btn.textContent = '⏳ Expanding...';
+      try {
+        const res = await fetch('/api/voice-intent-expand', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ intent: name, existing_regex: regexInput.value })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.regex) regexInput.value = data.regex;
+        }
+      } finally {
+        btn.disabled = false; btn.textContent = '🧠 Expand with AI';
+      }
+    });
+    
+    // Close
+    document.getElementById('wizard-close')?.addEventListener('click', () => wizard.remove());
+    
+    // Create
+    document.getElementById('wizard-create')?.addEventListener('click', () => {
+      const name = (document.getElementById('wizard-name') as HTMLInputElement).value.trim();
+      if (!name) { (document.getElementById('wizard-name') as HTMLInputElement).focus(); return; }
+      
+      const activeMode = wizard.querySelector('.wizard-mode-btn.bg-purple-700')?.getAttribute('data-mode') || 'intent';
+      const target = (document.getElementById('wizard-target') as HTMLSelectElement).value;
+      const speak = (document.getElementById('wizard-speak') as HTMLInputElement).value.trim();
+      
+      // Build edge object
+      const edge: any = {};
+      if (activeMode === 'intent') {
+        const intent = (document.getElementById('wizard-intent') as HTMLSelectElement).value;
+        if (intent && intentLibrary[intent]) {
+          edge.match_intent = intent;
+          edge.match_regex = intentLibrary[intent].regex || intentLibrary[intent].match_regex || '';
+        }
+      } else if (activeMode === 'regex') {
+        edge.match_regex = (document.getElementById('wizard-regex') as HTMLInputElement).value;
+      } else if (activeMode === 'function') {
+        edge.match_fn = (document.getElementById('wizard-fn') as HTMLSelectElement).value;
+      }
+      
+      if (speak) edge.speak = [speak];
+      
+      // Handle target
+      let targetId = target;
+      if (target === '__new__') {
+        const newName = prompt('New node ID (snake_case):');
+        if (!newName) return;
+        targetId = newName;
+        currentTree[targetId] = { speak: [''], action: '' };
+      }
+      if (targetId) edge.next = targetId;
+      
+      // Add edge to node
+      if (!currentTree[nodeId].edges) currentTree[nodeId].edges = {};
+      currentTree[nodeId].edges[name] = edge;
+      
+      wizard.remove();
+      markDirty();
+      renderCanvas();
+      renderNodeList();
+      selectNode(nodeId);
+    });
+    
+    // Focus name input
+    (document.getElementById('wizard-name') as HTMLInputElement).focus();
+  }
+
   let intentLibrary: Record<string, any> = {};
   let intentLibraryLoaded = false;
 
@@ -2889,6 +3219,75 @@ const userEmail = session.email;
     fitToView();
   });
 
+  /** Center the tree (preserving relative positions) in the canvas viewport */
+  function centerTreeOnCanvas() {
+    if (nodePositions.size === 0) return;
+    const canvasEl = document.getElementById('canvas')!;
+    
+    // Find bounding box of all nodes
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [nodeId, pos] of nodePositions) {
+      const node = currentTree[nodeId];
+      const nh = node ? getNodeHeight(node, nodeId) : NODE_H;
+      minX = Math.min(minX, pos.x);
+      minY = Math.min(minY, pos.y);
+      maxX = Math.max(maxX, pos.x + NODE_W);
+      maxY = Math.max(maxY, pos.y + nh);
+    }
+    
+    const treeW = maxX - minX;
+    const treeH = maxY - minY;
+    
+    // Target center: middle of the virtual canvas (or viewport-appropriate)
+    const canvasW = Math.max(4000, treeW + 400);
+    const canvasH = Math.max(2000, treeH + 400);
+    const targetCenterX = canvasW / 2;
+    const targetCenterY = canvasH / 2;
+    
+    // Current center of tree
+    const treeCenterX = minX + treeW / 2;
+    const treeCenterY = minY + treeH / 2;
+    
+    // Shift all nodes
+    const dx = targetCenterX - treeCenterX;
+    const dy = targetCenterY - treeCenterY;
+    
+    for (const [nodeId, pos] of nodePositions) {
+      nodePositions.set(nodeId, { x: pos.x + dx, y: pos.y + dy });
+    }
+    
+    renderCanvas();
+    
+    // Scroll to center of tree
+    canvasEl.scrollTo({
+      left: (targetCenterX * zoom) - canvasEl.clientWidth / 2,
+      top: (targetCenterY * zoom) - canvasEl.clientHeight / 2,
+      behavior: 'smooth'
+    });
+    
+    markDirty();
+  }
+
+  /** Center just the selection (box or group) */
+  function centerSelectionOnCanvas() {
+    const nodes = boxSelectedNodes.size > 0 ? [...boxSelectedNodes] : (selectedNode ? [selectedNode] : []);
+    if (nodes.length === 0) return;
+    
+    const canvasEl = document.getElementById('canvas')!;
+    const positions = nodes.map(n => nodePositions.get(n)).filter(Boolean) as Array<{x:number, y:number}>;
+    const avgX = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+    const avgY = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+    
+    canvasEl.scrollTo({
+      left: (avgX + NODE_W / 2) * zoom - canvasEl.clientWidth / 2,
+      top: (avgY + NODE_H / 2) * zoom - canvasEl.clientHeight / 2,
+      behavior: 'smooth'
+    });
+  }
+
+  document.getElementById('btn-center-tree')?.addEventListener('click', centerTreeOnCanvas);
+  document.getElementById('btn-center-selection')?.addEventListener('click', centerSelectionOnCanvas);
+
   // Mouse wheel: plain wheel = zoom, Shift+wheel = horizontal scroll
   document.getElementById('canvas')?.addEventListener('wheel', (e: WheelEvent) => {
     if (e.shiftKey) {
@@ -2902,7 +3301,6 @@ const userEmail = session.email;
     const mouseX = (e.clientX - rect.left + canvasEl.scrollLeft) / zoom;
     const mouseY = (e.clientY - rect.top + canvasEl.scrollTop) / zoom;
     
-    const oldZoom = zoom;
     zoom = Math.max(0.3, Math.min(2, zoom - e.deltaY * 0.002));
     applyZoom();
     
@@ -4051,8 +4449,13 @@ const userEmail = session.email;
     // If we selected multiple nodes, show the group creation prompt
     if (boxSelectedNodes.size >= 2) {
       showBoxSelectionActions(boxSelectedNodes);
+      // Show center-selection button
+      document.getElementById('btn-center-selection')?.classList.remove('hidden');
     } else if (boxSelectedNodes.size === 1) {
       selectNode([...boxSelectedNodes][0]);
+      document.getElementById('btn-center-selection')?.classList.add('hidden');
+    } else {
+      document.getElementById('btn-center-selection')?.classList.add('hidden');
     }
   });
 
