@@ -1224,8 +1224,8 @@ const userEmail = session.email;
           </div>
         </div>
         ${edgeHandlesHtml}
-        <!-- Add-edge button (right side, below last edge handle) -->
-        <div class="absolute flex items-center" style="right: -6px; bottom: -8px;" data-add-edge-btn="${nodeId}">
+        <!-- Add-edge button (right side, below last edge handle or at mid-height for no-edge nodes) -->
+        <div class="absolute flex items-center" style="right: -6px; top: ${nodeH + 4}px;" data-add-edge-btn="${nodeId}">
           <div class="w-3.5 h-3.5 rounded-full bg-gray-600 border border-dashed border-gray-400 hover:bg-brand-500 hover:border-brand-300 hover:scale-150 transition-all cursor-pointer z-10 flex items-center justify-center" title="Add edge">
             <span class="text-[8px] text-gray-300 font-bold leading-none">+</span>
           </div>
@@ -1660,8 +1660,9 @@ const userEmail = session.email;
     const pathId = `ep-${Math.round(x1)}-${Math.round(y1)}-${Math.round(x2)}-${Math.round(y2)}`;
     const edgeName = (sourceNode?.edges && edgeIndex !== undefined && edgeIndex >= 0) ? Object.keys(sourceNode.edges)[edgeIndex] : '_next';
     const pathD = `M${x1},${y1} C${x1 + cpOffset},${y1} ${x2 - cpOffset},${y2} ${x2},${y2}`;
-    // Invisible wide hit-area path for click detection
-    let svg = `<path d="${pathD}" fill="none" stroke="transparent" stroke-width="12" class="edge-hitarea" data-edge-source="${sourceNodeId || ''}" data-edge-name="${edgeName}" style="cursor:pointer;"/>`;
+    const escapedSpeak = speakText ? speakText.replace(/"/g, '&quot;').replace(/</g, '&lt;') : '';
+    // Invisible wide hit-area path for click + hover detection
+    let svg = `<path d="${pathD}" fill="none" stroke="transparent" stroke-width="14" class="edge-hitarea" data-edge-source="${sourceNodeId || ''}" data-edge-name="${edgeName}" data-speak-full="${escapedSpeak}" style="cursor:pointer;"/>`;
     // Visible path
     svg += `<path id="${pathId}" d="${pathD}" fill="none" stroke="${color}" stroke-width="1.2" marker-end="url(#${marker})" ${dash} opacity="0.55" class="edge-path" data-edge-source="${sourceNodeId || ''}" data-edge-name="${edgeName}" style="pointer-events:none;"/>`;
 
@@ -2010,26 +2011,184 @@ const userEmail = session.email;
   document.getElementById('canvas-svg')?.addEventListener('click', (e) => {
     const hitarea = (e.target as SVGElement).closest('.edge-hitarea') as SVGElement;
     if (!hitarea) return;
+    // Don't fire during edge-connect mode
+    if (edgeConnectMode) return;
     const sourceId = hitarea.dataset.edgeSource;
     const edgeName = hitarea.dataset.edgeName;
     if (sourceId && edgeName) {
-      // Select the source node first, then highlight the edge
       selectNode(sourceId);
       setTimeout(() => highlightEdge(sourceId, edgeName), 50);
     }
   });
 
-  // Click on "Add Edge" button (delegated on nodes layer)
+  // Edge hover tooltip for full speak text
+  let edgeTooltip: HTMLElement | null = null;
+  let hoveredPath: SVGElement | null = null;
+
+  function createEdgeTooltip() {
+    if (edgeTooltip) return edgeTooltip;
+    edgeTooltip = document.createElement('div');
+    edgeTooltip.id = 'edge-tooltip';
+    edgeTooltip.className = 'fixed z-[100] max-w-xs px-3 py-2 bg-gray-900/95 border border-gray-600 rounded-lg shadow-xl pointer-events-none opacity-0 transition-opacity duration-150';
+    edgeTooltip.style.cssText = 'backdrop-filter: blur(4px);';
+    document.body.appendChild(edgeTooltip);
+    return edgeTooltip;
+  }
+
+  document.getElementById('canvas-svg')?.addEventListener('mouseover', (e) => {
+    const hitarea = (e.target as SVGElement).closest('.edge-hitarea') as SVGElement;
+    if (!hitarea) return;
+    
+    const speak = hitarea.dataset.speakFull;
+    const edgeName = hitarea.dataset.edgeName || '';
+    const sourceId = hitarea.dataset.edgeSource || '';
+    
+    // Highlight the visible sibling path
+    const nextPath = hitarea.nextElementSibling as SVGElement;
+    if (nextPath?.classList.contains('edge-path')) {
+      nextPath.style.opacity = '1';
+      nextPath.style.strokeWidth = '2.5';
+      hoveredPath = nextPath;
+      // Also show the speak label if it exists
+      const labelEl = nextPath.nextElementSibling as SVGElement;
+      if (labelEl?.classList.contains('edge-speak-label')) {
+        labelEl.style.opacity = '1';
+      }
+    }
+    
+    // Show tooltip if speak text exists and is truncated
+    if (speak && speak.length > 28) {
+      const tip = createEdgeTooltip();
+      const node = currentTree[sourceId];
+      const targetId = node?.edges?.[edgeName]?.next || node?.next || '';
+      tip.innerHTML = `
+        <div class="text-[9px] text-gray-500 mb-1 font-mono">${sourceId.replace(/_/g, ' ')} → <span class="text-green-400">${edgeName}</span> → ${targetId.replace(/_/g, ' ')}</div>
+        <div class="text-[11px] text-gray-200 leading-relaxed">"${speak}"</div>
+      `;
+      tip.style.opacity = '1';
+    }
+  });
+
+  document.getElementById('canvas-svg')?.addEventListener('mousemove', (e) => {
+    if (edgeTooltip && edgeTooltip.style.opacity === '1') {
+      edgeTooltip.style.left = (e.clientX + 12) + 'px';
+      edgeTooltip.style.top = (e.clientY - 10) + 'px';
+    }
+  });
+
+  document.getElementById('canvas-svg')?.addEventListener('mouseout', (e) => {
+    const hitarea = (e.target as SVGElement).closest('.edge-hitarea') as SVGElement;
+    if (!hitarea) return;
+    
+    // Unhighlight
+    if (hoveredPath) {
+      hoveredPath.style.opacity = '';
+      hoveredPath.style.strokeWidth = '';
+      const labelEl = hoveredPath.nextElementSibling as SVGElement;
+      if (labelEl?.classList.contains('edge-speak-label')) {
+        labelEl.style.opacity = '';
+      }
+      hoveredPath = null;
+    }
+    
+    // Hide tooltip
+    if (edgeTooltip) edgeTooltip.style.opacity = '0';
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // ADD EDGE: Interactive click-to-connect wizard
+  // ═══════════════════════════════════════════════════════════════
+  let edgeConnectMode = false;
+  let edgeConnectSource: string | null = null;
+
+  // Click on "Add Edge" button → enter connect mode
   document.getElementById('nodes-layer')?.addEventListener('click', (e) => {
     const addBtn = (e.target as HTMLElement).closest('[data-add-edge-btn]') as HTMLElement;
     if (!addBtn) return;
     e.stopPropagation();
     const nodeId = addBtn.dataset.addEdgeBtn!;
-    openAddEdgeWizard(nodeId);
+    enterEdgeConnectMode(nodeId);
   });
 
-  /** Add-edge wizard: guides through creating a new edge with regex help */
-  function openAddEdgeWizard(nodeId: string) {
+  function enterEdgeConnectMode(sourceNodeId: string) {
+    // If already in connect mode, cancel it
+    if (edgeConnectMode) {
+      exitEdgeConnectMode();
+      return;
+    }
+    
+    edgeConnectMode = true;
+    edgeConnectSource = sourceNodeId;
+    
+    // Visual feedback: pulse the source node's add button
+    const sourceEl = document.querySelector(`[data-node-id="${sourceNodeId}"]`) as HTMLElement;
+    if (sourceEl) {
+      sourceEl.classList.add('edge-connect-source');
+    }
+
+    // Highlight all compatible target nodes (everything except self)
+    document.querySelectorAll('[data-node-id]').forEach(el => {
+      const nId = (el as HTMLElement).dataset.nodeId!;
+      if (nId === sourceNodeId) return;
+      (el as HTMLElement).classList.add('edge-connect-target');
+    });
+
+    // Show instruction banner
+    const banner = document.createElement('div');
+    banner.id = 'edge-connect-banner';
+    banner.className = 'fixed top-12 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 bg-brand-600/95 text-white text-xs font-medium rounded-lg shadow-xl flex items-center gap-3';
+    banner.style.cssText = 'backdrop-filter: blur(4px); animation: pulse 2s infinite;';
+    banner.innerHTML = `
+      <span class="w-2 h-2 rounded-full bg-green-400 animate-ping"></span>
+      <span>Click a target node to connect from <strong>${sourceNodeId.replace(/_/g, ' ')}</strong></span>
+      <button id="edge-connect-cancel" class="ml-2 px-2 py-0.5 bg-white/20 rounded text-[10px] hover:bg-white/30">Cancel (Esc)</button>
+    `;
+    document.body.appendChild(banner);
+    
+    document.getElementById('edge-connect-cancel')?.addEventListener('click', exitEdgeConnectMode);
+    
+    // Listen for Esc
+    const escHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { exitEdgeConnectMode(); document.removeEventListener('keydown', escHandler); }
+    };
+    document.addEventListener('keydown', escHandler);
+    
+    // Listen for node clicks
+    const clickHandler = (e: MouseEvent) => {
+      if (!edgeConnectMode) { document.removeEventListener('click', clickHandler); return; }
+      const targetEl = (e.target as HTMLElement).closest('[data-node-id]') as HTMLElement;
+      if (!targetEl) return;
+      const targetId = targetEl.dataset.nodeId!;
+      if (targetId === edgeConnectSource) return; // Can't connect to self
+      
+      e.stopPropagation();
+      e.preventDefault();
+      
+      // Got a target — open the wizard with this target pre-selected
+      const source = edgeConnectSource!;
+      exitEdgeConnectMode();
+      document.removeEventListener('click', clickHandler);
+      document.removeEventListener('keydown', escHandler);
+      openAddEdgeWizard(source, targetId);
+    };
+    // Use a slight delay so the current click event doesn't fire
+    setTimeout(() => document.addEventListener('click', clickHandler, true), 50);
+  }
+
+  function exitEdgeConnectMode() {
+    edgeConnectMode = false;
+    edgeConnectSource = null;
+    
+    // Remove visual classes
+    document.querySelectorAll('.edge-connect-source').forEach(el => el.classList.remove('edge-connect-source'));
+    document.querySelectorAll('.edge-connect-target').forEach(el => el.classList.remove('edge-connect-target'));
+    
+    // Remove banner
+    document.getElementById('edge-connect-banner')?.remove();
+  }
+
+  /** Add-edge wizard: opens with optional pre-selected target */
+  function openAddEdgeWizard(nodeId: string, preSelectedTarget?: string) {
     // Remove any existing wizard
     document.getElementById('add-edge-wizard')?.remove();
     
@@ -2048,11 +2207,14 @@ const userEmail = session.email;
     wizard.className = 'absolute z-50 bg-gray-900 border border-gray-600 rounded-xl shadow-2xl p-4 w-72';
     wizard.style.cssText = `left:${pos.x + NODE_W + 20}px; top:${pos.y}px;`;
     
+    const targetLabel = preSelectedTarget ? preSelectedTarget.replace(/_/g, ' ') : '';
+    
     wizard.innerHTML = `
       <div class="flex items-center justify-between mb-3">
         <h4 class="text-sm font-semibold text-gray-200">Add Edge</h4>
         <button class="text-gray-400 hover:text-white text-lg" id="wizard-close">✕</button>
       </div>
+      ${preSelectedTarget ? `<div class="mb-2 px-2 py-1 bg-green-900/40 border border-green-700 rounded text-[10px] text-green-300">→ Target: <strong>${targetLabel}</strong></div>` : ''}
       
       <!-- Step 1: Edge name -->
       <div class="space-y-2">
@@ -2099,15 +2261,15 @@ const userEmail = session.email;
           </select>
         </div>
         
-        <!-- Step 3: Target -->
-        <div>
+        <!-- Step 3: Target (show only if not pre-selected) -->
+        ${!preSelectedTarget ? `<div>
           <label class="text-[10px] text-gray-500 uppercase tracking-wider">Target Node</label>
           <select id="wizard-target" class="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-300 mt-0.5">
             <option value="">— Select or create —</option>
             ${allNodes.map(n => `<option value="${n}">${n.replace(/_/g, ' ')}</option>`).join('')}
             <option value="__new__">+ Create new node...</option>
           </select>
-        </div>
+        </div>` : ''}
         
         <!-- Step 4: Speak (optional) -->
         <div>
@@ -2176,7 +2338,8 @@ const userEmail = session.email;
       if (!name) { (document.getElementById('wizard-name') as HTMLInputElement).focus(); return; }
       
       const activeMode = wizard.querySelector('.wizard-mode-btn.bg-purple-700')?.getAttribute('data-mode') || 'intent';
-      const target = (document.getElementById('wizard-target') as HTMLSelectElement).value;
+      const targetSelect = document.getElementById('wizard-target') as HTMLSelectElement | null;
+      const target = preSelectedTarget || (targetSelect?.value || '');
       const speak = (document.getElementById('wizard-speak') as HTMLInputElement).value.trim();
       
       // Build edge object
@@ -4766,6 +4929,32 @@ const userEmail = session.email;
   /* Also show all labels when canvas is zoomed in close */
   #canvas-svg[data-zoom-close] .edge-speak-label {
     opacity: 0.6;
+  }
+  /* Edge connect mode: pulsing source, highlighted targets */
+  .edge-connect-source {
+    animation: source-pulse 1.5s ease-in-out infinite;
+    border-color: #22c55e !important;
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+  }
+  .edge-connect-target {
+    border-color: #818cf8 !important;
+    box-shadow: 0 0 8px rgba(129, 140, 248, 0.3);
+    cursor: crosshair !important;
+    transition: all 0.2s ease;
+  }
+  .edge-connect-target:hover {
+    border-color: #22c55e !important;
+    box-shadow: 0 0 16px rgba(34, 197, 94, 0.5);
+    transform: scale(1.02);
+  }
+  @keyframes source-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(34, 197, 94, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.6); }
+  }
+  /* Edge hitarea hover cursor */
+  .edge-hitarea:hover + .edge-path {
+    opacity: 0.9 !important;
+    stroke-width: 2.2;
   }
 </style>
 
