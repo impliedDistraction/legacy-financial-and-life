@@ -105,6 +105,13 @@ if (!session) {
               <input type="text" name="name" required placeholder="e.g., GA Business Owners - Life" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none" />
             </div>
             <div class="grid gap-1">
+              <label class="text-sm font-medium text-gray-700">Campaign Type</label>
+              <select name="campaign_type" class="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none">
+                <option value="quote">Quote Email (standard)</option>
+                <option value="video">Video / Content Share</option>
+              </select>
+            </div>
+            <div class="grid gap-1">
               <label class="text-sm font-medium text-gray-700">Objective</label>
               <select name="objective" required class="rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none">
                 <option value="">Select objective…</option>
@@ -115,6 +122,24 @@ if (!session) {
                 <option value="final_expense">Final Expense</option>
                 <option value="t65">Turning 65 (Medicare + Life)</option>
               </select>
+            </div>
+            <!-- Video/Content fields (shown when campaign_type=video) -->
+            <div id="video-fields" class="sm:col-span-2 hidden space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <p class="text-xs font-medium text-blue-700 mb-2">📹 Video / Content Details</p>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div class="grid gap-1">
+                  <label class="text-sm font-medium text-gray-700">Video / Content URL</label>
+                  <input type="url" name="content_url" placeholder="https://umustsee.net/..." class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none" />
+                </div>
+                <div class="grid gap-1">
+                  <label class="text-sm font-medium text-gray-700">Title (shown in email CTA)</label>
+                  <input type="text" name="content_title" placeholder="e.g., Estate Planning Overview" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none" />
+                </div>
+              </div>
+              <div class="grid gap-1">
+                <label class="text-sm font-medium text-gray-700">Description (optional teaser in email body)</label>
+                <textarea name="content_description" rows="2" placeholder="Brief description of what the video covers…" class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none"></textarea>
+              </div>
             </div>
             <div class="sm:col-span-2 grid gap-1">
               <label class="text-sm font-medium text-gray-700">Target Description</label>
@@ -365,10 +390,17 @@ if (!session) {
       final_expense: '⚰️ Final Expense',
     };
 
+    const typeLabels: Record<string, string> = {
+      quote: '',
+      video: '📹 Video',
+      content: '📄 Content',
+    };
+
     container.innerHTML = campaigns.map((c: any) => {
       const count = counts[c.id] || { total: 0, sent: 0, new: 0 };
       const statusClass = statusColors[c.status] || 'bg-gray-100 text-gray-700';
       const objectiveLabel = objectiveLabels[c.objective] || c.objective;
+      const typeLabel = typeLabels[c.campaign_type] || '';
       const states = (c.states || []).join(', ') || '—';
 
       // Next-step hint based on state
@@ -391,7 +423,7 @@ if (!session) {
                 <h3 class="font-semibold text-gray-900 text-sm truncate">${esc(c.name)}</h3>
                 <span class="px-2 py-0.5 rounded-full text-[10px] font-medium ${statusClass}">${c.status}</span>
               </div>
-              <p class="text-xs text-gray-500">${objectiveLabel} · ${states}</p>
+              <p class="text-xs text-gray-500">${typeLabel ? typeLabel + ' · ' : ''}${objectiveLabel} · ${states}</p>
               ${c.description ? `<p class="text-xs text-gray-400 mt-1 line-clamp-1">${esc(c.description)}</p>` : ''}
               ${hint}
             </div>
@@ -534,6 +566,18 @@ if (!session) {
   // ─── Create campaign ─────────────────────────────────────────────
 
   const createForm = document.getElementById('create-campaign-form') as HTMLFormElement;
+  const campaignTypeSelect = createForm.querySelector('[name="campaign_type"]') as HTMLSelectElement;
+  const videoFields = document.getElementById('video-fields')!;
+
+  // Show/hide video fields based on campaign type
+  campaignTypeSelect.addEventListener('change', () => {
+    if (campaignTypeSelect.value === 'video' || campaignTypeSelect.value === 'content') {
+      videoFields.classList.remove('hidden');
+    } else {
+      videoFields.classList.add('hidden');
+    }
+  });
+
   createForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(createForm);
@@ -543,14 +587,27 @@ if (!session) {
     const statesRaw = String(fd.get('states') || '').trim();
     const states = statesRaw ? statesRaw.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(Boolean) : [];
     const daily_limit = parseInt(String(fd.get('daily_limit') || '50'), 10);
+    const campaign_type = String(fd.get('campaign_type') || 'quote');
+    const content_url = String(fd.get('content_url') || '').trim();
+    const content_title = String(fd.get('content_title') || '').trim();
+    const content_description = String(fd.get('content_description') || '').trim();
 
     if (!name || !objective) { alert('Name and objective required'); return; }
+    if ((campaign_type === 'video' || campaign_type === 'content') && !content_url) {
+      alert('Video/content URL is required for this campaign type');
+      return;
+    }
 
     try {
+      const payload: Record<string, unknown> = { action: 'create', name, objective, description, states, daily_limit, campaign_type };
+      if (content_url) payload.content_url = content_url;
+      if (content_title) payload.content_title = content_title;
+      if (content_description) payload.content_description = content_description;
+
       const res = await fetch('/api/sales-campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create', name, objective, description, states, daily_limit }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) { alert(data.error || 'Create failed'); return; }

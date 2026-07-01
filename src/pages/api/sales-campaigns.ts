@@ -102,6 +102,10 @@ export const POST: APIRoute = async ({ request }) => {
       const objective = String(body.objective || '').trim().slice(0, 50);
       const description = String(body.description || '').trim().slice(0, 2000);
       const states = Array.isArray(body.states) ? body.states.map((s: unknown) => String(s).trim().slice(0, 2)) : [];
+      const campaignType = String(body.campaign_type || 'quote').trim().slice(0, 20);
+      const contentUrl = String(body.content_url || '').trim().slice(0, 500);
+      const contentTitle = String(body.content_title || '').trim().slice(0, 200);
+      const contentDescription = String(body.content_description || '').trim().slice(0, 1000);
 
       if (!name || !objective) {
         return jsonRes({ error: 'Name and objective are required' }, 400);
@@ -112,10 +116,19 @@ export const POST: APIRoute = async ({ request }) => {
         return jsonRes({ error: `Objective must be one of: ${validObjectives.join(', ')}` }, 400);
       }
 
+      const validTypes = ['quote', 'video', 'content'];
+      if (!validTypes.includes(campaignType)) {
+        return jsonRes({ error: `campaign_type must be one of: ${validTypes.join(', ')}` }, 400);
+      }
+
+      if ((campaignType === 'video' || campaignType === 'content') && !contentUrl) {
+        return jsonRes({ error: 'content_url is required for video/content campaigns' }, 400);
+      }
+
       // Generate Apollo search prompt based on objective
       const apolloPrompt = generateApolloPrompt(objective, description, states);
 
-      const insert = {
+      const insert: Record<string, unknown> = {
         name,
         objective,
         description,
@@ -123,7 +136,12 @@ export const POST: APIRoute = async ({ request }) => {
         apollo_prompt: apolloPrompt,
         status: 'draft',
         daily_limit: Number(body.daily_limit) || 50,
+        campaign_type: campaignType,
       };
+
+      if (contentUrl) insert.content_url = contentUrl;
+      if (contentTitle) insert.content_title = contentTitle;
+      if (contentDescription) insert.content_description = contentDescription;
 
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${CAMPAIGNS_TABLE}`, {
         method: 'POST',
@@ -145,7 +163,8 @@ export const POST: APIRoute = async ({ request }) => {
       const allowed = ['name', 'description', 'states', 'daily_limit', 'apollo_prompt', 'apollo_params',
         'seniorities', 'industries', 'employee_ranges', 'custom_titles',
         'from_name', 'from_label', 'reply_to', 'sign_off', 'cta_url', 'cta_label',
-        'secondary_cta_url', 'secondary_cta_label', 'send_hours_start', 'send_hours_end'];
+        'secondary_cta_url', 'secondary_cta_label', 'send_hours_start', 'send_hours_end',
+        'campaign_type', 'content_url', 'content_title', 'content_description'];
       const updates: Record<string, unknown> = {};
       for (const key of allowed) {
         if (key in body) updates[key] = body[key];
