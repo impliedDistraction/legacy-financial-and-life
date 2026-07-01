@@ -104,8 +104,11 @@ if (!session) {
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="preview">
         🧪 Preview & Test
       </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="credits">
+        💳 Credits
+      </button>
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="pipeline">
-        ⚙️ Pipeline
+        ⚙️ Settings
       </button>
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="surveys">
         📊 Surveys
@@ -185,8 +188,8 @@ if (!session) {
           </div>
           <!-- Source breakdown -->
           <div class="flex gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500" id="pool-sources">
-            <span>🔍 Prophog: <strong id="pool-src-prophog">—</strong></span>
-            <span>🏛️ FL: <strong id="pool-src-fl-licensee">—</strong></span>
+            <span>� Apollo: <strong id="pool-src-apollo">—</strong></span>
+            <span>🏛️ FL/State: <strong id="pool-src-fl-licensee">—</strong></span>
             <span>📤 CSV: <strong id="pool-src-csv">—</strong></span>
             <span>🌐 Landing Page: <strong id="pool-src-landing">—</strong></span>
           </div>
@@ -218,14 +221,12 @@ if (!session) {
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Lead Source</label>
                   <select id="cmp-source" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
-                    <option value="prophog" selected>🔍 Prophog (auto-search)</option>
-                    <option value="apollo_recruitment">🚀 Apollo (enriched search)</option>
-                    <option value="fl_licensee">🏛️ FL Licensee (bulk CSV)</option>
-                    <option value="state_licensee">🏛️ State Licensee (TX, etc.)</option>
+                    <option value="apollo_recruitment" selected>🚀 Apollo (AI-powered search)</option>
+                    <option value="fl_licensee">🏛️ FL Licensee (bulk DOI data)</option>
+                    <option value="state_licensee">🏛️ State Licensee (TX, OH, etc.)</option>
                     <option value="csv">📤 CSV Import</option>
-
                   </select>
-                  <p class="text-xs text-gray-400 mt-0.5">Prophog auto-searches for new agents. Apollo searches with email reveals (1 credit/each). FL/State Licensee uses DOI bulk data. CSV uses agents you've uploaded.</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Apollo finds agents and reveals emails (1 credit each). FL/State Licensee uses free DOI bulk data. CSV uses agents you've uploaded.</p>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Target State</label>
@@ -453,8 +454,9 @@ if (!session) {
             </ol>
           </div>
           <div class="bg-green-50 rounded-xl border border-green-200 p-5">
-            <h3 class="text-sm font-semibold text-green-900 mb-2">Cost: $0 per message</h3>
-            <p class="text-xs text-green-800">All AI processing runs locally — no per-message fees. Email sending included in your plan.</p>
+            <h3 class="text-sm font-semibold text-green-900 mb-2">Pricing</h3>
+            <p class="text-xs text-green-800">CSV imports don't consume credits — those leads already have emails. AI processing and email sending are included.</p>
+            <p class="text-xs text-green-700 mt-1">Apollo campaigns cost 1 credit per email reveal ($0.50/credit).</p>
           </div>
         </div>
       </div>
@@ -870,6 +872,79 @@ if (!session) {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ CREDITS TAB ═══════════════ -->
+    <div id="tab-credits" class="tab-panel hidden">
+      <div class="space-y-6">
+
+        <!-- Balance Overview -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Apollo Credits</h2>
+              <p class="text-xs text-gray-500 mt-0.5">Credits are consumed when revealing email addresses from Apollo searches. Each reveal = 1 credit ($0.50). Campaigns auto-pause when credits run out and resume when topped up.</p>
+            </div>
+            <div id="credits-badge" class="px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-sm font-bold text-emerald-700">— credits</div>
+          </div>
+
+          <!-- Stats -->
+          <div class="grid grid-cols-3 gap-4 mt-4">
+            <div class="bg-emerald-50 rounded-lg p-4 text-center">
+              <div class="text-3xl font-bold text-emerald-700" id="rc-wallet-balance">—</div>
+              <div class="text-xs text-emerald-600">Available</div>
+            </div>
+            <div class="bg-blue-50 rounded-lg p-4 text-center">
+              <div class="text-3xl font-bold text-blue-700" id="rc-wallet-purchased">—</div>
+              <div class="text-xs text-blue-600">Total Purchased</div>
+            </div>
+            <div class="bg-purple-50 rounded-lg p-4 text-center">
+              <div class="text-3xl font-bold text-purple-700" id="rc-wallet-used">—</div>
+              <div class="text-xs text-purple-600">Total Used</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add Credits -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 class="text-sm font-semibold text-gray-900 mb-3">Add Credits</h3>
+          <form id="rc-deposit-form" class="flex items-end gap-3 flex-wrap">
+            <div class="grid gap-1 flex-1 min-w-[280px]">
+              <label class="text-xs font-medium text-gray-600">Amount</label>
+              <div class="flex gap-2 flex-wrap">
+                <button type="button" class="rc-credit-preset px-3 py-1.5 text-xs rounded-lg border border-gray-300 hover:bg-gray-50 font-medium" data-amount="100">100</button>
+                <button type="button" class="rc-credit-preset px-3 py-1.5 text-xs rounded-lg border border-gray-300 hover:bg-gray-50 font-medium" data-amount="250">250</button>
+                <button type="button" class="rc-credit-preset px-3 py-1.5 text-xs rounded-lg border border-gray-300 hover:bg-gray-50 font-medium" data-amount="500">500</button>
+                <button type="button" class="rc-credit-preset px-3 py-1.5 text-xs rounded-lg border border-gray-300 hover:bg-gray-50 font-medium" data-amount="1000">1,000</button>
+                <input type="number" name="amount" id="rc-deposit-amount" min="1" max="10000" placeholder="Custom" class="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none" />
+              </div>
+            </div>
+            <div class="grid gap-1">
+              <label class="text-xs font-medium text-gray-600">Reference (optional)</label>
+              <input type="text" name="reference" id="rc-deposit-reference" placeholder="Invoice #, note…" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none w-48" />
+            </div>
+            <button type="submit" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 text-sm font-semibold transition-colors whitespace-nowrap">
+              Add Credits
+            </button>
+          </form>
+          <div id="rc-deposit-result" class="hidden mt-3 p-2 rounded-lg text-sm"></div>
+
+          <!-- Pricing Info -->
+          <div class="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+            <p class="text-xs text-gray-600"><strong>Pricing:</strong> $0.50 per credit. Each credit reveals one prospect's email and enables the full AI outreach pipeline (research, personalized email, follow-up sequence, tracking).</p>
+            <p class="text-xs text-gray-500 mt-1">Non-Apollo campaigns (FL/State Licensee, CSV) don't consume credits — those leads already have emails.</p>
+          </div>
+        </div>
+
+        <!-- Transaction History -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Transaction History</h2>
+          <div id="rc-transactions-list" class="space-y-1 max-h-96 overflow-y-auto">
+            <p class="text-sm text-gray-400 py-4 text-center">Loading transactions…</p>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -1532,6 +1607,7 @@ if (!session) {
       if (tab === 'pipeline') loadPipelineStatus();
       if (tab === 'surveys') loadSurveyCampaigns();
       if (tab === 'roadmap') loadRoadmapData();
+      if (tab === 'credits') loadRecruitmentCredits();
     });
   });
 
@@ -1550,7 +1626,7 @@ if (!session) {
       const current = dd.value;
       dd.innerHTML = '<option value="">All Campaigns</option>';
       for (const c of campaignsCache) {
-        const icon = c.source_type === 'fl_licensee' || c.source_type === 'state_licensee' ? '\u{1f3db}\ufe0f' : c.source_type === 'csv_import' ? '\u{1f4e4}' : '\u{1f50d}';
+        const icon = c.source_type === 'apollo_recruitment' ? '\u{1f680}' : c.source_type === 'fl_licensee' || c.source_type === 'state_licensee' ? '\u{1f3db}\ufe0f' : c.source_type === 'csv_import' || c.source_type === 'csv' ? '\u{1f4e4}' : '\u{1f680}';
         const opt = document.createElement('option');
         opt.value = c.id;
         opt.textContent = `${icon} ${c.name}`;
@@ -1635,7 +1711,7 @@ if (!session) {
               <button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}" title="${c.status === 'active' ? 'Pause' : 'Resume'}">${c.status === 'active' ? '⏸' : '▶'}</button>
               <button class="text-xs text-red-500 hover:text-red-700 font-medium" data-campaign-action="stop" data-campaign-id="${c.id}" title="Stop campaign">⏹</button>`;
 
-      const sourceIcon = c.source_type === 'fl_licensee' ? '🏛️ FL Licensee' : c.source_type === 'state_licensee' ? `🏛️ ${c.search_state || 'State'} Licensee` : c.source_type === 'csv' ? '📤 CSV' : c.source_type === 'pool' ? '🎯 Pool' : '🔍 Prophog';
+      const sourceIcon = c.source_type === 'apollo_recruitment' ? '🚀 Apollo' : c.source_type === 'fl_licensee' ? '🏛️ FL Licensee' : c.source_type === 'state_licensee' ? `🏛️ ${c.search_state || 'State'} Licensee` : c.source_type === 'csv' ? '📤 CSV' : c.source_type === 'pool' ? '🎯 Pool' : c.source_type === 'prophog' ? '🔍 Prophog (legacy)' : '🚀 Apollo';
 
       return `
         <div class="bg-white rounded-xl border border-gray-200 p-4 ${isPast ? 'opacity-75' : 'hover:border-brand-300'} transition-colors">
@@ -1752,7 +1828,7 @@ if (!session) {
   async function refreshPoolStats() {
     try {
       const statuses = ['pending', 'drafted', 'reviewed', 'approved', 'held', 'sent', 'follow_up_1', 'follow_up_2', 'follow_up_exhausted', 'survey_sent', 'converted', 'rejected'];
-      const sources = ['prophog_scan', 'csv_import', 'landing_page', 'fl_licensee'];
+      const sources = ['apollo_recruitment', 'csv_import', 'landing_page', 'fl_licensee', 'state_licensee', 'prophog_scan'];
       const fetches = [
         ...statuses.map(s => fetch(`/api/recruitment-upload?status=${s}&limit=1`).then(r => r.json()).then(d => ({ key: s, count: d.total || 0 }))),
         ...sources.map(s => fetch(`/api/recruitment-upload?limit=1&source=${s}`).then(r => r.json()).then(d => ({ key: `src-${s}`, count: d.total || 0 }))),
@@ -1778,8 +1854,8 @@ if (!session) {
       setEl('pool-converted', counts['converted'] || 0);
       setEl('pool-rejected', counts['rejected'] || 0);
       setEl('pool-exhausted', counts['follow_up_exhausted'] || 0);
-      setEl('pool-src-prophog', counts['src-prophog_scan'] || 0);
-      setEl('pool-src-fl-licensee', counts['src-fl_licensee'] || 0);
+      setEl('pool-src-apollo', (counts['src-apollo_recruitment'] || 0) + (counts['src-prophog_scan'] || 0));
+      setEl('pool-src-fl-licensee', (counts['src-fl_licensee'] || 0) + (counts['src-state_licensee'] || 0));
       setEl('pool-src-csv', counts['src-csv_import'] || 0);
       setEl('pool-src-landing', counts['src-landing_page'] || 0);
     } catch { /* silent */ }
@@ -1872,8 +1948,11 @@ if (!session) {
     WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'District of Columbia'
   };
 
-  // Prophog target states (all states Tim is interested in for Prophog searches)
+  // Prophog target states (legacy — Apollo covers all these now)
   const PROPHOG_STATES = ['FL','GA','OH','OK','SC','MS','MI','TX','UT','AL','LA','TN'];
+
+  // Apollo-supported states (primary source)
+  const APOLLO_STATES = ['GA','OH','OK','SC','MS','MI','TX','UT','AL','LA','FL','TN','CA','AZ','NC','VA','PA','IL','IN','CO'];
 
   // Cache discovery findings
   let discoveryFindings: Record<string, { status: string; stateName?: string }> = {};
@@ -1911,7 +1990,7 @@ if (!session) {
       };
     }
     // Initial population for default source
-    const source = (document.getElementById('cmp-source') as HTMLSelectElement)?.value || 'prophog';
+    const source = (document.getElementById('cmp-source') as HTMLSelectElement)?.value || 'apollo_recruitment';
     populateStateDropdown(source);
   }
 
@@ -1946,13 +2025,12 @@ if (!session) {
       if (hint) hint.textContent = `${confirmed.length} state source${confirmed.length !== 1 ? 's' : ''} confirmed. ${promising.length} being verified.`;
     } else if (source === 'apollo_recruitment') {
       // Apollo-supported states (free search, paid reveals)
-      const APOLLO_STATES = ['GA','OH','OK','SC','MS','MI','TX','UT','AL','LA','FL','TN'];
       for (const code of APOLLO_STATES) {
         options.push({ value: STATE_NAMES[code] || code, label: `${STATE_NAMES[code]} (${code})` });
       }
-      if (hint) hint.textContent = 'Apollo searches 12 states. Email reveals cost 1 credit each.';
+      if (hint) hint.textContent = `Apollo searches ${APOLLO_STATES.length} states. Email reveals cost 1 credit each.`;
     } else if (source === 'prophog') {
-      // All Prophog target states
+      // Legacy — Prophog target states (being deprecated)
       for (const code of PROPHOG_STATES) {
         options.push({ value: STATE_NAMES[code] || code, label: `${STATE_NAMES[code]} (${code})` });
       }
@@ -5227,6 +5305,121 @@ if (!session) {
       annotation.classList.remove('hidden');
     }
   })();
+
+  // ═══════════════════════════════════════════
+  // CREDITS TAB
+  // ═══════════════════════════════════════════
+  async function loadRecruitmentCredits() {
+    try {
+      const res = await fetch('/api/apollo-credits');
+      if (!res.ok) throw new Error('Failed to load');
+      const data = await res.json();
+
+      const balance = data.balance ?? 0;
+      const purchased = data.lifetime_purchased ?? 0;
+      const used = data.lifetime_used ?? 0;
+
+      const balEl = document.getElementById('rc-wallet-balance');
+      const purEl = document.getElementById('rc-wallet-purchased');
+      const usedEl = document.getElementById('rc-wallet-used');
+      const badge = document.getElementById('credits-badge');
+
+      if (balEl) balEl.textContent = balance.toLocaleString();
+      if (purEl) purEl.textContent = purchased.toLocaleString();
+      if (usedEl) usedEl.textContent = used.toLocaleString();
+      if (badge) badge.textContent = `${balance.toLocaleString()} credits`;
+
+      // Transactions
+      const txList = document.getElementById('rc-transactions-list');
+      if (txList && data.transactions) {
+        if (data.transactions.length === 0) {
+          txList.innerHTML = '<p class="text-sm text-gray-400 py-4 text-center">No transactions yet.</p>';
+        } else {
+          txList.innerHTML = data.transactions.map((tx: any) => {
+            const isDeposit = tx.amount > 0;
+            const icon = isDeposit ? '💰' : '🔍';
+            const color = isDeposit ? 'text-emerald-600' : 'text-red-500';
+            const sign = isDeposit ? '+' : '';
+            const date = new Date(tx.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const time = new Date(tx.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+            const ref = tx.payment_reference ? ` · ${escapeHtml(tx.payment_reference)}` : '';
+            return `<div class="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+              <div class="flex items-center gap-2">
+                <span class="text-sm">${icon}</span>
+                <div>
+                  <div class="text-sm text-gray-800">${escapeHtml(tx.description || tx.type)}</div>
+                  <div class="text-xs text-gray-400">${date}, ${time}${ref}</div>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="font-semibold ${color}">${sign}${tx.amount.toLocaleString()}</span>
+                <span class="text-xs text-gray-400 ml-1">${tx.balance_after?.toLocaleString() ?? ''}</span>
+              </div>
+            </div>`;
+          }).join('');
+        }
+      }
+    } catch {
+      const txList = document.getElementById('rc-transactions-list');
+      if (txList) txList.innerHTML = '<p class="text-sm text-red-500 py-4 text-center">Failed to load credit data.</p>';
+    }
+  }
+
+  // Deposit form
+  const rcDepositForm = document.getElementById('rc-deposit-form') as HTMLFormElement;
+  const rcDepositAmountInput = document.getElementById('rc-deposit-amount') as HTMLInputElement;
+
+  // Preset buttons — set amount and auto-submit
+  document.querySelectorAll('.rc-credit-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      rcDepositAmountInput.value = (btn as HTMLElement).dataset.amount || '';
+      rcDepositForm.requestSubmit();
+    });
+  });
+
+  rcDepositForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(rcDepositForm);
+    const amount = parseInt(String(fd.get('amount') || rcDepositAmountInput.value || '0'), 10);
+    const reference = (document.getElementById('rc-deposit-reference') as HTMLInputElement)?.value.trim() || '';
+
+    if (!amount || amount <= 0) {
+      alert('Enter a valid credit amount');
+      return;
+    }
+
+    const resultEl = document.getElementById('rc-deposit-result')!;
+    try {
+      const res = await fetch('/api/apollo-credits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deposit', amount, reference }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        resultEl.className = 'mt-3 p-2 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200';
+        resultEl.textContent = data.error || 'Deposit failed';
+        resultEl.classList.remove('hidden');
+        return;
+      }
+
+      resultEl.className = 'mt-3 p-2 rounded-lg text-sm bg-emerald-50 text-emerald-700 border border-emerald-200';
+      resultEl.textContent = data.message || `Added ${amount} credits`;
+      resultEl.classList.remove('hidden');
+      rcDepositForm.reset();
+      setTimeout(() => resultEl.classList.add('hidden'), 4000);
+      loadRecruitmentCredits();
+    } catch {
+      resultEl.className = 'mt-3 p-2 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200';
+      resultEl.textContent = 'Network error';
+      resultEl.classList.remove('hidden');
+    }
+  });
+
+  // Load credits when tab shown
+  document.querySelector('[data-tab="credits"]')?.addEventListener('click', () => {
+    loadRecruitmentCredits();
+  });
 
   // ═══════════════════════════════════════════
   // DEEPLINK: ?pid= switches to Sent tab and searches for prospect

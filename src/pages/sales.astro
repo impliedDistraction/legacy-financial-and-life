@@ -1103,10 +1103,11 @@ if (!session) {
   const depositForm = document.getElementById('deposit-form') as HTMLFormElement;
   const depositAmountInput = document.getElementById('deposit-amount') as HTMLInputElement;
 
-  // Preset buttons
+  // Preset buttons — set amount and auto-submit
   document.querySelectorAll('.credit-preset').forEach(btn => {
     btn.addEventListener('click', () => {
       depositAmountInput.value = (btn as HTMLElement).dataset.amount || '';
+      depositForm.requestSubmit();
     });
   });
 
