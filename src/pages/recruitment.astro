@@ -294,8 +294,8 @@ if (!session) {
                   <input type="email" id="cmp-reply-to" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="recruiting@legacyfinancial.app" />
                   <p class="text-xs text-gray-400 mt-0.5">Where replies go. Leave blank for default.</p>
                 </div>
-                <!-- Auto-relaunch toggle -->
-                <label class="flex items-center gap-3 py-2 cursor-pointer">
+                <!-- Auto-relaunch toggle (hidden for CSV — finite list) -->
+                <label id="cmp-relaunch-wrap" class="flex items-center gap-3 py-2 cursor-pointer">
                   <input type="checkbox" id="cmp-relaunch" class="w-4 h-4 text-brand-600 border-gray-300 rounded focus:ring-brand-500" />
                   <div>
                     <span class="text-sm font-medium text-gray-800">Continuous</span>
@@ -455,8 +455,8 @@ if (!session) {
           </div>
           <div class="bg-green-50 rounded-xl border border-green-200 p-5">
             <h3 class="text-sm font-semibold text-green-900 mb-2">Pricing</h3>
-            <p class="text-xs text-green-800">CSV imports don't consume credits — those leads already have emails. AI processing and email sending are included.</p>
-            <p class="text-xs text-green-700 mt-1">Apollo campaigns cost 1 credit per email reveal ($0.50/credit).</p>
+            <p class="text-xs text-green-800">All campaigns consume 1 credit per prospect processed through the AI pipeline (research, personalized email, follow-ups, tracking).</p>
+            <p class="text-xs text-green-700 mt-1">Apollo campaigns cost 2 credits/prospect (1 reveal + 1 processing). Voice calls cost 2 credits/call.</p>
           </div>
         </div>
       </div>
@@ -932,8 +932,8 @@ if (!session) {
 
           <!-- Pricing Info -->
           <div class="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
-            <p class="text-xs text-gray-600"><strong>Pricing:</strong> $0.50 per credit. Each credit reveals one prospect's email and enables the full AI outreach pipeline (research, personalized email, follow-up sequence, tracking).</p>
-            <p class="text-xs text-gray-500 mt-1">Non-Apollo campaigns (FL/State Licensee, CSV) don't consume credits — those leads already have emails.</p>
+            <p class="text-xs text-gray-600"><strong>Pricing:</strong> $0.50 per credit. Each credit processes one prospect through the full AI pipeline (research, personalized email, follow-up sequence, tracking). Apollo campaigns use 2 credits/prospect (reveal + processing).</p>
+            <p class="text-xs text-gray-500 mt-1">Voice calls cost 2 credits/call. Follow-up sequences and surveys are included — no extra charge.</p>
           </div>
         </div>
 
@@ -1921,6 +1921,12 @@ if (!session) {
     const flFilters = document.getElementById('fl-filters');
     const stateSelect = document.getElementById('cmp-state')?.closest('div') as HTMLElement;
     if (flFilters) flFilters.classList.toggle('hidden', source !== 'fl_licensee' && source !== 'state_licensee');
+    // Hide Continuous for CSV (finite list, no auto-relaunch)
+    const relaunchWrap = document.getElementById('cmp-relaunch-wrap');
+    if (relaunchWrap) {
+      relaunchWrap.classList.toggle('hidden', source === 'csv');
+      if (source === 'csv') (document.getElementById('cmp-relaunch') as HTMLInputElement).checked = false;
+    }
     // Lock state to Florida when FL Licensee selected
     if (source === 'fl_licensee' && stateSelect) {
       (document.getElementById('cmp-state') as HTMLSelectElement).value = 'Florida';

@@ -1,11 +1,17 @@
 -- ═══════════════════════════════════════════════════════════════════
--- MIGRATION: Apollo credit wallets — client-funded credit system
+-- MIGRATION: Pipeline credit wallets — unified credit system
 -- Run in Supabase SQL Editor (Legacy Financial: kxmojndpgxgbykxjtxba)
 -- Safe to re-run — all statements use IF NOT EXISTS.
 --
--- Enables clients (Tim/Beth) to fund their own Apollo credits.
--- System auto-pauses campaigns when wallet balance hits zero.
--- Credits are consumed on email reveals (1 credit = 1 reveal).
+-- Single token economy for all pipeline actions:
+--   - Recruitment processing: 1 credit/prospect (research + AI draft + QA + send)
+--   - Sales processing: 1 credit/prospect
+--   - Apollo email reveal: 1 credit/reveal
+--   - Voice call: 2 credits/call (real-time GPU + telephony)
+--   - Follow-up emails & surveys: 0 (included in initial processing credit)
+--
+-- System auto-pauses ALL campaigns when wallet balance hits zero.
+-- Credits priced at $0.50 each.
 -- ═══════════════════════════════════════════════════════════════════
 
 
@@ -51,7 +57,7 @@ CREATE TABLE IF NOT EXISTS apollo_credit_transactions (
   wallet_id UUID NOT NULL REFERENCES apollo_credit_wallets(id),
 
   -- Transaction details
-  type TEXT NOT NULL,                -- 'deposit', 'reveal', 'adjustment', 'refund'
+  type TEXT NOT NULL,                -- 'deposit', 'reveal', 'processing', 'voice_call', 'adjustment', 'refund'
   amount INTEGER NOT NULL,           -- positive = credit added, negative = credit consumed
   balance_after INTEGER NOT NULL,    -- wallet balance after this transaction
 
