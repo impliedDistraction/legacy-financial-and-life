@@ -86,6 +86,9 @@ if (!session) {
       <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="upload">
         📤 Upload CSV
       </button>
+      <button class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-colors" data-tab="credits">
+        💳 Credits
+      </button>
     </div>
   </div>
 
@@ -289,6 +292,74 @@ if (!session) {
           </div>
         </form>
         <div id="upload-result" class="hidden mt-4 p-3 rounded-lg text-sm"></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════ CREDITS TAB ═══════════════ -->
+    <div id="tab-credits" class="tab-panel hidden">
+      <div class="space-y-6">
+
+        <!-- Wallet Balance -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Apollo Credits</h2>
+            <div id="wallet-balance-badge" class="px-3 py-1.5 rounded-full text-sm font-bold bg-gray-100 text-gray-500">
+              Loading…
+            </div>
+          </div>
+          <p class="text-sm text-gray-600 mb-4">
+            Credits are consumed when revealing email addresses from Apollo searches. Each reveal = 1 credit.
+            Campaigns auto-pause when credits run out and resume when topped up.
+          </p>
+
+          <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="text-center p-3 bg-emerald-50 rounded-lg">
+              <div class="text-2xl font-bold text-emerald-700" id="wallet-balance">—</div>
+              <div class="text-xs text-emerald-600">Available</div>
+            </div>
+            <div class="text-center p-3 bg-blue-50 rounded-lg">
+              <div class="text-2xl font-bold text-blue-700" id="wallet-purchased">—</div>
+              <div class="text-xs text-blue-600">Total Purchased</div>
+            </div>
+            <div class="text-center p-3 bg-purple-50 rounded-lg">
+              <div class="text-2xl font-bold text-purple-700" id="wallet-used">—</div>
+              <div class="text-xs text-purple-600">Total Used</div>
+            </div>
+          </div>
+
+          <!-- Add Credits Form -->
+          <div class="border-t border-gray-200 pt-4">
+            <h3 class="text-sm font-semibold text-gray-900 mb-3">Add Credits</h3>
+            <form id="deposit-form" class="flex items-end gap-3">
+              <div class="grid gap-1 flex-1">
+                <label class="text-xs font-medium text-gray-600">Amount</label>
+                <div class="flex gap-2">
+                  <button type="button" class="credit-preset px-3 py-1.5 text-xs rounded-lg border border-gray-300 hover:bg-gray-50 font-medium" data-amount="100">100</button>
+                  <button type="button" class="credit-preset px-3 py-1.5 text-xs rounded-lg border border-gray-300 hover:bg-gray-50 font-medium" data-amount="250">250</button>
+                  <button type="button" class="credit-preset px-3 py-1.5 text-xs rounded-lg border border-gray-300 hover:bg-gray-50 font-medium" data-amount="500">500</button>
+                  <button type="button" class="credit-preset px-3 py-1.5 text-xs rounded-lg border border-gray-300 hover:bg-gray-50 font-medium" data-amount="1000">1,000</button>
+                  <input type="number" name="amount" id="deposit-amount" min="1" max="10000" placeholder="Custom" class="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none" />
+                </div>
+              </div>
+              <div class="grid gap-1">
+                <label class="text-xs font-medium text-gray-600">Reference (optional)</label>
+                <input type="text" name="reference" placeholder="Invoice #, note…" class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-200 focus:outline-none w-48" />
+              </div>
+              <button type="submit" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 text-sm font-semibold transition-colors whitespace-nowrap">
+                Add Credits
+              </button>
+            </form>
+            <div id="deposit-result" class="hidden mt-3 p-2 rounded-lg text-sm"></div>
+          </div>
+        </div>
+
+        <!-- Transaction History -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Transaction History</h2>
+          <div id="transactions-list" class="space-y-1 max-h-96 overflow-y-auto">
+            <p class="text-sm text-gray-400 py-4 text-center">Loading transactions…</p>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -960,6 +1031,131 @@ if (!session) {
 
   // Refresh button
   document.getElementById('refresh-apollo-lists')!.addEventListener('click', loadApolloLists);
+
+  // ─── Credits Tab ─────────────────────────────────────────────────
+
+  async function loadCredits() {
+    try {
+      const res = await fetch('/api/apollo-credits');
+      const data = await res.json();
+      if (!res.ok || !data.wallet) {
+        document.getElementById('wallet-balance')!.textContent = '—';
+        document.getElementById('wallet-purchased')!.textContent = '—';
+        document.getElementById('wallet-used')!.textContent = '—';
+        const badge = document.getElementById('wallet-balance-badge')!;
+        badge.textContent = 'Not Set Up';
+        badge.className = 'px-3 py-1.5 rounded-full text-sm font-bold bg-gray-100 text-gray-500';
+        document.getElementById('transactions-list')!.innerHTML = '<p class="text-sm text-gray-400 py-4 text-center">Run the migration to enable the credit wallet system.</p>';
+        return;
+      }
+
+      const w = data.wallet;
+      document.getElementById('wallet-balance')!.textContent = w.balance.toLocaleString();
+      document.getElementById('wallet-purchased')!.textContent = (w.lifetime_purchased || 0).toLocaleString();
+      document.getElementById('wallet-used')!.textContent = (w.lifetime_used || 0).toLocaleString();
+
+      const badge = document.getElementById('wallet-balance-badge')!;
+      if (w.balance <= 0) {
+        badge.textContent = `⚠️ Empty`;
+        badge.className = 'px-3 py-1.5 rounded-full text-sm font-bold bg-red-100 text-red-700';
+      } else if (w.balance <= (w.low_balance_threshold || 50)) {
+        badge.textContent = `⚠️ Low: ${w.balance}`;
+        badge.className = 'px-3 py-1.5 rounded-full text-sm font-bold bg-amber-100 text-amber-700';
+      } else {
+        badge.textContent = `${w.balance.toLocaleString()} credits`;
+        badge.className = 'px-3 py-1.5 rounded-full text-sm font-bold bg-emerald-100 text-emerald-700';
+      }
+
+      // Render transactions
+      const txnList = document.getElementById('transactions-list')!;
+      if (data.transactions.length === 0) {
+        txnList.innerHTML = '<p class="text-sm text-gray-400 py-4 text-center">No transactions yet.</p>';
+      } else {
+        txnList.innerHTML = data.transactions.map((t: any) => {
+          const isDeposit = t.amount > 0;
+          const date = new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+          const amountClass = isDeposit ? 'text-emerald-600' : 'text-red-600';
+          const amountStr = isDeposit ? `+${t.amount}` : `${t.amount}`;
+          const typeIcon = isDeposit ? '💰' : '🔍';
+          return `
+            <div class="flex items-center justify-between py-2 px-3 rounded hover:bg-gray-50 border-b border-gray-50">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="text-sm">${typeIcon}</span>
+                <div class="min-w-0">
+                  <p class="text-sm text-gray-900 truncate">${esc(t.description || t.type)}</p>
+                  <p class="text-[10px] text-gray-400">${date}${t.payment_reference ? ' · ' + esc(t.payment_reference) : ''}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 flex-shrink-0">
+                <span class="text-sm font-semibold ${amountClass}">${amountStr}</span>
+                <span class="text-xs text-gray-400">${t.balance_after}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    } catch (err) {
+      console.error('Load credits failed:', err);
+    }
+  }
+
+  // Deposit form
+  const depositForm = document.getElementById('deposit-form') as HTMLFormElement;
+  const depositAmountInput = document.getElementById('deposit-amount') as HTMLInputElement;
+
+  // Preset buttons
+  document.querySelectorAll('.credit-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      depositAmountInput.value = (btn as HTMLElement).dataset.amount || '';
+    });
+  });
+
+  depositForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(depositForm);
+    const amount = parseInt(String(fd.get('amount') || depositAmountInput.value || '0'), 10);
+    const reference = String(fd.get('reference') || '').trim();
+
+    if (!amount || amount <= 0) {
+      alert('Enter a valid credit amount');
+      return;
+    }
+
+    const resultEl = document.getElementById('deposit-result')!;
+    try {
+      const res = await fetch('/api/apollo-credits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deposit', amount, reference }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        resultEl.className = 'mt-3 p-2 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200';
+        resultEl.textContent = data.error || 'Deposit failed';
+        resultEl.classList.remove('hidden');
+        return;
+      }
+
+      resultEl.className = 'mt-3 p-2 rounded-lg text-sm bg-emerald-50 text-emerald-700 border border-emerald-200';
+      resultEl.textContent = data.message || `Added ${amount} credits`;
+      resultEl.classList.remove('hidden');
+      depositForm.reset();
+      setTimeout(() => resultEl.classList.add('hidden'), 4000);
+      loadCredits(); // refresh display
+    } catch {
+      resultEl.className = 'mt-3 p-2 rounded-lg text-sm bg-red-50 text-red-700 border border-red-200';
+      resultEl.textContent = 'Network error';
+      resultEl.classList.remove('hidden');
+    }
+  });
+
+  // Load credits when tab is shown
+  tabNav.addEventListener('click', (e: Event) => {
+    const btn = (e.target as HTMLElement).closest('.tab-btn') as HTMLElement;
+    if (btn?.dataset.tab === 'credits') {
+      loadCredits();
+    }
+  });
 
   // ─── Utilities ───────────────────────────────────────────────────
 

@@ -219,12 +219,13 @@ if (!session) {
                   <label class="block text-xs font-medium text-gray-600 mb-1">Lead Source</label>
                   <select id="cmp-source" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">
                     <option value="prophog" selected>🔍 Prophog (auto-search)</option>
+                    <option value="apollo_recruitment">🚀 Apollo (enriched search)</option>
                     <option value="fl_licensee">🏛️ FL Licensee (bulk CSV)</option>
                     <option value="state_licensee">🏛️ State Licensee (TX, etc.)</option>
                     <option value="csv">📤 CSV Import</option>
 
                   </select>
-                  <p class="text-xs text-gray-400 mt-0.5">Prophog auto-searches for new agents. FL/State Licensee uses DOI bulk data. CSV uses agents you've uploaded.</p>
+                  <p class="text-xs text-gray-400 mt-0.5">Prophog auto-searches for new agents. Apollo searches with email reveals (1 credit/each). FL/State Licensee uses DOI bulk data. CSV uses agents you've uploaded.</p>
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-600 mb-1">Target State</label>
@@ -1943,6 +1944,13 @@ if (!session) {
         options.push({ value: STATE_NAMES[code] || code, label: `${STATE_NAMES[code]} (${code}) — verifying`, disabled: true });
       }
       if (hint) hint.textContent = `${confirmed.length} state source${confirmed.length !== 1 ? 's' : ''} confirmed. ${promising.length} being verified.`;
+    } else if (source === 'apollo_recruitment') {
+      // Apollo-supported states (free search, paid reveals)
+      const APOLLO_STATES = ['GA','OH','OK','SC','MS','MI','TX','UT','AL','LA','FL','TN'];
+      for (const code of APOLLO_STATES) {
+        options.push({ value: STATE_NAMES[code] || code, label: `${STATE_NAMES[code]} (${code})` });
+      }
+      if (hint) hint.textContent = 'Apollo searches 12 states. Email reveals cost 1 credit each.';
     } else if (source === 'prophog') {
       // All Prophog target states
       for (const code of PROPHOG_STATES) {
