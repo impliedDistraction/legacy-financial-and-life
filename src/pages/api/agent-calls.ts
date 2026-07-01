@@ -6,11 +6,17 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
+import { verifySessionCookie } from '../../lib/ai-demo-auth';
 
 const SUPABASE_URL = import.meta.env.SUPABASE_URL || import.meta.env.PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
 
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ url, request }) => {
+  const session = await verifySessionCookie(request.headers.get('cookie'));
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+  }
+
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return new Response(JSON.stringify({ error: 'Supabase not configured' }), { status: 500 });
   }

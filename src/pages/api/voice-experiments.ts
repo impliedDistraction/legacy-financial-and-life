@@ -28,8 +28,8 @@ async function bridgeFetch(path: string): Promise<Response> {
 /**
  * GET /api/voice-experiments — Get live A/B experiment status from voice bridge
  */
-export const GET: APIRoute = async ({ request, cookies }) => {
-  const session = await verifySessionCookie(cookies);
+export const GET: APIRoute = async ({ request }) => {
+  const session = await verifySessionCookie(request.headers.get('cookie'));
   if (!session) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
   }

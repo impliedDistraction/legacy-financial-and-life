@@ -96,6 +96,52 @@ if (!session) {
       <p id="dial-success" class="mt-2 text-xs text-green-600 hidden"></p>
     </div>
 
+    <!-- Prospect Call Queue -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
+      <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <h2 class="text-sm font-semibold text-gray-900">📋 Call Queue</h2>
+          <span id="queue-count" class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">—</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="queue-filter" class="px-2 py-1 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-brand-500 bg-white">
+            <option value="all">All warm leads</option>
+            <option value="has_phone">With phone only</option>
+            <option value="interested">Interested</option>
+            <option value="replied">Replied</option>
+          </select>
+          <button id="queue-refresh" class="px-2 py-1 text-xs text-brand-600 hover:text-brand-700 font-medium">↻ Refresh</button>
+        </div>
+      </div>
+      <div id="prospect-queue" class="max-h-[320px] overflow-y-auto divide-y divide-gray-100">
+        <div class="p-4 text-center">
+          <p class="text-xs text-gray-400">Loading warm leads...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Post-Call Outcome (shown after call ends) -->
+    <div id="outcome-section" class="hidden">
+      <div class="bg-white rounded-xl border border-amber-200 shadow-sm p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3">📝 Call Outcome</h3>
+        <p id="outcome-prospect-name" class="text-xs text-gray-500 mb-3"></p>
+        <div class="flex flex-wrap gap-2 mb-3">
+          <button data-outcome="interested" class="outcome-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 hover:bg-green-50 hover:border-green-300 transition-colors">✅ Interested</button>
+          <button data-outcome="callback" class="outcome-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-colors">📅 Callback</button>
+          <button data-outcome="not_interested" class="outcome-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 hover:bg-red-50 hover:border-red-300 transition-colors">❌ Not Interested</button>
+          <button data-outcome="voicemail" class="outcome-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-colors">📭 Voicemail</button>
+          <button data-outcome="wrong_number" class="outcome-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-colors">🚫 Wrong #</button>
+          <button data-outcome="no_answer" class="outcome-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-colors">📵 No Answer</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="text" id="outcome-notes" placeholder="Optional notes..."
+            class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-brand-500" />
+          <button id="outcome-skip" class="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">Skip</button>
+        </div>
+        <p id="outcome-saved" class="mt-2 text-xs text-green-600 hidden">✓ Saved</p>
+      </div>
+    </div>
+
     <!-- Dialog Tree Flowchart -->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm">
       <button id="tree-toggle" class="w-full p-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors rounded-xl">
@@ -501,6 +547,194 @@ if (!session) {
   startPolling();
   loadRecentCalls();
   loadScriptSelector();
+  loadProspectQueue();
+
+  // ─── Prospect Queue ───
+  let queueData: any[] = [];
+  let lastCalledProspect: any = null;
+
+  async function loadProspectQueue() {
+    const container = document.getElementById('prospect-queue')!;
+    try {
+      const res = await fetch('/api/recruitment-warm-leads');
+      if (!res.ok) throw new Error('Failed to load');
+      const { leads } = await res.json();
+      queueData = leads || [];
+      renderQueue();
+    } catch {
+      container.innerHTML = '<div class="p-4 text-center"><p class="text-xs text-red-500">Could not load prospects</p></div>';
+    }
+  }
+
+  function renderQueue() {
+    const container = document.getElementById('prospect-queue')!;
+    const countEl = document.getElementById('queue-count')!;
+    const filter = (document.getElementById('queue-filter') as HTMLSelectElement)?.value || 'all';
+
+    let filtered = queueData;
+    if (filter === 'has_phone') filtered = queueData.filter((p: any) => p.phone);
+    else if (filter === 'interested') filtered = queueData.filter((p: any) => p.interaction_stage === 'interested' || p.signals?.includes('expressed interest'));
+    else if (filter === 'replied') filtered = queueData.filter((p: any) => p.interaction_stage === 'replied' || p.signals?.includes('email reply'));
+
+    const withPhone = filtered.filter((p: any) => p.phone);
+    countEl.textContent = `${withPhone.length} callable`;
+
+    if (filtered.length === 0) {
+      container.innerHTML = '<div class="p-4 text-center"><p class="text-xs text-gray-400">No warm leads match this filter</p></div>';
+      return;
+    }
+
+    container.innerHTML = filtered.map((p: any) => {
+      const hasPhone = !!p.phone;
+      const warmthBar = Math.min(100, Math.round((p.warmth / 10) * 100));
+      const warmthColor = warmthBar >= 70 ? 'bg-green-500' : warmthBar >= 40 ? 'bg-yellow-500' : 'bg-orange-400';
+      const signals = (p.signals || []).slice(0, 3).join(' · ');
+      const stateLabel = p.state ? `<span class="text-[10px] px-1 py-0.5 rounded bg-gray-100 text-gray-600">${p.state}</span>` : '';
+      const stageColor = p.interaction_stage === 'interested' ? 'text-green-600' : p.interaction_stage === 'replied' ? 'text-blue-600' : 'text-gray-500';
+
+      return `
+        <div class="px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors ${!hasPhone ? 'opacity-50' : ''}">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="text-sm font-medium text-gray-900 truncate">${p.name}</span>
+              ${stateLabel}
+              <span class="text-[10px] ${stageColor} font-medium">${p.interaction_stage || ''}</span>
+            </div>
+            <div class="flex items-center gap-2 mt-0.5">
+              <span class="inline-block w-16 h-1.5 rounded-full bg-gray-200"><span class="block h-full rounded-full ${warmthColor}" style="width:${warmthBar}%"></span></span>
+              <span class="text-[10px] text-gray-400">${signals}</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 ml-3">
+            ${hasPhone
+              ? `<button onclick="queueCall('${p.id}')" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors whitespace-nowrap">📞 Call</button>`
+              : '<span class="text-[10px] text-gray-400">No phone</span>'}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('queue-filter')?.addEventListener('change', renderQueue);
+  document.getElementById('queue-refresh')?.addEventListener('click', loadProspectQueue);
+
+  // Call from queue
+  (window as any).queueCall = async function(prospectId: string) {
+    const prospect = queueData.find((p: any) => p.id === prospectId);
+    if (!prospect || !prospect.phone) return;
+
+    const transferNumber = (document.getElementById('transfer-input') as HTMLInputElement)?.value.trim();
+    if (!transferNumber) {
+      const dialError = document.getElementById('dial-error')!;
+      dialError.textContent = 'Set a Transfer To number first';
+      dialError.classList.remove('hidden');
+      setTimeout(() => dialError.classList.add('hidden'), 3000);
+      return;
+    }
+
+    const testMode = (document.getElementById('test-mode') as HTMLInputElement)?.checked;
+    lastCalledProspect = prospect;
+
+    // Build context from signals
+    const context = prospect.signals?.join(', ') || '';
+
+    try {
+      const res = await fetch('/api/recruitment-dial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: prospect.phone,
+          prospectId: prospect.id,
+          prospectName: prospect.name,
+          prospectContext: context,
+          transferNumber,
+          testMode,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        const dialError = document.getElementById('dial-error')!;
+        dialError.textContent = data.error || 'Call failed';
+        dialError.classList.remove('hidden');
+        setTimeout(() => dialError.classList.add('hidden'), 5000);
+      } else {
+        const dialSuccess = document.getElementById('dial-success')!;
+        dialSuccess.textContent = `✅ Calling ${prospect.name} (${prospect.phone})`;
+        dialSuccess.classList.remove('hidden');
+        setTimeout(() => dialSuccess.classList.add('hidden'), 5000);
+        startPolling();
+      }
+    } catch (err: any) {
+      const dialError = document.getElementById('dial-error')!;
+      dialError.textContent = 'Network error: ' + err.message;
+      dialError.classList.remove('hidden');
+    }
+  };
+
+  // ─── Post-Call Outcome ───
+  function showOutcomeForm(prospect: any) {
+    const section = document.getElementById('outcome-section')!;
+    const nameEl = document.getElementById('outcome-prospect-name')!;
+    section.classList.remove('hidden');
+    nameEl.textContent = `For: ${prospect?.name || 'Unknown'} (${prospect?.phone || ''})`;
+    // Reset state
+    document.querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('ring-2', 'ring-brand-500', 'bg-brand-50'));
+    (document.getElementById('outcome-notes') as HTMLInputElement).value = '';
+    document.getElementById('outcome-saved')!.classList.add('hidden');
+  }
+
+  // Listen for call completion to show outcome form
+  const originalStopTranscript = stopTranscriptPolling;
+  stopTranscriptPolling = function() {
+    originalStopTranscript();
+    if (lastCalledProspect) {
+      showOutcomeForm(lastCalledProspect);
+    }
+  };
+
+  // Outcome button clicks
+  document.querySelectorAll('.outcome-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const outcome = btn.getAttribute('data-outcome');
+      if (!outcome || !lastCalledProspect) return;
+
+      // Visual selection
+      document.querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('ring-2', 'ring-brand-500', 'bg-brand-50'));
+      btn.classList.add('ring-2', 'ring-brand-500', 'bg-brand-50');
+
+      const notes = (document.getElementById('outcome-notes') as HTMLInputElement)?.value.trim();
+      await saveOutcome(lastCalledProspect.id, outcome, notes);
+    });
+  });
+
+  document.getElementById('outcome-skip')?.addEventListener('click', () => {
+    document.getElementById('outcome-section')!.classList.add('hidden');
+    lastCalledProspect = null;
+  });
+
+  async function saveOutcome(prospectId: string, outcome: string, notes: string) {
+    try {
+      const res = await fetch('/api/recruitment-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: prospectId,
+          action: 'mark_called',
+          callOutcome: outcome,
+          reason: notes || undefined,
+        }),
+      });
+      if (res.ok) {
+        document.getElementById('outcome-saved')!.classList.remove('hidden');
+        setTimeout(() => {
+          document.getElementById('outcome-section')!.classList.add('hidden');
+          lastCalledProspect = null;
+          loadProspectQueue(); // Refresh queue
+        }, 1500);
+      }
+    } catch { /* silent */ }
+  }
 
   /** Populate the script selector with saved trees from Supabase */
   async function loadScriptSelector() {

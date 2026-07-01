@@ -10,7 +10,36 @@ import { createMagicToken, isAllowedEmail } from '../../lib/ai-demo-auth';
 
 export const prerender = false;
 
+// Rate limiting: 5 magic-link requests per 15 minutes per IP
+const rateLimiter = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 5;
+const RATE_WINDOW = 15 * 60 * 1000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimiter.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimiter.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 export const POST: APIRoute = async ({ request }) => {
+  const clientIp =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+
+  if (!checkRateLimit(clientIp)) {
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   let body: { email?: string; redirect?: string };
   try {
     body = await request.json();

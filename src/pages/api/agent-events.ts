@@ -6,10 +6,16 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
+import { verifySessionCookie } from '../../lib/ai-demo-auth';
 
 const BRIDGE_URL = import.meta.env.OLLAMA_URL?.replace(/\/v1.*$/, '').replace(':3377', ':3380') || 'http://localhost:3380';
 
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ url, request }) => {
+  const session = await verifySessionCookie(request.headers.get('cookie'));
+  if (!session) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+  }
+
   const agentId = url.searchParams.get('agentId');
   if (!agentId) {
     return new Response(JSON.stringify({ error: 'agentId required' }), { status: 400 });

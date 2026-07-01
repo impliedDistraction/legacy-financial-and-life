@@ -5,6 +5,23 @@ import { getLeadTrackingId, trackLeadEvent } from '../../lib/lead-analytics';
 
 export const prerender = false;
 
+// Rate limiting: 5 submissions per 15 minutes per IP
+const rateLimiter = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 5;
+const RATE_WINDOW = 15 * 60 * 1000;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimiter.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimiter.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 const RECIPIENTS = ['tim@legacyf-l.com', 'beth@legacyf-l.com'];
 
 const SERVICE_LABELS: Record<string, string> = {
@@ -23,6 +40,15 @@ export const POST: APIRoute = async ({ request }) => {
       status,
       headers: { 'Content-Type': 'application/json' },
     });
+
+  const clientIp =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+
+  if (!checkRateLimit(clientIp)) {
+    return json(429, { error: 'Too many requests. Please try again later.' });
+  }
 
   let body: Record<string, string>;
   try {
@@ -71,11 +97,6 @@ export const POST: APIRoute = async ({ request }) => {
       provider: 'legacy_financial',
       properties,
     });
-
-  const clientIp =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    request.headers.get('x-real-ip') ||
-    'unknown';
 
   await trackContactEvent('contact_form_received', 'submission', 'info', {
     client_ip: clientIp,
