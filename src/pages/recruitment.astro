@@ -5321,9 +5321,10 @@ if (!session) {
       if (!res.ok) throw new Error('Failed to load');
       const data = await res.json();
 
-      const balance = data.balance ?? 0;
-      const purchased = data.lifetime_purchased ?? 0;
-      const used = data.lifetime_used ?? 0;
+      const wallet = data.wallet || {};
+      const balance = wallet.balance ?? 0;
+      const purchased = wallet.lifetime_purchased ?? 0;
+      const used = wallet.lifetime_used ?? 0;
 
       const balEl = document.getElementById('rc-wallet-balance');
       const purEl = document.getElementById('rc-wallet-purchased');

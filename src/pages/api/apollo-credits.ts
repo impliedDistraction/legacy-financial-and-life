@@ -139,9 +139,36 @@ export const POST: APIRoute = async ({ request }) => {
         }
       );
 
+      // Auto-resume campaigns that were paused due to zero balance
+      let resumed: string[] = [];
+      if (wallet.zero_balance_paused_at) {
+        try {
+          const pausedRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/recruitment_campaigns?status=eq.paused&select=id,name`,
+            { headers: supaHeaders() }
+          );
+          if (pausedRes.ok) {
+            const pausedCampaigns = await pausedRes.json();
+            for (const c of pausedCampaigns) {
+              await fetch(
+                `${SUPABASE_URL}/rest/v1/recruitment_campaigns?id=eq.${c.id}`,
+                {
+                  method: 'PATCH',
+                  headers: { ...supaHeaders(), Prefer: 'return=minimal' },
+                  body: JSON.stringify({ status: 'active', updated_at: new Date().toISOString() }),
+                }
+              );
+              resumed.push(c.name);
+            }
+          }
+        } catch { /* non-fatal */ }
+      }
+
+      const resumeMsg = resumed.length > 0 ? ` Resumed ${resumed.length} campaign(s).` : '';
       return jsonRes({
         wallet: updatedWallet,
-        message: `Added ${amount} credits. New balance: ${newBalance}`,
+        resumed,
+        message: `Added ${amount} credits. New balance: ${newBalance}.${resumeMsg}`,
       });
     }
 
