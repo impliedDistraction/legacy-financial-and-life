@@ -8,6 +8,10 @@ const HMAC_SECRET = import.meta.env.UNSUBSCRIBE_HMAC_SECRET?.trim()
   || import.meta.env.OPENCLAW_SECRET?.trim()
   || '';
 
+// Fieldwork Systems Supabase (for team membership creation)
+const FW_SUPABASE_URL = import.meta.env.FWSYS_SUPABASE_URL?.trim() || import.meta.env.WO_SUPABASE_URL?.trim();
+const FW_SUPABASE_KEY = import.meta.env.FWSYS_SUPABASE_SERVICE_ROLE_KEY?.trim() || import.meta.env.WO_SUPABASE_SERVICE_ROLE_KEY?.trim();
+
 // Valid outcomes for recruiter and prospect roles
 const RECRUITER_OUTCOMES = ['committed', 'interested', 'not_interested', 'no_show'];
 const PROSPECT_OUTCOMES = ['planning_to_join', 'thinking', 'not_for_me'];
@@ -37,6 +41,14 @@ function supabaseHeaders() {
   return {
     apikey: SUPABASE_SERVICE_ROLE_KEY!,
     Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+function fwHeaders() {
+  return {
+    apikey: FW_SUPABASE_KEY!,
+    Authorization: `Bearer ${FW_SUPABASE_KEY}`,
     'Content-Type': 'application/json',
   };
 }
@@ -232,12 +244,74 @@ export const GET: APIRoute = async ({ url, request }) => {
         const patch: Record<string, string> = { updated_at: now };
         if (newStatus) patch.status = newStatus;
         if (newInteractionStage) patch.interaction_stage = newInteractionStage;
+        if (newStatus === 'committing') patch.committed_at = now;
 
         await fetch(`${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${prospectId}`, {
           method: 'PATCH',
           headers: { ...supabaseHeaders(), Prefer: 'return=minimal' },
           body: JSON.stringify(patch),
         });
+
+        // Create team membership on Fieldwork Systems when committing
+        if (newStatus === 'committing' && FW_SUPABASE_URL && FW_SUPABASE_KEY) {
+          try {
+            // Fetch prospect details (name, email, campaign_id)
+            const prospectUrl = `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${prospectId}&select=name,email,campaign_id&limit=1`;
+            const prospectRes = await fetch(prospectUrl, { headers: supabaseHeaders() });
+            if (prospectRes.ok) {
+              const [prospect] = await prospectRes.json();
+              if (prospect) {
+                // Look up campaign to find recruiter slug
+                let recruiterSlug = '';
+                if (prospect.campaign_id) {
+                  const campUrl = `${SUPABASE_URL}/rest/v1/recruitment_campaigns?id=eq.${prospect.campaign_id}&select=name,client&limit=1`;
+                  const campRes = await fetch(campUrl, { headers: supabaseHeaders() });
+                  if (campRes.ok) {
+                    const [campaign] = await campRes.json();
+                    // Campaign client field or properties may contain the recruiter slug
+                    // For now, use the campaign client as the recruiter identifier
+                    recruiterSlug = campaign?.client || 'legacy';
+                  }
+                }
+
+                // Find the recruiter's showcase site on Fieldwork Systems
+                const recruiterSiteUrl = `${FW_SUPABASE_URL}/rest/v1/wo_showcase_sites?slug=eq.${encodeURIComponent(recruiterSlug)}&status=eq.claimed&select=id,slug&limit=1`;
+                const recruiterSiteRes = await fetch(recruiterSiteUrl, { headers: fwHeaders() });
+                let recruiterSiteId: string | null = null;
+                let finalRecruiterSlug = recruiterSlug;
+
+                if (recruiterSiteRes.ok) {
+                  const [rSite] = await recruiterSiteRes.json();
+                  if (rSite) {
+                    recruiterSiteId = rSite.id;
+                    finalRecruiterSlug = rSite.slug;
+                  }
+                }
+
+                // Create team membership (if we found the recruiter's site)
+                if (recruiterSiteId && prospect.email) {
+                  await fetch(`${FW_SUPABASE_URL}/rest/v1/wo_agent_teams`, {
+                    method: 'POST',
+                    headers: { ...fwHeaders(), Prefer: 'return=minimal' },
+                    body: JSON.stringify({
+                      recruiter_site_id: recruiterSiteId,
+                      recruiter_slug: finalRecruiterSlug,
+                      member_email: prospect.email,
+                      member_name: prospect.name || inviteeName,
+                      prospect_id: prospectId,
+                      campaign_id: prospect.campaign_id,
+                      status: 'committing',
+                      committed_at: now,
+                      warmth_score: 100,
+                    }),
+                  });
+                }
+              }
+            }
+          } catch {
+            // Non-fatal: team creation failure shouldn't block outcome recording
+          }
+        }
       }
     }
   }
