@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { verifySessionCookie } from '../../lib/ai-demo-auth';
+import { isCampaignReturnType } from '../../lib/campaign-returns';
 
 export const prerender = false;
 
@@ -57,7 +58,7 @@ export const GET: APIRoute = async ({ request }) => {
   try {
     // Fetch all campaigns ordered by most recent activity
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${TABLE}?order=updated_at.desc&limit=50&select=id,name,source_type,status,search_state,send_limit,require_review,auto_relaunch,next_campaign_id,reply_to_email,sign_off,credit_budget,credits_used,schedule_interval_minutes,created_at,updated_at`,
+      `${SUPABASE_URL}/rest/v1/${TABLE}?order=updated_at.desc&limit=50&select=id,name,source_type,status,search_state,send_limit,require_review,auto_relaunch,next_campaign_id,primary_return_type,reply_to_email,sign_off,credit_budget,credits_used,schedule_interval_minutes,created_at,updated_at`,
       { headers: supaHeaders() }
     );
     if (!res.ok) throw new Error(`Supabase ${res.status}`);
@@ -102,6 +103,12 @@ export const POST: APIRoute = async ({ request }) => {
 
     if (action === 'create') {
       const name = String(body.name || 'Untitled Search').slice(0, 200);
+      const primaryReturnType = body.primaryReturnType === undefined
+        ? 'recruitment_conversion'
+        : body.primaryReturnType;
+      if (!isCampaignReturnType(primaryReturnType)) {
+        return jsonRes({ error: 'Invalid primaryReturnType' }, 400);
+      }
       const record = {
         name,
         client: String(body.client || 'legacy').slice(0, 50),
@@ -121,6 +128,7 @@ export const POST: APIRoute = async ({ request }) => {
         auto_relaunch: body.autoRelaunch === true,
         sign_off: String(body.signOff || 'Legacy Financial Recruiting Team').slice(0, 200),
         reply_to_email: body.replyToEmail ? String(body.replyToEmail).slice(0, 200) : null,
+        primary_return_type: primaryReturnType,
         status: 'active',
         created_by: session.email || 'unknown',
         notes: String(body.notes || '').slice(0, 500),
@@ -156,6 +164,10 @@ export const POST: APIRoute = async ({ request }) => {
       if (updates.searchFilters !== undefined) allowed.search_filters = updates.searchFilters;
       if (updates.signOff !== undefined) allowed.sign_off = String(updates.signOff).slice(0, 200);
       if (updates.replyToEmail !== undefined) allowed.reply_to_email = updates.replyToEmail ? String(updates.replyToEmail).slice(0, 200) : null;
+      if (updates.primaryReturnType !== undefined) {
+        if (!isCampaignReturnType(updates.primaryReturnType)) return jsonRes({ error: 'Invalid primaryReturnType' }, 400);
+        allowed.primary_return_type = updates.primaryReturnType;
+      }
 
       const res = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}`, {
         method: 'PATCH',

@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { verifySessionCookie } from '../../lib/ai-demo-auth';
+import { isCampaignReturnType } from '../../lib/campaign-returns';
 
 export const prerender = false;
 
@@ -106,9 +107,13 @@ export const POST: APIRoute = async ({ request }) => {
       const contentUrl = String(body.content_url || '').trim().slice(0, 500);
       const contentTitle = String(body.content_title || '').trim().slice(0, 200);
       const contentDescription = String(body.content_description || '').trim().slice(0, 1000);
+      const primaryReturnType = body.primary_return_type === undefined ? 'quote_request' : body.primary_return_type;
 
       if (!name || !objective) {
         return jsonRes({ error: 'Name and objective are required' }, 400);
+      }
+      if (!isCampaignReturnType(primaryReturnType)) {
+        return jsonRes({ error: 'Invalid primary_return_type' }, 400);
       }
 
       const validObjectives = ['t65', 'health', 'life', 'life_and_health', 'key_person', 'final_expense'];
@@ -137,6 +142,7 @@ export const POST: APIRoute = async ({ request }) => {
         status: 'draft',
         daily_limit: Number(body.daily_limit) || 50,
         campaign_type: campaignType,
+        primary_return_type: primaryReturnType,
       };
 
       if (contentUrl) insert.content_url = contentUrl;
@@ -164,10 +170,14 @@ export const POST: APIRoute = async ({ request }) => {
         'seniorities', 'industries', 'employee_ranges', 'custom_titles',
         'from_name', 'from_label', 'reply_to', 'sign_off', 'cta_url', 'cta_label',
         'secondary_cta_url', 'secondary_cta_label', 'send_hours_start', 'send_hours_end',
-        'campaign_type', 'content_url', 'content_title', 'content_description'];
+        'campaign_type', 'content_url', 'content_title', 'content_description', 'primary_return_type'];
       const updates: Record<string, unknown> = {};
       for (const key of allowed) {
         if (key in body) updates[key] = body[key];
+      }
+
+      if ('primary_return_type' in updates && !isCampaignReturnType(updates.primary_return_type)) {
+        return jsonRes({ error: 'Invalid primary_return_type' }, 400);
       }
 
       if (Object.keys(updates).length === 0) {

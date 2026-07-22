@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════════
 -- Meeting Outcomes: Post-meeting feedback and prospect status promotion
--- Run in Supabase SQL Editor (Legacy Financial: kxmojndpgxgbykxjtxba)
+-- Run in Legacy Financial Supabase (kxmojndpgxgbykxjtxba)
 -- Safe to re-run — uses IF NOT EXISTS throughout
 -- ═══════════════════════════════════════════════════════════════════
 

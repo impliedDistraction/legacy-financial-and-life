@@ -14,6 +14,28 @@ const SITE_URL = import.meta.env.SITE?.trim() || 'https://legacyfinancial.app';
 const WO_SUPABASE_URL = import.meta.env.FWSYS_SUPABASE_URL?.trim() || import.meta.env.WO_SUPABASE_URL?.trim();
 const WO_SUPABASE_SERVICE_ROLE_KEY = import.meta.env.FWSYS_SUPABASE_SERVICE_ROLE_KEY?.trim() || import.meta.env.WO_SUPABASE_SERVICE_ROLE_KEY?.trim();
 
+async function recordVideoEngagementReturn(prospectId: string, salesCampaignId: string, clickedUrl: string) {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return;
+  await fetch(`${SUPABASE_URL}/rest/v1/campaign_returns`, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({
+      campaign_kind: 'sales',
+      sales_campaign_id: salesCampaignId,
+      prospect_id: prospectId,
+      return_type: 'content_engagement',
+      return_status: 'observed',
+      source: 'webhook',
+      properties: { template: 'sales_video', clicked_url: clickedUrl },
+    }),
+  }).catch(error => console.error('Failed to record video engagement return:', error));
+}
+
 /**
  * Fire a recruitment-specific alert to Josh (or configured recipient) when
  * a prospect replies. Includes prospect name, stage, and message preview.
@@ -219,7 +241,7 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
   const prospectId = headers.find(h => h.name.toLowerCase() === 'x-legacy-prospect-id')?.value;
   const template = headers.find(h => h.name.toLowerCase() === 'x-legacy-template')?.value;
   // Track all outbound templates that include prospect IDs
-  const TRACKED_TEMPLATES = ['recruitment', 'recruitment-auto-invite', 'recruitment-warm-visitor', 'recruitment-info-pack', 'sales_quote', 'survey', 'market_pulse'];
+  const TRACKED_TEMPLATES = ['recruitment', 'recruitment-auto-invite', 'recruitment-warm-visitor', 'recruitment-info-pack', 'sales_quote', 'sales_video', 'survey', 'market_pulse'];
   if (!prospectId || !template || !TRACKED_TEMPLATES.includes(template)) return;
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -287,7 +309,7 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
   try {
     // Fetch existing properties + interaction_stage to merge (avoid overwriting)
     const existingRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(prospectId)}&select=properties,interaction_stage`,
+      `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${encodeURIComponent(prospectId)}&select=properties,interaction_stage,sales_campaign_id`,
       {
         headers: {
           apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -330,6 +352,10 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
       }
 
       update.properties = { ...existing, ...propsPatch };
+
+      if (eventType === 'email.clicked' && template === 'sales_video' && !isBot && clickedUrl && row?.sales_campaign_id) {
+        await recordVideoEngagementReturn(prospectId, row.sales_campaign_id, clickedUrl);
+      }
     } else {
       delete propsPatch._preserve_first_open;
       delete update._promote_stage;

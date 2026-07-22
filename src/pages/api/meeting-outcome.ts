@@ -252,6 +252,31 @@ export const GET: APIRoute = async ({ url, request }) => {
           body: JSON.stringify(patch),
         });
 
+        if ((outcome === 'committed' || outcome === 'planning_to_join')) {
+          const prospectRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=eq.${prospectId}&select=campaign_id&limit=1`,
+            { headers: supabaseHeaders() },
+          );
+          if (prospectRes.ok) {
+            const [prospect] = await prospectRes.json();
+            if (prospect?.campaign_id) {
+              await fetch(`${SUPABASE_URL}/rest/v1/campaign_returns`, {
+                method: 'POST',
+                headers: { ...supabaseHeaders(), Prefer: 'return=minimal' },
+                body: JSON.stringify({
+                  campaign_kind: 'recruitment',
+                  recruitment_campaign_id: prospect.campaign_id,
+                  prospect_id: prospectId,
+                  return_type: 'recruitment_commitment',
+                  return_status: 'observed',
+                  source: 'calendly',
+                  properties: { calendly_event_id: eventId, meeting_outcome: outcome, reported_via: role },
+                }),
+              });
+            }
+          }
+        }
+
         // Create team membership on Fieldwork Systems when committing
         if (newStatus === 'committing' && FW_SUPABASE_URL && FW_SUPABASE_KEY) {
           try {
