@@ -20,22 +20,20 @@ About Legacy Financial & Life:
 - Products: Term Life, Whole Life, Universal Life, Final Expense, IUL, Annuities
 - Offers: mentorship, AI-powered tools, proven systems, weekly training, lead sharing
 
-Given a recruit's profile, generate a personalized outreach email and call script.
+Given a recruit's profile, generate the two substantive body paragraphs for a personalized outreach email and a call script. The delivery template adds the greeting, CTA button, signature, and compliance footer.
 
 EMAIL RULES:
-- 150-250 words, warm, direct, professional
-- Brief intro → value prop → soft CTA
+- 90-140 words across exactly two paragraphs; warm, direct, professional
+- Paragraph 1: brief, honest introduction. Paragraph 2: value proposition and a low-pressure invitation.
 - Reference their state/experience if known
 - Write as a recruiter introducing the Legacy Financial team — NOT from any individual's first-person perspective
-- The sign-off will be provided in the user message as SIGN_OFF — use that exact text at the end of the email
+- Do NOT add a greeting, CTA URL, sign-off, unsubscribe text, or any other URL; the delivery template supplies them.
 - NEVER use placeholder brackets like [Your Name], [Name], [Company], etc. — always use actual values
 - Use the prospect's actual first name in the greeting (e.g., "Hi Juan," not "Hi [Name],")
 - NEVER reference specific meeting topics or fabricate shared experiences
 - NEVER mention how many years anyone has been in the business or any specific duration of experience
 - NEVER use MLM language, income claims, "unlimited earning potential", "be your own boss"
 - NEVER guarantee income or disparage their current agency
-- The CTA should direct them to learn more at: CTA_LINK (provided in the user message)
-- Phrase the CTA naturally, e.g., "If you're curious, you can learn more and schedule a quick conversation here: {link}"
 - If RESEARCH FINDINGS are provided, use them to personalize: mention their community involvement, professional background, or specific strengths you noticed — but do NOT sound stalkerish or reference private info
 
 CALL SCRIPT RULES:
@@ -231,10 +229,10 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     // Fetch prospects to process
-    let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.pending&processed_at=is.null&source=neq.apollo_sales_search&order=created_at.asc&limit=${batchLimit}`;
+    let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.pending&processed_at=is.null&email=not.is.null&source=neq.apollo_sales_search&order=created_at.asc&limit=${batchLimit}`;
     if (prospectIds && Array.isArray(prospectIds) && prospectIds.length > 0) {
       const ids = prospectIds.slice(0, 20).map(id => String(id));
-      queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?id=in.(${ids.join(',')})&status=eq.pending&source=neq.apollo_sales_search`;
+      queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?id=in.(${ids.join(',')})&status=eq.pending&email=not.is.null&source=neq.apollo_sales_search`;
     } else if (campaignId) {
       queryUrl += `&campaign_id=eq.${encodeURIComponent(campaignId)}`;
     }
@@ -254,8 +252,7 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const fetchedProspects = await fetchRes.json();
-    const prospects = fetchedProspects.filter(isRecruitmentEligible);
+    const prospects = await fetchRes.json();
     if (prospects.length === 0) {
       return new Response(JSON.stringify({ processed: 0, message: 'No pending prospects to process' }), {
         status: 200,
@@ -413,12 +410,6 @@ async function processProspect(prospect: Record<string, unknown>, signOff: strin
   }
 
   return { fitScore };
-}
-
-function isRecruitmentEligible(prospect: Record<string, unknown>): boolean {
-  const properties = prospect.properties as Record<string, unknown> | undefined;
-  const authority = String(properties?.lines_of_authority || properties?.license_type || '');
-  return /\b(life|health|accident(?:\s*&?\s*health)?|variable\s+life|annuities?)\b/i.test(authority);
 }
 
 function normalizeRecruitmentEmailBody(value: unknown): string {
