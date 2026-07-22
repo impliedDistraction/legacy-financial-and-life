@@ -2846,7 +2846,7 @@ if (!session) {
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
             ` : ''}
             ${status === 'held' ? `
-              <span class="text-xs text-amber-600 italic">${isLockedSample ? '🔒 Sample preview — approval and sending are disabled' : `⏸️ ${(p.properties?.agent_reasons || []).length ? escapeHtml((p.properties.agent_reasons).join(' · ')) : p.properties?.held_reason === 'no_email' ? 'No email address' : 'Held for manual review'}`}</span>
+              <span class="text-xs text-amber-600 italic">${isLockedSample ? `🔒 ${escapeHtml(p.properties?.sample_label || 'Sample preview')} — approval and sending are disabled` : `⏸️ ${(p.properties?.agent_reasons || []).length ? escapeHtml((p.properties.agent_reasons).join(' · ')) : p.properties?.held_reason === 'no_email' ? 'No email address' : 'Held for manual review'}`}</span>
               ${!isLockedSample ? `<button class="action-btn approve-btn bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✓ Approve</button>
               ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Approve & Send</button>` : ''}` : ''}
               <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
