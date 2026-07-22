@@ -61,6 +61,14 @@ export const POST: APIRoute = async ({ request }) => {
 
     let update: Record<string, unknown> = {};
 
+    const isLockedSample = prospect.properties?.sample_send_authorized === false;
+    if (isLockedSample && (action === 'approve' || action === 'send_email')) {
+      return new Response(JSON.stringify({ error: 'This is a held sample draft. Review it first; an explicit campaign approval must remove the sample lock before approval or sending.' }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     switch (action) {
       case 'approve':
         update.status = 'approved';
