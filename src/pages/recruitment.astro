@@ -2551,10 +2551,10 @@ if (!session) {
         if (/^Hi\s+\w+[,.]?$/i.test(paragraph)) return false;
         if (/^(Best|Regards|Sincerely|Warm regards|Thanks)[,]?\s*(\n|$)/im.test(paragraph)) return false;
         if (/^Legacy Financial/i.test(paragraph)) return false;
+        if (/https?:\/\/[^\s)\]}>,]+/i.test(paragraph)) return false;
         if (/\b(book a (?:quick )?call|explore opportunities|learn more)\b.*:?\s*$/i.test(paragraph)) return false;
         return true;
       })
-      .map((paragraph: string) => paragraph.replace(/\s*https:\/\/legacyfinancial\.app\/join(?:\?pid=\S+)?\.?\s*/g, ' ').trim())
       .filter((paragraph: string) => paragraph.length > 10);
     const renderedParagraphs = paragraphs.map((paragraph: string) =>
       `<p class="mb-4 text-[15px] leading-6 text-slate-700">${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`
