@@ -2534,6 +2534,15 @@ if (!session) {
   function renderDeliveryPreview(p: any) {
     const firstName = String(p.name || '').trim().split(/\s+/)[0]?.replace(/[,.]+$/, '') || '';
     const rawBody = String(p.email_body || '');
+    const ctaVariant = p.properties?.cta_variant === 'B' ? 'B' : 'A';
+    const ctaLabel = ctaVariant === 'B' ? 'Book a 30-Minute Call' : 'Explore the Opportunity';
+    const ctaDestination = ctaVariant === 'B'
+      ? 'https://calendly.com/bethandtim-legacyf-l/30min'
+      : `https://legacyfinancial.app/join?pid=${encodeURIComponent(p.id)}`;
+    const draftUrls = rawBody.match(/https?:\/\/[^\s)\]}>,]+/gi) || [];
+    const unsupportedUrls = draftUrls.filter((url: string) =>
+      !url.includes('legacyfinancial.app/join') && !url.includes('calendly.com/bethandtim-legacyf-l')
+    );
     const paragraphs = rawBody
       .split(/\n\n+/)
       .map((paragraph: string) => paragraph.trim())
@@ -2559,13 +2568,15 @@ if (!session) {
             <span>From</span><span class="font-medium text-slate-700">Legacy Financial Recruiting &lt;recruiting@legacyfinancial.app&gt;</span>
             <span>To</span><span class="font-medium text-slate-700">${escapeHtml(p.email || 'No email address')}</span>
             <span>Subject</span><span class="font-medium text-slate-700">${escapeHtml(p.email_subject || '')}</span>
+            <span>CTA</span><span class="font-medium text-slate-700">Variant ${ctaVariant} · ${escapeHtml(ctaLabel)}</span>
           </div>
+          ${unsupportedUrls.length ? `<p class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">⚠️ This older recruitment draft contains an unsupported link that will not be part of the controlled delivery template. Recruitment delivery uses one tracked CTA only; video/content campaigns use their own template.</p>` : ''}
           <div class="mx-auto max-w-[600px] overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
             <div class="bg-gradient-to-br from-blue-800 to-blue-600 px-6 py-5 text-center text-base font-bold text-white">Legacy Financial &amp; Life</div>
             <div class="px-6 py-7">
               <p class="mb-5 text-[15px] font-semibold text-slate-800">${firstName ? `Hi ${escapeHtml(firstName)},` : 'Hi there,'}</p>
               ${renderedParagraphs || '<p class="text-sm italic text-slate-400">No delivery copy is available.</p>'}
-              <span class="my-2 inline-block rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white">Explore the Opportunity</span>
+              <span class="my-2 inline-block rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white">${escapeHtml(ctaLabel)}</span>
               <p class="mb-1 mt-5 text-[15px] text-slate-700">Best,</p>
               <p class="text-[15px] font-semibold text-slate-800">Legacy Financial Recruiting Team</p>
             </div>
@@ -2575,6 +2586,7 @@ if (!session) {
               <span class="text-slate-300">The delivered email includes a personalized unsubscribe and incorrect-recipient link.</span>
             </div>
           </div>
+          <a href="${escapeHtml(ctaDestination)}" target="_blank" rel="noopener" class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-brand-700 underline">Open CTA destination in a new tab <span aria-hidden="true">↗</span></a>
         </div>
       </details>`;
   }
