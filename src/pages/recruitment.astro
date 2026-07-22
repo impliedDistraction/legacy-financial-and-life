@@ -485,7 +485,7 @@ if (!session) {
             </button>
             <span class="text-gray-300 mx-1">|</span>
             <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="held">
-              🏷️ Held <span class="review-stage-count ml-1 bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="held">0</span>
+              🏷️ Held <span class="review-stage-count ml-1 bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="held">—</span>
             </button>
             <button class="review-stage-btn px-3 py-1.5 rounded-full text-xs font-medium border transition-colors" data-stage="no_email">
               📭 No Email <span class="review-stage-count ml-1 bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-[10px]" data-count="no_email">0</span>
@@ -2444,7 +2444,7 @@ if (!session) {
         const url = s === 'no_email'
           ? `/api/recruitment-upload?email=missing&limit=0${campParam}`
           : `/api/recruitment-upload?status=${s}&limit=0${campParam}`;
-        const res = await fetch(url);
+        const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
         const data = await res.json();
         const el = document.querySelector(`.review-stage-count[data-count="${s}"]`);
         if (el) el.textContent = String(data.total || 0);
@@ -2511,12 +2511,12 @@ if (!session) {
       const campId = reviewCampaignFilter.value;
       let url: string;
       if (status === 'no_email') {
-        url = `/api/recruitment-upload?email=missing&limit=${PAGE_SIZE}&offset=${currentOffset}`;
+        url = `/api/recruitment-upload?email=missing&include_content=true&limit=${PAGE_SIZE}&offset=${currentOffset}`;
       } else {
-        url = `/api/recruitment-upload?status=${status}&limit=${PAGE_SIZE}&offset=${currentOffset}`;
+        url = `/api/recruitment-upload?status=${status}&include_content=true&limit=${PAGE_SIZE}&offset=${currentOffset}`;
       }
       if (campId) url += `&campaign_id=${encodeURIComponent(campId)}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
       const data = await res.json();
       const count = data.total || data.prospects?.length || 0;
       document.getElementById('review-count')!.textContent = count > 0 ? `${count} total` : '';
@@ -2531,6 +2531,54 @@ if (!session) {
 
   loadMoreBtn.addEventListener('click', () => { currentOffset += PAGE_SIZE; loadReviewList(); });
 
+  function renderDeliveryPreview(p: any) {
+    const firstName = String(p.name || '').trim().split(/\s+/)[0]?.replace(/[,.]+$/, '') || '';
+    const rawBody = String(p.email_body || '');
+    const paragraphs = rawBody
+      .split(/\n\n+/)
+      .map((paragraph: string) => paragraph.trim())
+      .filter((paragraph: string) => {
+        if (!paragraph) return false;
+        if (/^Hi\s+\w+[,.]?$/i.test(paragraph)) return false;
+        if (/^(Best|Regards|Sincerely|Warm regards|Thanks)[,]?\s*(\n|$)/im.test(paragraph)) return false;
+        if (/^Legacy Financial/i.test(paragraph)) return false;
+        if (/\b(book a (?:quick )?call|explore opportunities|learn more)\b.*:?\s*$/i.test(paragraph)) return false;
+        return true;
+      })
+      .map((paragraph: string) => paragraph.replace(/\s*https:\/\/legacyfinancial\.app\/join(?:\?pid=\S+)?\.?\s*/g, ' ').trim())
+      .filter((paragraph: string) => paragraph.length > 10);
+    const renderedParagraphs = paragraphs.map((paragraph: string) =>
+      `<p class="mb-4 text-[15px] leading-6 text-slate-700">${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`
+    ).join('');
+
+    return `
+      <details class="mt-3">
+        <summary class="text-xs font-medium text-brand-600 cursor-pointer">Open delivery preview</summary>
+        <div class="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <div class="mb-3 grid gap-1 text-[11px] text-slate-500 sm:grid-cols-[56px_1fr]">
+            <span>From</span><span class="font-medium text-slate-700">Legacy Financial Recruiting &lt;recruiting@legacyfinancial.app&gt;</span>
+            <span>To</span><span class="font-medium text-slate-700">${escapeHtml(p.email || 'No email address')}</span>
+            <span>Subject</span><span class="font-medium text-slate-700">${escapeHtml(p.email_subject || '')}</span>
+          </div>
+          <div class="mx-auto max-w-[600px] overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+            <div class="bg-gradient-to-br from-blue-800 to-blue-600 px-6 py-5 text-center text-base font-bold text-white">Legacy Financial &amp; Life</div>
+            <div class="px-6 py-7">
+              <p class="mb-5 text-[15px] font-semibold text-slate-800">${firstName ? `Hi ${escapeHtml(firstName)},` : 'Hi there,'}</p>
+              ${renderedParagraphs || '<p class="text-sm italic text-slate-400">No delivery copy is available.</p>'}
+              <span class="my-2 inline-block rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white">Explore the Opportunity</span>
+              <p class="mb-1 mt-5 text-[15px] text-slate-700">Best,</p>
+              <p class="text-[15px] font-semibold text-slate-800">Legacy Financial Recruiting Team</p>
+            </div>
+            <div class="border-t border-slate-200 bg-slate-50 px-6 py-4 text-[11px] leading-4 text-slate-400">
+              Legacy Financial &amp; Life | Luthersville, GA 30251<br>
+              <span class="underline">Unsubscribe</span><br>
+              <span class="text-slate-300">The delivered email includes a personalized unsubscribe and incorrect-recipient link.</span>
+            </div>
+          </div>
+        </div>
+      </details>`;
+  }
+
   function renderReviewCards(prospects: any[], status: string) {
     if (prospects.length === 0) {
       const msg = status === 'pending' ? 'No pending prospects. Upload a CSV to add agents.' : `No prospects with status "${status}"`;
@@ -2541,6 +2589,7 @@ if (!session) {
     reviewList.innerHTML = prospects.map(p => {
       const scoreColor = (p.fit_score || 0) >= 7 ? 'green' : (p.fit_score || 0) >= 4 ? 'amber' : 'red';
       const stateMatch = ['GA','OH','OK','SC','MS','MI','TX','UT','AL','LA'].includes(p.state?.toUpperCase());
+      const isLockedSample = p.properties?.sample_send_authorized === false;
 
       return `
         <div class="bg-white rounded-xl border border-gray-200 p-4 prospect-card" data-id="${p.id}">
@@ -2551,6 +2600,7 @@ if (!session) {
                 ${p.fit_score ? `<span class="text-xs font-bold text-${scoreColor}-600">${p.fit_score}/10</span>` : ''}
                 ${stateMatch ? '<span class="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Licensed State</span>' : ''}
                 <span class="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">${escapeHtml(p.status)}</span>
+                ${isLockedSample ? '<span class="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-medium">🔒 Sample locked</span>' : ''}
                 ${!p.email ? '<span class="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">📞 Phone Only</span>' : ''}
                 ${p.web_presence?.carrierEmail ? `<span class="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-medium" title="Sending to carrier email risks the agent's position">🏢 Carrier Email</span>` : ''}
                 ${p.research_score != null ? `<span class="text-xs ${p.research_score >= 7 ? 'bg-green-100 text-green-700' : p.research_score >= 4 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'} px-1.5 py-0.5 rounded">🔍 ${p.research_score}/10</span>` : p.research_status === 'unscored' ? '<span class="text-xs bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded">⏳ unscored</span>' : ''}
@@ -2750,7 +2800,8 @@ if (!session) {
               <div class="text-xs text-gray-500 mb-1">Subject: <span class="font-medium text-gray-700">${escapeHtml(p.email_subject || '')}</span></div>
               <textarea class="w-full text-xs text-gray-700 bg-white border border-gray-200 rounded p-2 min-h-[80px] email-edit" data-id="${p.id}">${escapeHtml(p.email_body || '')}</textarea>
             </div>
-          </details>` : ''}
+          </details>
+          ${renderDeliveryPreview(p)}` : ''}
 
           ${p.call_opener ? `
           <details class="mt-2">
@@ -2783,9 +2834,9 @@ if (!session) {
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
             ` : ''}
             ${status === 'held' ? `
-              <span class="text-xs text-amber-600 italic">⏸️ ${(p.properties?.agent_reasons || []).length ? escapeHtml((p.properties.agent_reasons).join(' · ')) : p.properties?.held_reason === 'no_email' ? 'No email address' : 'Held for manual review'}</span>
-              <button class="action-btn approve-btn bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✓ Approve</button>
-              ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Approve & Send</button>` : ''}
+              <span class="text-xs text-amber-600 italic">${isLockedSample ? '🔒 Sample preview — approval and sending are disabled' : `⏸️ ${(p.properties?.agent_reasons || []).length ? escapeHtml((p.properties.agent_reasons).join(' · ')) : p.properties?.held_reason === 'no_email' ? 'No email address' : 'Held for manual review'}`}</span>
+              ${!isLockedSample ? `<button class="action-btn approve-btn bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✓ Approve</button>
+              ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Approve & Send</button>` : ''}` : ''}
               <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
             ` : ''}
             ${status === 'rejected' ? `
@@ -2894,8 +2945,8 @@ if (!session) {
       btn.addEventListener('click', async () => {
         const id = getAttr(btn, 'data-id');
         const emailArea = document.querySelector(`.email-edit[data-id="${id}"]`) as HTMLTextAreaElement | null;
-        await doAction(id, 'approve', emailArea?.value);
-        await doAction(id, 'send_email', emailArea?.value);
+        const approved = await doAction(id, 'approve', emailArea?.value);
+        if (approved) await doAction(id, 'send_email', emailArea?.value);
       });
     });
     reviewList.querySelectorAll('.call-btn').forEach(btn => {
@@ -2913,19 +2964,26 @@ if (!session) {
     refreshStats();
   });
 
-  async function doAction(id: string, action: string, editedEmailBody?: string, reason?: string) {
+  async function doAction(id: string, action: string, editedEmailBody?: string, reason?: string): Promise<boolean> {
     try {
-      await fetch('/api/recruitment-action', {
+      const res = await fetch('/api/recruitment-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action, editedEmailBody, reason }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        showToast(data.error || 'Action failed', 'error');
+        return false;
+      }
       // Remove the card from view
       const card = reviewList.querySelector(`[data-id="${id}"]`);
       card?.remove();
       refreshStats();
+      return true;
     } catch {
       showToast('Action failed', 'error');
+      return false;
     }
   }
 

@@ -146,6 +146,7 @@ export const GET: APIRoute = async ({ request }) => {
   const tracking = url.searchParams.get('tracking');
   const order = url.searchParams.get('order');
   const emailFilter = url.searchParams.get('email');
+  const includeContent = url.searchParams.get('include_content') === 'true';
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 200);
   const offset = parseInt(url.searchParams.get('offset') || '0');
 
@@ -154,9 +155,11 @@ export const GET: APIRoute = async ({ request }) => {
   const orderClause = order || defaultOrder;
   // When limit=1 with no search, we're likely just counting — use minimal select to save egress
   const isCountOnly = limit <= 1 && !search;
+  const baseColumns = 'id,name,email,phone,state,city,fit_score,fit_reason,status,interaction_stage,campaign_id,source,sent_at,created_at,research_score,updated_at';
+  const contentColumns = ',properties,email_subject,email_body,call_opener,call_voicemail,personal_notes';
   const selectCols = isCountOnly
     ? 'select=id'
-    : 'select=id,name,email,phone,state,city,fit_score,fit_reason,status,interaction_stage,campaign_id,source,sent_at,created_at,research_score,updated_at';
+    : `select=${baseColumns}${includeContent ? contentColumns : ''}`;
   let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?order=${orderClause}&limit=${limit}&offset=${offset}&${selectCols}`;
   if (campaignId) queryUrl += `&campaign_id=eq.${encodeURIComponent(campaignId)}`;
   if (source) queryUrl += `&source=eq.${encodeURIComponent(source)}`;
@@ -213,7 +216,10 @@ export const GET: APIRoute = async ({ request }) => {
 
   return new Response(JSON.stringify({ prospects: data, total: parseInt(total) }), {
     status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'private, no-store, max-age=0',
+    },
   });
 };
 
