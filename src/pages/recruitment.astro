@@ -2458,10 +2458,15 @@ if (!session) {
     activeGenerations++;
     updateGenerationStatus();
     try {
+      const campaignId = reviewCampaignFilter.value;
+      if (!campaignId) {
+        showToast('Select a recruitment campaign before generating outreach', 'error');
+        return;
+      }
       const res = await fetch('/api/recruitment-process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ limit: 1 }),
+        body: JSON.stringify({ limit: 1, campaignId }),
       });
       if (!res.ok && res.status === 504) {
         showAiErrorBanner('Generation timed out — the model is too slow for the server time limit');

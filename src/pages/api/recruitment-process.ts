@@ -221,12 +221,22 @@ export const POST: APIRoute = async ({ request }) => {
     const body = await request.json();
     const batchLimit = Math.min(parseInt(body.limit) || 5, 20);
     const prospectIds: string[] | undefined = body.prospectIds;
+    const campaignId = typeof body.campaignId === 'string' ? body.campaignId.trim() : '';
+
+    if (!campaignId && (!prospectIds || prospectIds.length === 0)) {
+      return new Response(JSON.stringify({ error: 'Select a recruitment campaign before generating outreach' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     // Fetch prospects to process
-    let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.pending&processed_at=is.null&order=created_at.asc&limit=${batchLimit}`;
+    let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.pending&processed_at=is.null&source=neq.apollo_sales_search&order=created_at.asc&limit=${batchLimit}`;
     if (prospectIds && Array.isArray(prospectIds) && prospectIds.length > 0) {
       const ids = prospectIds.slice(0, 20).map(id => String(id));
-      queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?id=in.(${ids.join(',')})&status=eq.pending`;
+      queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?id=in.(${ids.join(',')})&status=eq.pending&source=neq.apollo_sales_search`;
+    } else if (campaignId) {
+      queryUrl += `&campaign_id=eq.${encodeURIComponent(campaignId)}`;
     }
 
     const fetchRes = await fetch(queryUrl, {
@@ -244,7 +254,8 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const prospects = await fetchRes.json();
+    const fetchedProspects = await fetchRes.json();
+    const prospects = fetchedProspects.filter(isRecruitmentEligible);
     if (prospects.length === 0) {
       return new Response(JSON.stringify({ processed: 0, message: 'No pending prospects to process' }), {
         status: 200,
@@ -386,7 +397,7 @@ async function processProspect(prospect: Record<string, unknown>, signOff: strin
         fit_score: fitScore,
         fit_reason: String(parsed.fitReason || '').slice(0, 500),
         email_subject: String(email?.subject || '').slice(0, 200),
-        email_body: String(email?.body || '').slice(0, 5000),
+        email_body: normalizeRecruitmentEmailBody(email?.body).slice(0, 5000),
         call_opener: String(callScript?.opener || '').slice(0, 2000),
         call_voicemail: String(callScript?.voicemail || '').slice(0, 1000),
         personal_notes: String(parsed.personalNotes || '').slice(0, 1000),
@@ -402,6 +413,26 @@ async function processProspect(prospect: Record<string, unknown>, signOff: strin
   }
 
   return { fitScore };
+}
+
+function isRecruitmentEligible(prospect: Record<string, unknown>): boolean {
+  const properties = prospect.properties as Record<string, unknown> | undefined;
+  const authority = String(properties?.lines_of_authority || properties?.license_type || '');
+  return /\b(life|health|accident(?:\s*&?\s*health)?|variable\s+life|annuities?)\b/i.test(authority);
+}
+
+function normalizeRecruitmentEmailBody(value: unknown): string {
+  return String(value || '')
+    .split(/\n\s*\n+/)
+    .map(paragraph => paragraph.trim())
+    .filter(paragraph => {
+      if (!paragraph) return false;
+      if (/^Hi\s+\w+[,.]?$/i.test(paragraph)) return false;
+      if (/^(Best|Regards|Sincerely|Warm regards|Thanks)[,]?\s*(\n|$)/im.test(paragraph)) return false;
+      if (/^Legacy Financial/i.test(paragraph)) return false;
+      return !/https?:\/\/[^\s)\]}>,]+/i.test(paragraph);
+    })
+    .join('\n\n');
 }
 
 function buildProfileDescription(prospect: Record<string, unknown>): string {
