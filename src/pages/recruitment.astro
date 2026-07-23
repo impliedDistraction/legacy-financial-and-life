@@ -612,6 +612,7 @@ if (!session) {
             <div class="text-center"><span class="text-lg font-bold text-orange-500" id="stat-track-follow_up">-</span><p class="text-xs text-gray-400">In Follow-up</p></div>
             <div class="text-center"><span class="text-lg font-bold text-gray-500" id="stat-track-no_response">-</span><p class="text-xs text-gray-400">No Response</p></div>
           </div>
+          <div id="tracking-cohort-summary" class="hidden mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800"></div>
         </div>
 
         <!-- 🔥 Hot Leads — Warmest Prospects for Calling -->
@@ -3349,6 +3350,12 @@ if (!session) {
       const res = await fetch(url);
       const data = await res.json();
       const prospects = data.prospects || [];
+      // A filter can change while the user is on a later page. Reset to the
+      // first page rather than showing an empty list beside a non-zero total.
+      if (!append && prospects.length === 0 && sentOffset > 0 && Number(data.total || 0) > 0) {
+        sentOffset = 0;
+        return loadSentList();
+      }
 
       if (append) {
         sentProspects = [...sentProspects, ...prospects];
@@ -3658,7 +3665,7 @@ if (!session) {
   async function loadTrackingStats() {
     try {
       const [statsRes, warmRes] = await Promise.all([
-        fetch('/api/recruitment-stats'),
+        fetch(`/api/recruitment-stats${sentCampaignFilter.value ? `?campaign_id=${encodeURIComponent(sentCampaignFilter.value)}` : ''}`),
         fetch(`/api/recruitment-warm-leads${sentCampaignFilter.value ? `?campaign_id=${encodeURIComponent(sentCampaignFilter.value)}` : ''}`),
       ]);
       const stats = await statsRes.json();
@@ -3667,6 +3674,19 @@ if (!session) {
         for (const f of fields) {
           const el = document.getElementById(`stat-track-${f}`);
           if (el) el.textContent = String(stats[f] ?? '-');
+        }
+        const cohortSummary = document.getElementById('tracking-cohort-summary')!;
+        if (stats.cohort) {
+          const firstSent = stats.cohort.first_sent_at
+            ? new Date(stats.cohort.first_sent_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+            : 'not yet sent';
+          const operatingNote = stats.cohort.status === 'paused'
+            ? 'This paused cohort is observation-only.'
+            : `Campaign status: ${stats.cohort.status}.`;
+          cohortSummary.textContent = `Pre-seed cohort: ${stats.sent} delivered · ${stats.cohort.reaction_count} reactions observed · ${stats.cohort.awaiting_reaction} awaiting a signal · first send ${firstSent}. ${operatingNote}`;
+          cohortSummary.classList.remove('hidden');
+        } else {
+          cohortSummary.classList.add('hidden');
         }
       }
 
