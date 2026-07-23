@@ -24,6 +24,41 @@ function jsonRes(data: unknown, status = 200) {
   });
 }
 
+type RescueCandidate = {
+  source_prospect_id: string;
+  selection_reason: string;
+  recommended_strategy: 'doi_lookup' | 'paid_contact_reveal' | 'brave_identity_research' | 'redraft_only';
+  metadata: Record<string, unknown>;
+};
+
+function classifyRescueCandidate(prospect: Record<string, unknown>): RescueCandidate | null {
+  const properties = (prospect.properties || {}) as Record<string, unknown>;
+  const reason = String(prospect.qa_rejection_reason || properties.held_reason || properties.rejection_reason || '').toLowerCase();
+  if (prospect.status === 'opted_out' || /compliance|deceased|do not contact/.test(reason)) return null;
+  if (!prospect.email) {
+    return {
+      source_prospect_id: String(prospect.id), selection_reason: 'No email address',
+      recommended_strategy: properties.npn ? 'doi_lookup' : 'paid_contact_reveal',
+      metadata: { has_npn: Boolean(properties.npn), original_status: prospect.status },
+    };
+  }
+  if (/carrier email/.test(reason)) {
+    return {
+      source_prospect_id: String(prospect.id), selection_reason: 'Carrier-owned email requires personal-contact discovery',
+      recommended_strategy: 'brave_identity_research', metadata: { original_status: prospect.status },
+    };
+  }
+  // Formatting failures should be corrected by the drafting system, not billed as enrichment.
+  if (/email too short|poor structure|missing cta|placeholder/.test(reason)) return null;
+  if (prospect.status === 'held') {
+    return {
+      source_prospect_id: String(prospect.id), selection_reason: 'Held with incomplete identity or contact evidence',
+      recommended_strategy: 'brave_identity_research', metadata: { original_status: prospect.status },
+    };
+  }
+  return null;
+}
+
 /** Sanitize search_filters JSON — only allow known keys with string/boolean values */
 function sanitizeSearchFilters(raw: unknown): Record<string, string | boolean | undefined> {
   if (!raw || typeof raw !== 'object') return {};
@@ -162,6 +197,63 @@ export const POST: APIRoute = async ({ request }) => {
       return jsonRes({ campaign: created }, 201);
     }
 
+    if (action === 'create_rescue_add_on') {
+      const parentCampaignId = typeof body.parentCampaignId === 'string' ? body.parentCampaignId : '';
+      const providerPlan = ['doi_only', 'doi_then_apollo', 'brave_research', 'full'].includes(body.providerPlan)
+        ? body.providerPlan : '';
+      const creditBudget = Math.max(1, Math.min(10000, parseInt(body.creditBudget) || 0));
+      if (!parentCampaignId || !providerPlan || !creditBudget) {
+        return jsonRes({ error: 'parentCampaignId, providerPlan, and a positive creditBudget are required' }, 400);
+      }
+
+      const parentRes = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(parentCampaignId)}&select=*&limit=1`, { headers: supaHeaders() });
+      const [parent] = parentRes.ok ? await parentRes.json() : [];
+      if (!parent) return jsonRes({ error: 'Parent campaign not found' }, 404);
+      if (!['paused', 'completed'].includes(parent.status)) {
+        return jsonRes({ error: 'Pause or complete the parent campaign before creating a rescue add-on' }, 409);
+      }
+
+      const prospectsRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/${PROSPECTS_TABLE}?campaign_id=eq.${encodeURIComponent(parentCampaignId)}&or=(status.eq.held,status.eq.rejected)&select=id,status,email,qa_rejection_reason,properties`,
+        { headers: supaHeaders() }
+      );
+      if (!prospectsRes.ok) throw new Error(`Candidate lookup failed: ${prospectsRes.status}`);
+      const candidates = (await prospectsRes.json()).map(classifyRescueCandidate).filter(Boolean) as RescueCandidate[];
+      if (candidates.length === 0) return jsonRes({ error: 'No actionable held or rejected records qualify for rescue; QA-format and compliance failures are intentionally excluded.' }, 409);
+
+      const planLabel = providerPlan.replace(/_/g, ' ');
+      const createRes = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+        method: 'POST', headers: { ...supaHeaders(), Prefer: 'return=representation' },
+        body: JSON.stringify({
+          name: `${parent.name} — Rescue Add-On`, client: parent.client || 'legacy', source_type: 'rescue_addon',
+          parent_campaign_id: parent.id, search_state: parent.search_state || 'Unknown', status: 'paused',
+          credit_budget: creditBudget, credits_used: 0, require_review: true, auto_relaunch: false,
+          primary_return_type: parent.primary_return_type || 'recruitment_conversion',
+          sign_off: parent.sign_off || 'Legacy Financial Recruiting Team', reply_to_email: parent.reply_to_email || null,
+          search_filters: { rescue_provider_plan: providerPlan, parent_campaign_id: parent.id, candidate_count: candidates.length },
+          notes: `Client-authorized rescue add-on. Plan: ${planLabel}. Created paused; no enrichment or outreach runs until explicitly enabled.`,
+          created_by: session.email || 'unknown',
+        }),
+      });
+      if (!createRes.ok) throw new Error(`Rescue campaign creation failed: ${createRes.status}`);
+      const [rescueCampaign] = await createRes.json();
+
+      const candidateRes = await fetch(`${SUPABASE_URL}/rest/v1/recruitment_rescue_candidates`, {
+        method: 'POST', headers: { ...supaHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify(candidates.map(candidate => ({
+          ...candidate, rescue_campaign_id: rescueCampaign.id,
+          metadata: { ...candidate.metadata, provider_plan: providerPlan },
+        }))),
+      });
+      if (!candidateRes.ok) throw new Error(`Rescue candidate snapshot failed: ${candidateRes.status}`);
+
+      await fetch(`${SUPABASE_URL}/rest/v1/recruitment_campaign_operations`, {
+        method: 'POST', headers: { ...supaHeaders(), Prefer: 'return=minimal' },
+        body: JSON.stringify({ campaign_id: parent.id, action: 'create_rescue_add_on', affected_count: candidates.length, actor_email: session.email || null, metadata: { rescue_campaign_id: rescueCampaign.id, provider_plan: providerPlan, credit_budget: creditBudget } }),
+      }).catch(() => undefined);
+      return jsonRes({ campaign: rescueCampaign, candidateCount: candidates.length }, 201);
+    }
+
     if (action === 'update') {
       const { id, ...updates } = body;
       if (!id) return jsonRes({ error: 'id required' }, 400);
@@ -195,6 +287,14 @@ export const POST: APIRoute = async ({ request }) => {
     if (action === 'pause' || action === 'resume' || action === 'stop') {
       const { id } = body;
       if (!id) return jsonRes({ error: 'id required' }, 400);
+
+      if (action === 'resume') {
+        const currentRes = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}&select=source_type&limit=1`, { headers: supaHeaders() });
+        const [current] = currentRes.ok ? await currentRes.json() : [];
+        if (current?.source_type === 'rescue_addon') {
+          return jsonRes({ error: 'Rescue add-ons remain paused until their client-authorized rescue runner is enabled.' }, 409);
+        }
+      }
 
       const newStatus = action === 'stop' ? 'completed' : action === 'pause' ? 'paused' : 'active';
       const patchBody: Record<string, unknown> = {

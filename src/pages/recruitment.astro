@@ -1758,11 +1758,12 @@ if (!session) {
         ? '<span class="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Continuous</span>'
         : '';
 
-      const actionButtons = isPast ? '' : `
-              <button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}" title="${c.status === 'active' ? 'Pause' : 'Resume'}">${c.status === 'active' ? '⏸' : '▶'}</button>
+            const actionButtons = isPast ? '' : `
+              ${c.status === 'paused' && c.source_type !== 'rescue_addon' ? `<button class="text-xs text-violet-600 hover:text-violet-800 font-medium" data-campaign-action="create_rescue_add_on" data-campaign-id="${c.id}" title="Create a paused, client-authorized rescue add-on">🛟</button>` : ''}
+              ${c.source_type === 'rescue_addon' ? '<span class="text-xs text-slate-400" title="Candidate snapshot — rescue execution requires a dedicated client-authorized runner">🔒 Snapshot</span>' : `<button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}" title="${c.status === 'active' ? 'Pause' : 'Resume'}">${c.status === 'active' ? '⏸' : '▶'}</button>`}
               <button class="text-xs text-red-500 hover:text-red-700 font-medium" data-campaign-action="stop" data-campaign-id="${c.id}" title="Stop campaign">⏹</button>`;
 
-      const sourceIcon = c.source_type === 'apollo_recruitment' ? '🚀 Apollo' : c.source_type === 'fl_licensee' ? '🏛️ FL Licensee' : c.source_type === 'state_licensee' ? `🏛️ ${c.search_state || 'State'} Licensee` : c.source_type === 'csv' ? '📤 CSV' : c.source_type === 'pool' ? '🎯 Pool' : c.source_type === 'prophog' ? '🔍 Prophog (legacy)' : '🚀 Apollo';
+      const sourceIcon = c.source_type === 'rescue_addon' ? '🛟 Rescue Add-On' : c.source_type === 'apollo_recruitment' ? '🚀 Apollo' : c.source_type === 'fl_licensee' ? '🏛️ FL Licensee' : c.source_type === 'state_licensee' ? `🏛️ ${c.search_state || 'State'} Licensee` : c.source_type === 'csv' ? '📤 CSV' : c.source_type === 'pool' ? '🎯 Pool' : c.source_type === 'prophog' ? '🔍 Prophog (legacy)' : '🚀 Apollo';
 
       return `
         <div class="bg-white rounded-xl border border-gray-200 p-4 ${isPast ? 'opacity-75' : 'hover:border-brand-300'} transition-colors">
@@ -1840,11 +1841,19 @@ if (!session) {
         const action = el.dataset.campaignAction;
         const id = el.dataset.campaignId;
         if (action === 'stop' && !confirm('Stop this campaign? It will be moved to Past Campaigns.')) return;
+        let payload: Record<string, unknown> = { action, id };
+        if (action === 'create_rescue_add_on') {
+          const providerPlan = prompt('Rescue provider plan: doi_only, doi_then_apollo, brave_research, or full', 'doi_only');
+          if (!providerPlan) return;
+          const creditBudget = prompt('Client-authorized rescue credit budget (no work starts until the add-on is explicitly enabled)', '25');
+          if (!creditBudget) return;
+          payload = { action, parentCampaignId: id, providerPlan, creditBudget };
+        }
         try {
           await fetch('/api/recruitment-campaigns', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, id }),
+            body: JSON.stringify(payload),
           });
           loadCampaigns();
         } catch (err) {
