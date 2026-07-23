@@ -1741,6 +1741,11 @@ if (!session) {
       const progressPct = goal > 0 ? Math.round((totalSent / goal) * 100) : 0;
       const lastRun = c.last_run_at ? new Date(c.last_run_at).toLocaleString() : 'Never';
       const nextRun = c.next_run_at ? new Date(c.next_run_at).toLocaleString() : 'Queued';
+      const returnSummary = c.return_summary || {};
+      const observedReturns = Number(returnSummary.return_count) || 0;
+      const realizedReturns = Number(returnSummary.realized_return_count) || 0;
+      const realizedValue = Number(returnSummary.realized_value_cents) || 0;
+      const formatMoney = (cents: number) => `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       const relaunchBadge = c.auto_relaunch
         ? '<span class="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Continuous</span>'
         : '';
@@ -1779,13 +1784,23 @@ if (!session) {
             </div>
           </div>
           <!-- Pipeline mini-stats -->
-          <div class="grid grid-cols-5 gap-1 text-center mb-3">
+          <div class="grid grid-cols-3 sm:grid-cols-7 gap-1 text-center mb-3">
             <div><div class="text-sm font-bold text-gray-900">${totalFound}</div><div class="text-[10px] text-gray-400">Found</div></div>
             <div><div class="text-sm font-bold text-amber-600">${counts.pending || 0}</div><div class="text-[10px] text-gray-400">Pending</div></div>
             <div><div class="text-sm font-bold text-blue-600">${(counts.drafted || 0) + (counts.reviewed || 0)}</div><div class="text-[10px] text-gray-400">Pipeline</div></div>
             <div><div class="text-sm font-bold text-emerald-600">${counts.approved || 0}</div><div class="text-[10px] text-gray-400">Ready</div></div>
             <div><div class="text-sm font-bold text-green-600">${totalSent}</div><div class="text-[10px] text-gray-400">Sent</div></div>
+            <div><div class="text-sm font-bold text-indigo-600">${counts.scheduled || 0}</div><div class="text-[10px] text-gray-400">Scheduled</div></div>
+            <div><div class="text-sm font-bold text-violet-600">${counts.converted || 0}</div><div class="text-[10px] text-gray-400">Converted</div></div>
           </div>
+          <details class="mb-3 rounded-lg border border-slate-200 bg-slate-50">
+            <summary class="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700" data-campaign-results="${c.id}">
+              📊 Results: ${observedReturns} observed · ${realizedReturns} realized · ${formatMoney(realizedValue)} realized value · View prospects
+            </summary>
+            <div class="border-t border-slate-200 p-3" data-campaign-results-panel="${c.id}">
+              <p class="text-xs text-slate-400">Open to load campaign prospects and attributed outcomes.</p>
+            </div>
+          </details>
           <div class="flex items-center justify-between text-xs text-gray-400">
             <span>Last: ${lastRun}</span>
             ${isPast ? `<span>Ended: ${c.updated_at ? new Date(c.updated_at).toLocaleString() : '—'}</span>` : `<span>Next: ${nextRun}</span>`}
@@ -1823,6 +1838,38 @@ if (!session) {
           loadCampaigns();
         } catch (err) {
           console.error('Campaign action failed:', err);
+        }
+      });
+    });
+
+    list.querySelectorAll('[data-campaign-results]').forEach(summary => {
+      summary.addEventListener('click', async () => {
+        const campaignId = (summary as HTMLElement).dataset.campaignResults;
+        const panel = list.querySelector(`[data-campaign-results-panel="${campaignId}"]`) as HTMLElement | null;
+        if (!campaignId || !panel || panel.dataset.loaded === 'true') return;
+        panel.dataset.loaded = 'true';
+        panel.innerHTML = '<p class="text-xs text-slate-400">Loading prospects and outcomes…</p>';
+        try {
+          const response = await fetch(`/api/campaign-returns?campaign_kind=recruitment&campaign_id=${encodeURIComponent(campaignId)}&limit=25`);
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Failed to load campaign results');
+          const prospects = data.prospects || [];
+          const returns = data.returns || [];
+          const formatOutcomeMoney = (cents: number) => `$${((Number(cents) || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          const prospectRows = prospects.length
+            ? prospects.map((prospect: any) => {
+              const location = [prospect.city, prospect.state].filter(Boolean).join(', ') || 'Location unavailable';
+              const detail = prospect.interaction_stage || prospect.status || 'pending';
+              return `<div class="flex items-center justify-between gap-3 border-b border-slate-100 py-1.5 last:border-0"><div class="min-w-0"><span class="font-medium text-slate-700">${escapeHtml(prospect.name || 'Unnamed prospect')}</span><span class="ml-2 text-slate-400">${escapeHtml(location)}</span><span class="block truncate text-[11px] text-slate-400">${escapeHtml(prospect.email || 'No email on file')} · ${escapeHtml(detail)}</span></div><span class="shrink-0 text-xs font-medium text-slate-500">${prospect.fit_score ? `${prospect.fit_score}/10` : '—'}</span></div>`;
+            }).join('')
+            : '<p class="text-xs text-slate-400">No prospects recorded for this campaign.</p>';
+          const outcomeRows = returns.length
+            ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Attributed outcomes</p>${returns.map((outcome: any) => `<div class="text-xs text-slate-600">${escapeHtml(outcome.prospect?.name || 'Campaign outcome')} · ${escapeHtml(outcome.return_type.replace(/_/g, ' '))} · ${escapeHtml(outcome.return_status)}${outcome.return_value_cents ? ` · ${formatOutcomeMoney(outcome.return_value_cents)}` : ''}</div>`).join('')}</div>`
+            : '<p class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-400">No attributed return events yet. Scheduled appointments and conversions remain visible above.</p>';
+          panel.innerHTML = `<div class="max-h-56 overflow-y-auto">${prospectRows}</div>${outcomeRows}`;
+        } catch (error) {
+          panel.dataset.loaded = '';
+          panel.innerHTML = `<p class="text-xs text-red-600">${escapeHtml(error instanceof Error ? error.message : 'Failed to load campaign results')}</p>`;
         }
       });
     });
@@ -2936,7 +2983,7 @@ if (!session) {
               <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
             ` : ''}
             ${status === 'rejected' ? `
-              <span class="text-xs text-gray-400 italic">${p.qa_rejection_reason ? 'QA: ' + escapeHtml(p.qa_rejection_reason) : (p.properties?.rejection_reason) ? 'Reason: ' + escapeHtml(p.properties.rejection_reason) : 'No reason given'}</span>
+              <span class="max-w-full rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">⚠ <strong>Rejection reason:</strong> ${p.qa_rejection_reason ? escapeHtml(p.qa_rejection_reason) : (p.properties?.rejection_reason) ? escapeHtml(p.properties.rejection_reason) : 'No reason was recorded.'}</span>
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg ml-auto" data-id="${p.id}" title="Permanently delete">🗑️ Delete forever</button>
             ` : ''}
           </div>

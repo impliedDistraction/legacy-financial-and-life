@@ -58,7 +58,7 @@ export const GET: APIRoute = async ({ request }) => {
   try {
     // Fetch all campaigns ordered by most recent activity
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${TABLE}?order=updated_at.desc&limit=50&select=id,name,source_type,status,search_state,send_limit,require_review,auto_relaunch,next_campaign_id,primary_return_type,reply_to_email,sign_off,credit_budget,credits_used,schedule_interval_minutes,created_at,updated_at`,
+      `${SUPABASE_URL}/rest/v1/${TABLE}?order=updated_at.desc&limit=50&select=id,name,source_type,status,search_state,search_filters,send_limit,require_review,auto_relaunch,next_campaign_id,primary_return_type,reply_to_email,sign_off,credit_budget,credits_used,schedule_interval_minutes,last_run_at,next_run_at,created_at,updated_at`,
       { headers: supaHeaders() }
     );
     if (!res.ok) throw new Error(`Supabase ${res.status}`);
@@ -80,10 +80,23 @@ export const GET: APIRoute = async ({ request }) => {
       }
     }
 
-    // Enrich campaigns with counts
+    const campaignIds = campaigns.map((campaign: Record<string, unknown>) => campaign.id).filter(Boolean).join(',');
+    const returnSummaries: Record<string, Record<string, unknown>> = {};
+    if (campaignIds) {
+      const returnsRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/campaign_return_summary?campaign_kind=eq.recruitment&campaign_id=in.(${campaignIds})&select=campaign_id,primary_return_type,return_count,realized_return_count,realized_value_cents,latest_return_at`,
+        { headers: supaHeaders() }
+      ).catch(() => null);
+      if (returnsRes?.ok) {
+        for (const summary of await returnsRes.json()) returnSummaries[summary.campaign_id] = summary;
+      }
+    }
+
+    // Enrich campaigns with pipeline and return-outcome counts.
     const enriched = campaigns.map((c: Record<string, unknown>) => ({
       ...c,
       prospect_counts: counts[c.id as string] || {},
+      return_summary: returnSummaries[c.id as string] || null,
     }));
 
     return jsonRes({ campaigns: enriched });

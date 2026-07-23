@@ -19,6 +19,76 @@ function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+export const GET: APIRoute = async ({ request }) => {
+  const session = await verifySessionCookie(request.headers.get('cookie'));
+  if (!session) return json({ error: 'Unauthorized' }, 401);
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return json({ error: 'Database not configured' }, 503);
+
+  const url = new URL(request.url);
+  const campaignKind = url.searchParams.get('campaign_kind');
+  const campaignId = url.searchParams.get('campaign_id') || '';
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '25', 10) || 25, 1), 100);
+
+  if (campaignKind !== 'recruitment' && campaignKind !== 'sales') return json({ error: 'Invalid campaign_kind' }, 400);
+  if (!campaignId) return json({ error: 'campaign_id is required' }, 400);
+
+  try {
+    const campaignColumn = campaignKind === 'recruitment' ? 'recruitment_campaign_id' : 'sales_campaign_id';
+    const [returnsRes, summaryRes, prospectsRes] = await Promise.all([
+      fetch(
+        `${SUPABASE_URL}/rest/v1/campaign_returns?${campaignColumn}=eq.${encodeURIComponent(campaignId)}&order=occurred_at.desc&limit=${limit}&select=id,prospect_id,return_type,return_status,return_value_cents,source,occurred_at,notes,properties`,
+        { headers: headers() }
+      ),
+      fetch(
+        `${SUPABASE_URL}/rest/v1/campaign_return_summary?campaign_kind=eq.${campaignKind}&campaign_id=eq.${encodeURIComponent(campaignId)}&select=primary_return_type,return_count,realized_return_count,realized_value_cents,latest_return_at`,
+        { headers: headers() }
+      ),
+      campaignKind === 'recruitment'
+        ? fetch(
+          `${SUPABASE_URL}/rest/v1/recruitment_prospects?campaign_id=eq.${encodeURIComponent(campaignId)}&order=updated_at.desc.nullslast&limit=${limit}&select=id,name,email,phone,state,city,status,interaction_stage,fit_score,sent_at,updated_at,properties`,
+          { headers: headers() }
+        )
+        : Promise.resolve(null),
+    ]);
+
+    if (!returnsRes.ok || !summaryRes.ok || (prospectsRes && !prospectsRes.ok)) {
+      throw new Error('Campaign result query failed');
+    }
+
+    const [returns, summaries, prospects] = await Promise.all([
+      returnsRes.json(),
+      summaryRes.json(),
+      prospectsRes ? prospectsRes.json() : Promise.resolve([]),
+    ]);
+    const returnProspectIds = [...new Set(returns.map((campaignReturn: Record<string, unknown>) => campaignReturn.prospect_id).filter(Boolean))];
+    const returnProspects = campaignKind === 'recruitment' && returnProspectIds.length > 0
+      ? await fetch(
+        `${SUPABASE_URL}/rest/v1/recruitment_prospects?id=in.(${returnProspectIds.join(',')})&select=id,name,email,phone,state,city,status,interaction_stage,fit_score,sent_at,updated_at,properties`,
+        { headers: headers() }
+      ).then(async (response) => response.ok ? response.json() : [])
+      : [];
+    const prospectById = new Map([...prospects, ...returnProspects].map((prospect: Record<string, unknown>) => [prospect.id, prospect]));
+    const returnsWithProspects = returns.map((campaignReturn: Record<string, unknown>) => ({
+      ...campaignReturn,
+      prospect: campaignReturn.prospect_id ? prospectById.get(campaignReturn.prospect_id) || null : null,
+    }));
+
+    return json({
+      summary: summaries[0] || {
+        primary_return_type: null,
+        return_count: 0,
+        realized_return_count: 0,
+        realized_value_cents: 0,
+        latest_return_at: null,
+      },
+      returns: returnsWithProspects,
+      prospects,
+    });
+  } catch (error) {
+    return json({ error: error instanceof Error ? error.message : 'Failed to load campaign results' }, 500);
+  }
+};
+
 export const POST: APIRoute = async ({ request }) => {
   const session = await verifySessionCookie(request.headers.get('cookie'));
   if (!session) return json({ error: 'Unauthorized' }, 401);
