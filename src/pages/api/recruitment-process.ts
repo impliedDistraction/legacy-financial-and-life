@@ -29,7 +29,7 @@ EMAIL RULES:
 - Write as a recruiter introducing the Legacy Financial team — NOT from any individual's first-person perspective
 - Do NOT add a greeting, CTA URL, sign-off, unsubscribe text, or any other URL; the delivery template supplies them.
 - NEVER use placeholder brackets like [Your Name], [Name], [Company], etc. — always use actual values
-- Use the prospect's actual first name in the greeting (e.g., "Hi Juan," not "Hi [Name],")
+- If using the prospect's first name, use the actual value naturally in the body; do not add a greeting line.
 - NEVER reference specific meeting topics or fabricate shared experiences
 - NEVER mention how many years anyone has been in the business or any specific duration of experience
 - NEVER use MLM language, income claims, "unlimited earning potential", "be your own boss"
@@ -273,24 +273,6 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    // Fetch campaign sign-off setting if available
-    const campaignIds = [...new Set(prospects.map((p: Record<string, unknown>) => p.campaign_id).filter(Boolean))];
-    const campaignSignOffs: Record<string, string> = {};
-    if (campaignIds.length > 0) {
-      try {
-        const campRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/recruitment_campaigns?id=in.(${campaignIds.join(',')})&select=id,sign_off,reply_to_email`,
-          { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' } }
-        );
-        if (campRes.ok) {
-          const camps = await campRes.json();
-          for (const c of camps) {
-            if (c.sign_off) campaignSignOffs[c.id] = c.sign_off;
-          }
-        }
-      } catch { /* use default */ }
-    }
-
     const results: { id: string; success: boolean; fitScore?: number; error?: string }[] = [];
 
     // Process each prospect sequentially (GPU constraint)
@@ -311,8 +293,7 @@ export const POST: APIRoute = async ({ request }) => {
           results.push({ id: prospect.id, success: false, error: 'Prospect is already being generated elsewhere' });
           continue;
         }
-        const signOff = campaignSignOffs[prospect.campaign_id as string] || 'Legacy Financial Recruiting Team';
-        const result = await processProspect(prospect, signOff);
+        const result = await processProspect(prospect);
         results.push({ id: prospect.id, success: true, fitScore: result.fitScore });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -347,13 +328,9 @@ export const POST: APIRoute = async ({ request }) => {
   }
 };
 
-async function processProspect(prospect: Record<string, unknown>, signOff: string): Promise<{ fitScore: number }> {
+async function processProspect(prospect: Record<string, unknown>): Promise<{ fitScore: number }> {
   const profile = buildProfileDescription(prospect);
-  const prospectId = prospect.id ? String(prospect.id) : '';
-  const ctaLink = prospectId
-    ? `https://legacyfinancial.app/join?pid=${prospectId}`
-    : `https://legacyfinancial.app/join`;
-  const userMessage = `Generate recruitment outreach for this prospect:\n\n${profile}\n\nSIGN_OFF: Best,\\n${signOff}\nCTA_LINK: ${ctaLink}`;
+  const userMessage = `Generate recruitment outreach for this prospect. Return exactly two substantive body paragraphs. Do not add a greeting, sign-off, CTA text, footer, or URL.\n\n${profile}`;
 
   const ollamaHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
