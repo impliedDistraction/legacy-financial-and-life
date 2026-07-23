@@ -514,6 +514,12 @@ if (!session) {
             <button id="approve-all-btn" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors hidden">
               ✓ Approve All Visible
             </button>
+            <button id="delete-rejected-btn" class="bg-red-50 hover:bg-red-100 text-red-700 text-sm px-3 py-1.5 rounded-lg transition-colors hidden">
+              🗑️ Delete Rejected
+            </button>
+            <button id="reset-review-queue-btn" class="bg-amber-50 hover:bg-amber-100 text-amber-800 text-sm px-3 py-1.5 rounded-lg transition-colors hidden">
+              ↩ Reset Review Queue
+            </button>
             <select id="review-campaign-filter" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm ml-auto">
               <option value="">All Campaigns</option>
             </select>
@@ -1860,6 +1866,8 @@ if (!session) {
           if (!response.ok) throw new Error(data.error || 'Failed to load campaign results');
           const prospects = data.prospects || [];
           const returns = data.returns || [];
+          const enrichment = data.enrichment || [];
+          const operations = data.operations || [];
           const formatOutcomeMoney = (cents: number) => `$${((Number(cents) || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
           const prospectRows = prospects.length
             ? prospects.map((prospect: any) => {
@@ -1871,7 +1879,13 @@ if (!session) {
           const outcomeRows = returns.length
             ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Attributed outcomes</p>${returns.map((outcome: any) => `<div class="text-xs text-slate-600">${escapeHtml(outcome.prospect?.name || 'Campaign outcome')} · ${escapeHtml(outcome.return_type.replace(/_/g, ' '))} · ${escapeHtml(outcome.return_status)}${outcome.return_value_cents ? ` · ${formatOutcomeMoney(outcome.return_value_cents)}` : ''}</div>`).join('')}</div>`
             : '<p class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-400">No attributed return events yet. Scheduled appointments and conversions remain visible above.</p>';
-          panel.innerHTML = `<div class="max-h-56 overflow-y-auto">${prospectRows}</div>${outcomeRows}`;
+          const enrichmentRows = enrichment.length
+            ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Enrichment effectiveness</p>${enrichment.map((item: any) => { const attempts = Number(item.attempt_count) || 0; const enriched = Number(item.enriched_count) || 0; const emailFound = Number(item.email_found_count) || 0; const delivered = Number(item.deliverable_count) || 0; const converted = Number(item.conversion_count) || 0; const rate = attempts ? Math.round((enriched / attempts) * 100) : 0; return `<div class="text-xs text-slate-600">${escapeHtml(item.provider)} · ${enriched}/${attempts} enriched (${rate}%) · ${emailFound} emails found · ${delivered} deliverable · ${converted} converted${item.cost_cents ? ` · ${formatOutcomeMoney(item.cost_cents)} cost` : ''}</div>`; }).join('')}</div>`
+            : '<p class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-400">No enrichment attempts recorded yet. Provider performance will appear here as Sentinel runs DOI, rescue, or paid enrichment.</p>';
+          const operationRows = operations.length
+            ? `<div class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-500">Review operations: ${operations.map((operation: any) => `${escapeHtml(operation.action.replace(/_/g, ' '))} (${operation.affected_count})`).join(' · ')}</div>`
+            : '';
+          panel.innerHTML = `<div class="max-h-56 overflow-y-auto">${prospectRows}</div>${outcomeRows}${enrichmentRows}${operationRows}`;
         } catch (error) {
           panel.dataset.loaded = '';
           panel.innerHTML = `<p class="text-xs text-red-600">${escapeHtml(error instanceof Error ? error.message : 'Failed to load campaign results')}</p>`;
@@ -2495,6 +2509,8 @@ if (!session) {
   const processBatchBtn = document.getElementById('process-batch-btn') as HTMLButtonElement;
   const processTenBtn = document.getElementById('process-ten-btn') as HTMLButtonElement;
   const approveAllBtn = document.getElementById('approve-all-btn') as HTMLButtonElement;
+  const deleteRejectedBtn = document.getElementById('delete-rejected-btn') as HTMLButtonElement;
+  const resetReviewQueueBtn = document.getElementById('reset-review-queue-btn') as HTMLButtonElement;
   const loadMoreBtn = document.getElementById('load-more-btn') as HTMLButtonElement;
 
   reviewFilter.addEventListener('change', () => { currentOffset = 0; loadReviewList(); });
@@ -2641,6 +2657,8 @@ if (!session) {
     const status = reviewFilter.value;
     // Show/hide contextual buttons
     approveAllBtn.classList.toggle('hidden', status !== 'reviewed');
+    deleteRejectedBtn.classList.toggle('hidden', status !== 'rejected' || !reviewCampaignFilter.value);
+    resetReviewQueueBtn.classList.toggle('hidden', !reviewCampaignFilter.value);
     processBatchBtn.classList.toggle('hidden', status !== 'pending');
     processTenBtn.classList.toggle('hidden', status !== 'pending');
     updateStageBtnStyles();
@@ -3112,6 +3130,31 @@ if (!session) {
     loadReviewList();
     refreshStats();
   });
+
+  async function runBulkCampaignAction(action: 'delete_rejected' | 'reset_review_queue', confirmation: string, promptText: string) {
+    const campaignId = reviewCampaignFilter.value;
+    if (!campaignId) return showToast('Select a paused campaign first', 'error');
+    if (prompt(promptText) !== confirmation) return;
+    const res = await fetch('/api/recruitment-bulk-action', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, campaignId, confirmation }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) return showToast(data.error || 'Campaign operation failed', 'error');
+    showToast(`${data.affectedCount} prospect${data.affectedCount === 1 ? '' : 's'} updated`);
+    currentOffset = 0;
+    loadReviewList();
+    refreshStats();
+  }
+
+  deleteRejectedBtn.addEventListener('click', () => runBulkCampaignAction(
+    'delete_rejected', 'DELETE REJECTED',
+    'This permanently removes every rejected prospect in the selected PAUSED campaign. Type DELETE REJECTED to continue.'
+  ));
+  resetReviewQueueBtn.addEventListener('click', () => runBulkCampaignAction(
+    'reset_review_queue', 'RESET REVIEW QUEUE',
+    'This clears generated content and returns drafted, reviewed, approved, and rejected prospects to pending in the selected PAUSED campaign. Type RESET REVIEW QUEUE to continue.'
+  ));
 
   async function doAction(id: string, action: string, editedEmailBody?: string, reason?: string): Promise<boolean> {
     try {

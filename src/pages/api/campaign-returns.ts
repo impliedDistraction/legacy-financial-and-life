@@ -34,7 +34,7 @@ export const GET: APIRoute = async ({ request }) => {
 
   try {
     const campaignColumn = campaignKind === 'recruitment' ? 'recruitment_campaign_id' : 'sales_campaign_id';
-    const [returnsRes, summaryRes, prospectsRes] = await Promise.all([
+    const [returnsRes, summaryRes, prospectsRes, enrichmentRes, operationsRes] = await Promise.all([
       fetch(
         `${SUPABASE_URL}/rest/v1/campaign_returns?${campaignColumn}=eq.${encodeURIComponent(campaignId)}&order=occurred_at.desc&limit=${limit}&select=id,prospect_id,return_type,return_status,return_value_cents,source,occurred_at,notes,properties`,
         { headers: headers() }
@@ -49,16 +49,30 @@ export const GET: APIRoute = async ({ request }) => {
           { headers: headers() }
         )
         : Promise.resolve(null),
+      campaignKind === 'recruitment'
+        ? fetch(
+          `${SUPABASE_URL}/rest/v1/campaign_enrichment_summary?campaign_id=eq.${encodeURIComponent(campaignId)}&select=provider,attempt_count,enriched_count,no_match_count,failed_count,email_found_count,deliverable_count,conversion_count,cost_cents,latest_enriched_at`,
+          { headers: headers() }
+        ).catch(() => null)
+        : Promise.resolve(null),
+      campaignKind === 'recruitment'
+        ? fetch(
+          `${SUPABASE_URL}/rest/v1/recruitment_campaign_operations?campaign_id=eq.${encodeURIComponent(campaignId)}&order=occurred_at.desc&limit=10&select=action,affected_count,actor_email,notes,metadata,occurred_at`,
+          { headers: headers() }
+        ).catch(() => null)
+        : Promise.resolve(null),
     ]);
 
     if (!returnsRes.ok || !summaryRes.ok || (prospectsRes && !prospectsRes.ok)) {
       throw new Error('Campaign result query failed');
     }
 
-    const [returns, summaries, prospects] = await Promise.all([
+    const [returns, summaries, prospects, enrichment, operations] = await Promise.all([
       returnsRes.json(),
       summaryRes.json(),
       prospectsRes ? prospectsRes.json() : Promise.resolve([]),
+      enrichmentRes?.ok ? enrichmentRes.json() : Promise.resolve([]),
+      operationsRes?.ok ? operationsRes.json() : Promise.resolve([]),
     ]);
     const returnProspectIds = [...new Set(returns.map((campaignReturn: Record<string, unknown>) => campaignReturn.prospect_id).filter(Boolean))];
     const returnProspects = campaignKind === 'recruitment' && returnProspectIds.length > 0
@@ -83,6 +97,8 @@ export const GET: APIRoute = async ({ request }) => {
       },
       returns: returnsWithProspects,
       prospects,
+      enrichment,
+      operations,
     });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : 'Failed to load campaign results' }, 500);
