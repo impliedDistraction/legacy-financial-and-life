@@ -1730,10 +1730,10 @@ if (!session) {
       })();
       const isFixedCsvAudience = c.source_type === 'csv' || c.source_type === 'csv_import';
 
-      // Status logic: completed > goal-met > serving (pipeline active) > raw status
+      // A pause is an operational hard stop even if reviewable records remain.
+      // The queue can be reviewed while paused, but it must not look active.
       const displayStatus = c.status === 'completed' ? 'completed'
         : (c.status === 'paused' && goalMet) ? 'completed'
-        : (c.status === 'paused' && pipelineActive > 0) ? 'serving'
         : c.status;
       const statusColor = displayStatus === 'active' ? 'green' : displayStatus === 'serving' ? 'blue' : displayStatus === 'completed' ? 'gray' : displayStatus === 'paused' ? 'amber' : 'gray';
 
@@ -1784,6 +1784,10 @@ if (!session) {
           </div>` : ''}${isFixedCsvAudience && c.search_filters?.licenseEffectiveFrom ? `
           <div class="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
             <p class="text-xs text-blue-700">📋 Fixed CSV audience imported for license dates ${escapeHtml(c.search_filters.licenseEffectiveFrom)}${c.search_filters?.licenseEffectiveTo ? ` → ${escapeHtml(c.search_filters.licenseEffectiveTo)}` : ''}. This describes the imported pilot only; it does not schedule or refresh Prophog searches.</p>
+          </div>` : ''}${c.source_type === 'rescue_addon' ? `
+          <div class="mb-3 p-2 bg-violet-50 border border-violet-200 rounded-lg">
+            <p class="text-xs font-medium text-violet-800">🛟 Sub-campaign snapshot — ${Number(c.search_filters?.candidate_count || 0)} selected exception record${Number(c.search_filters?.candidate_count || 0) === 1 ? '' : 's'}.</p>
+            <p class="mt-0.5 text-[11px] text-violet-700">Provider plan: ${escapeHtml(String(c.search_filters?.rescue_provider_plan || 'not selected').replace(/_/g, ' '))}. It stays paused and spends nothing until a client-authorized rescue runner is enabled after the parent campaign.</p>
           </div>` : ''}
           <!-- Outreach Progress -->
           <div class="mb-3">
@@ -1888,19 +1892,19 @@ if (!session) {
             }).join('')
             : '<p class="text-xs text-slate-400">No prospects recorded for this campaign.</p>';
           const outcomeRows = returns.length
-            ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Attributed outcomes</p>${returns.map((outcome: any) => `<div class="text-xs text-slate-600">${escapeHtml(outcome.prospect?.name || 'Campaign outcome')} · ${escapeHtml(outcome.return_type.replace(/_/g, ' '))} · ${escapeHtml(outcome.return_status)}${outcome.return_value_cents ? ` · ${formatOutcomeMoney(outcome.return_value_cents)}` : ''}</div>`).join('')}</div>`
+            ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Attributed outcomes</p>${returns.map((outcome: any) => `<div class="text-xs text-slate-600">${escapeHtml(outcome.prospect?.name || 'Campaign outcome')} · ${escapeHtml(String(outcome.return_type || 'unclassified').replace(/_/g, ' '))} · ${escapeHtml(String(outcome.return_status || 'observed'))}${outcome.return_value_cents ? ` · ${formatOutcomeMoney(outcome.return_value_cents)}` : ''}</div>`).join('')}</div>`
             : '<p class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-400">No attributed return events yet. Scheduled appointments and conversions remain visible above.</p>';
           const enrichmentRows = enrichment.length
             ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Enrichment effectiveness</p>${enrichment.map((item: any) => { const attempts = Number(item.attempt_count) || 0; const enriched = Number(item.enriched_count) || 0; const emailFound = Number(item.email_found_count) || 0; const delivered = Number(item.deliverable_count) || 0; const converted = Number(item.conversion_count) || 0; const rate = attempts ? Math.round((enriched / attempts) * 100) : 0; return `<div class="text-xs text-slate-600">${escapeHtml(item.provider)} · ${enriched}/${attempts} enriched (${rate}%) · ${emailFound} emails found · ${delivered} deliverable · ${converted} converted${item.cost_cents ? ` · ${formatOutcomeMoney(item.cost_cents)} cost` : ''}</div>`; }).join('')}</div>`
             : '<p class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-400">No enrichment attempts recorded yet. Provider performance will appear here as Sentinel runs DOI, rescue, or paid enrichment.</p>';
           const operationRows = operations.length
-            ? `<div class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-500">Review operations: ${operations.map((operation: any) => `${escapeHtml(operation.action.replace(/_/g, ' '))} (${operation.affected_count})`).join(' · ')}</div>`
+            ? `<div class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-500">Review operations: ${operations.map((operation: any) => `${escapeHtml(String(operation.action || 'operation').replace(/_/g, ' '))} (${operation.affected_count || 0})`).join(' · ')}</div>`
             : '';
           const pipelineRows = pipelineEvents.length
             ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Recent pipeline decisions</p>${pipelineEvents.map((event: any) => `<div class="text-xs text-slate-600">${escapeHtml(event.from_status || 'new')} → ${escapeHtml(event.to_status)}${event.reason ? ` · ${escapeHtml(event.reason)}` : ''}</div>`).join('')}</div>`
             : '';
           const heldReasonRows = Object.keys(heldReasonSummary).length
-            ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Held cohort — next action needed</p>${Object.entries(heldReasonSummary).map(([reason, count]) => `<div class="text-xs text-amber-700">${count} · ${escapeHtml(reason.replace(/_/g, ' '))}</div>`).join('')}</div>`
+            ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Held cohort — next action needed</p>${Object.entries(heldReasonSummary).map(([reason, count]) => `<div class="text-xs text-amber-700">${count} · ${escapeHtml(String(reason || 'manual_review').replace(/_/g, ' '))}</div>`).join('')}</div>`
             : '';
           panel.innerHTML = `<div class="max-h-56 overflow-y-auto">${prospectRows}</div>${outcomeRows}${enrichmentRows}${operationRows}${pipelineRows}${heldReasonRows}`;
         } catch (error) {
@@ -3025,6 +3029,7 @@ if (!session) {
             ` : ''}
             ${status === 'rejected' ? `
               <span class="max-w-full rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">⚠ <strong>Rejection reason:</strong> ${p.qa_rejection_reason ? escapeHtml(p.qa_rejection_reason) : (p.properties?.rejection_reason) ? escapeHtml(p.properties.rejection_reason) : 'No reason was recorded.'}</span>
+              ${p.email ? `<button class="action-btn redraft-btn bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}">↻ Re-draft now</button>` : ''}
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg ml-auto" data-id="${p.id}" title="Permanently delete">🗑️ Delete forever</button>
             ` : ''}
           </div>
@@ -3085,6 +3090,22 @@ if (!session) {
     });
     reviewList.querySelectorAll('.approve-btn').forEach(btn => {
       btn.addEventListener('click', () => doAction(getAttr(btn, 'data-id'), 'approve'));
+    });
+    reviewList.querySelectorAll('.redraft-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = getAttr(btn, 'data-id');
+        (btn as HTMLButtonElement).disabled = true;
+        const queued = await doAction(id, 'queue_redraft');
+        if (!queued) return;
+        const res = await fetch('/api/recruitment-process', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prospectIds: [id] }),
+        });
+        const data = await res.json().catch(() => ({}));
+        showToast(data.processed ? 'Re-draft generated for QA review' : (data.error || data.failReason || 'Re-draft queued'));
+        loadReviewList();
+        refreshStats();
+      });
     });
     reviewList.querySelectorAll('.reject-open-btn').forEach(btn => {
       btn.addEventListener('click', () => {

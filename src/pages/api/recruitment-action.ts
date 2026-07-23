@@ -81,6 +81,27 @@ export const POST: APIRoute = async ({ request }) => {
         update.properties = { ...(prospect.properties || {}), rejection_reason: reason || null };
         break;
 
+      case 'queue_redraft': {
+        if (prospect.status !== 'rejected' || !prospect.email) {
+          return new Response(JSON.stringify({ error: 'Only rejected, email-ready prospects can be queued for a redraft' }), {
+            status: 409, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        const rejectionReason = String(prospect.qa_rejection_reason || prospect.properties?.rejection_reason || 'QA revision requested');
+        update.status = 'pending';
+        update.processed_at = null;
+        update.qa_status = 'redraft_requested';
+        update.qa_rejection_reason = rejectionReason;
+        update.properties = {
+          ...(prospect.properties || {}),
+          qa_redraft_instructions: rejectionReason,
+          qa_last_failure: rejectionReason,
+          qa_redraft_count: Number(prospect.properties?.qa_redraft_count || 0) + 1,
+          last_qa_redraft_at: new Date().toISOString(),
+        };
+        break;
+      }
+
       case 'delete': {
         // Permanently remove the record
         const deleteRes = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}`, {
@@ -139,19 +160,33 @@ export const POST: APIRoute = async ({ request }) => {
           });
         }
 
-        // Look up campaign reply-to if prospect has a campaign
+        // A campaign pause is a delivery hard stop, including manual dashboard sends.
+        // QA drafting/review may continue while paused, but no email may leave the system.
+        // Look up campaign reply-to and operational status if prospect has a campaign.
         let replyTo = 'recruiting@legacyfinancial.app';
         if (prospect.campaign_id) {
           try {
             const campRes = await fetch(
-              `${SUPABASE_URL}/rest/v1/recruitment_campaigns?id=eq.${encodeURIComponent(prospect.campaign_id)}&select=reply_to_email&limit=1`,
+              `${SUPABASE_URL}/rest/v1/recruitment_campaigns?id=eq.${encodeURIComponent(prospect.campaign_id)}&select=reply_to_email,status&limit=1`,
               { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY!, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' } }
             );
-            if (campRes.ok) {
-              const [camp] = await campRes.json();
-              if (camp?.reply_to_email) replyTo = camp.reply_to_email;
+            if (!campRes.ok) {
+              return new Response(JSON.stringify({ error: 'Campaign status could not be verified. Email sending remains blocked.' }), {
+                status: 503, headers: { 'Content-Type': 'application/json' },
+              });
             }
-          } catch { /* use default */ }
+            const [camp] = await campRes.json();
+            if (camp?.status !== 'active') {
+              return new Response(JSON.stringify({ error: 'This campaign is paused or inactive. Resume it explicitly before sending.' }), {
+                status: 403, headers: { 'Content-Type': 'application/json' },
+              });
+            }
+            if (camp?.reply_to_email) replyTo = camp.reply_to_email;
+          } catch {
+            return new Response(JSON.stringify({ error: 'Campaign status could not be verified. Email sending remains blocked.' }), {
+              status: 503, headers: { 'Content-Type': 'application/json' },
+            });
+          }
         }
 
         // Send via Resend

@@ -330,7 +330,11 @@ export const POST: APIRoute = async ({ request }) => {
 
 async function processProspect(prospect: Record<string, unknown>): Promise<{ fitScore: number }> {
   const profile = buildProfileDescription(prospect);
-  const userMessage = `Generate recruitment outreach for this prospect. Return exactly two substantive body paragraphs. Do not add a greeting, sign-off, CTA text, footer, or URL.\n\n${profile}`;
+  const properties = prospect.properties as Record<string, unknown> | undefined;
+  const revisionRequirement = properties?.qa_redraft_instructions
+    ? `\n\nREVISION REQUIREMENT: The prior draft failed QA for: ${String(properties.qa_redraft_instructions)}. Correct that issue directly while retaining exactly two substantive paragraphs.`
+    : '';
+  const userMessage = `Generate recruitment outreach for this prospect. Return exactly two substantive body paragraphs. Do not add a greeting, sign-off, CTA text, footer, or URL.\n\n${profile}${revisionRequirement}`;
 
   const ollamaHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
