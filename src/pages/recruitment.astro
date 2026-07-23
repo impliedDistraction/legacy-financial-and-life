@@ -1868,6 +1868,8 @@ if (!session) {
           const returns = data.returns || [];
           const enrichment = data.enrichment || [];
           const operations = data.operations || [];
+          const pipelineEvents = data.pipeline_events || [];
+          const heldReasonSummary = data.held_reason_summary || {};
           const formatOutcomeMoney = (cents: number) => `$${((Number(cents) || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
           const prospectRows = prospects.length
             ? prospects.map((prospect: any) => {
@@ -1885,7 +1887,13 @@ if (!session) {
           const operationRows = operations.length
             ? `<div class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-500">Review operations: ${operations.map((operation: any) => `${escapeHtml(operation.action.replace(/_/g, ' '))} (${operation.affected_count})`).join(' · ')}</div>`
             : '';
-          panel.innerHTML = `<div class="max-h-56 overflow-y-auto">${prospectRows}</div>${outcomeRows}${enrichmentRows}${operationRows}`;
+          const pipelineRows = pipelineEvents.length
+            ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Recent pipeline decisions</p>${pipelineEvents.map((event: any) => `<div class="text-xs text-slate-600">${escapeHtml(event.from_status || 'new')} → ${escapeHtml(event.to_status)}${event.reason ? ` · ${escapeHtml(event.reason)}` : ''}</div>`).join('')}</div>`
+            : '';
+          const heldReasonRows = Object.keys(heldReasonSummary).length
+            ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Held cohort — next action needed</p>${Object.entries(heldReasonSummary).map(([reason, count]) => `<div class="text-xs text-amber-700">${count} · ${escapeHtml(reason.replace(/_/g, ' '))}</div>`).join('')}</div>`
+            : '';
+          panel.innerHTML = `<div class="max-h-56 overflow-y-auto">${prospectRows}</div>${outcomeRows}${enrichmentRows}${operationRows}${pipelineRows}${heldReasonRows}`;
         } catch (error) {
           panel.dataset.loaded = '';
           panel.innerHTML = `<p class="text-xs text-red-600">${escapeHtml(error instanceof Error ? error.message : 'Failed to load campaign results')}</p>`;
@@ -3002,7 +3010,7 @@ if (!session) {
             ` : ''}
             ${status === 'held' ? `
               <span class="text-xs text-amber-600 italic">${isLockedSample ? `🔒 ${escapeHtml(p.properties?.sample_label || 'Sample preview')} — approval and sending are disabled` : `⏸️ ${(p.properties?.agent_reasons || []).length ? escapeHtml((p.properties.agent_reasons).join(' · ')) : p.properties?.held_reason === 'no_email' ? 'No email address' : 'Held for manual review'}`}</span>
-              ${!isLockedSample ? `<button class="action-btn approve-btn bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✓ Approve</button>
+              ${!isLockedSample && p.email ? `<button class="action-btn approve-btn bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✓ Approve</button>
               ${p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Approve & Send</button>` : ''}` : ''}
               <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
             ` : ''}
