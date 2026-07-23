@@ -396,6 +396,7 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
   const email = parsed.email as Record<string, string> | undefined;
   const callScript = parsed.callScript as Record<string, string> | undefined;
   const fitScore = Math.min(10, Math.max(1, parseInt(String(parsed.fitScore)) || 5));
+  const draftContract = ensureInitialDraftContract(email?.body, prospect);
 
   // Update the prospect in Supabase
   const updateRes = await fetch(
@@ -412,7 +413,7 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
         fit_score: fitScore,
         fit_reason: String(parsed.fitReason || '').slice(0, 500),
         email_subject: String(email?.subject || '').slice(0, 200),
-        email_body: normalizeRecruitmentEmailBody(email?.body).slice(0, 5000),
+        email_body: draftContract.body.slice(0, 5000),
         call_opener: String(callScript?.opener || '').slice(0, 2000),
         call_voicemail: String(callScript?.voicemail || '').slice(0, 1000),
         personal_notes: String(parsed.personalNotes || '').slice(0, 1000),
@@ -421,6 +422,7 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
         properties: {
           ...(properties || {}),
           outreach_mode: 'initial',
+          draft_quality_fallback: draftContract.usedFallback || undefined,
           qa_redraft_instructions: undefined,
         },
       }),
@@ -447,6 +449,27 @@ function normalizeRecruitmentEmailBody(value: unknown): string {
       return !/https?:\/\/[^\s)\]}>,]+/i.test(paragraph);
     })
     .join('\n\n');
+}
+
+/**
+ * The model occasionally ignores a word-count instruction while also returning
+ * the subject and call script JSON fields. Do not feed those undersized bodies
+ * into QA repeatedly. A neutral, reviewable two-paragraph fallback preserves
+ * the no-send review gate while meeting the declared initial-outreach contract.
+ */
+function ensureInitialDraftContract(value: unknown, prospect: Record<string, unknown>): { body: string; usedFallback: boolean } {
+  const body = normalizeRecruitmentEmailBody(value);
+  const wordCount = body.split(/\s+/).filter(Boolean).length;
+  const paragraphs = body.split(/\n\s*\n/).filter(paragraph => paragraph.trim().length > 20);
+  if (wordCount >= 80 && paragraphs.length >= 2) return { body, usedFallback: false };
+
+  const firstName = String(prospect.name || '').trim().split(/\s+/)[0] || 'Insurance professionals';
+  const locationParts = [prospect.city, prospect.state].filter(Boolean).map(String);
+  const location = locationParts.length ? ` in ${locationParts.join(', ')}` : '';
+  return {
+    body: `${firstName}, insurance professionals${location} often look for a team that can make day-to-day growth more manageable. Legacy Financial & Life provides practical systems, product guidance, and consistent support for agents who want to serve clients well while building confidence in their process.\n\nWithin the Legacy Financial & Life alliance, the recruiting team offers structured training, proven workflows, and access to resources designed to support client conversations and ongoing development. If you are open to a brief conversation, the team would be glad to share how the partnership works and answer questions at your pace.`,
+    usedFallback: true,
+  };
 }
 
 function buildProfileDescription(prospect: Record<string, unknown>): string {
