@@ -228,6 +228,23 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    const headers = {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    };
+
+    // A serverless request can be terminated while the model is working. Release
+    // only claims older than 15 minutes so a later dashboard request can retry them.
+    const staleBefore = new Date(Date.now() - 15 * 60_000).toISOString();
+    let staleQuery = `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.generating&processed_at=lt.${encodeURIComponent(staleBefore)}`;
+    if (campaignId) staleQuery += `&campaign_id=eq.${encodeURIComponent(campaignId)}`;
+    await fetch(staleQuery, {
+      method: 'PATCH',
+      headers: { ...headers, Prefer: 'return=minimal' },
+      body: JSON.stringify({ status: 'pending', processed_at: null }),
+    }).catch(() => undefined);
+
     // Fetch prospects to process
     let queryUrl = `${SUPABASE_URL}/rest/v1/${TABLE}?status=eq.pending&processed_at=is.null&email=not.is.null&source=neq.apollo_sales_search&order=created_at.asc&limit=${batchLimit}`;
     if (prospectIds && Array.isArray(prospectIds) && prospectIds.length > 0) {
@@ -238,11 +255,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const fetchRes = await fetch(queryUrl, {
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
 
     if (!fetchRes.ok) {
@@ -283,12 +296,35 @@ export const POST: APIRoute = async ({ request }) => {
     // Process each prospect sequentially (GPU constraint)
     for (const prospect of prospects) {
       try {
+        // Claim each record conditionally. This makes repeated clicks and two
+        // dashboard sessions idempotent without relying on browser button state.
+        const claimRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${prospect.id}&status=eq.pending&processed_at=is.null`,
+          {
+            method: 'PATCH',
+            headers: { ...headers, Prefer: 'return=representation' },
+            body: JSON.stringify({ status: 'generating', processed_at: new Date().toISOString() }),
+          }
+        );
+        const claimed = claimRes.ok ? await claimRes.json() : [];
+        if (!Array.isArray(claimed) || claimed.length !== 1) {
+          results.push({ id: prospect.id, success: false, error: 'Prospect is already being generated elsewhere' });
+          continue;
+        }
         const signOff = campaignSignOffs[prospect.campaign_id as string] || 'Legacy Financial Recruiting Team';
         const result = await processProspect(prospect, signOff);
         results.push({ id: prospect.id, success: true, fitScore: result.fitScore });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`Failed to process prospect ${prospect.id}:`, msg);
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${prospect.id}&status=eq.generating`,
+          {
+            method: 'PATCH',
+            headers: { ...headers, Prefer: 'return=minimal' },
+            body: JSON.stringify({ status: 'pending', processed_at: null }),
+          }
+        ).catch(() => undefined);
         results.push({ id: prospect.id, success: false, error: msg.slice(0, 200) });
       }
     }

@@ -506,7 +506,10 @@ if (!session) {
           </select>
           <div class="flex items-center gap-3 flex-wrap">
             <button id="process-batch-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors">
-              ⚡ Generate Next
+              ⚡ Generate 1 Draft
+            </button>
+            <button id="process-ten-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors">
+              ⚡ Generate 10 Drafts
             </button>
             <button id="approve-all-btn" class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-1.5 rounded-lg transition-colors hidden">
               ✓ Approve All Visible
@@ -902,6 +905,41 @@ if (!session) {
             <div class="bg-purple-50 rounded-lg p-4 text-center">
               <div class="text-3xl font-bold text-purple-700" id="rc-wallet-used">—</div>
               <div class="text-xs text-purple-600">Total Used</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Credit Value & Attribution -->
+        <div class="bg-white rounded-xl border border-gray-200 p-6">
+          <div class="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Credits at Work</h2>
+              <p class="text-xs text-gray-500 mt-0.5">Modeled at the current $0.50 list rate. This is usage value, not an invoice or a claim of realized revenue.</p>
+            </div>
+            <span class="text-xs text-gray-400">Recent activity: last 50 ledger entries</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="rounded-lg bg-slate-50 p-4">
+              <div id="rc-recent-credits" class="text-2xl font-bold text-slate-800">—</div>
+              <div class="text-xs text-slate-500">Recent credits consumed</div>
+            </div>
+            <div class="rounded-lg bg-blue-50 p-4">
+              <div id="rc-recent-modeled-value" class="text-2xl font-bold text-blue-700">—</div>
+              <div class="text-xs text-blue-600">Recent modeled value</div>
+            </div>
+            <div class="rounded-lg bg-violet-50 p-4">
+              <div id="rc-lifetime-modeled-value" class="text-2xl font-bold text-violet-700">—</div>
+              <div class="text-xs text-violet-600">Lifetime modeled value</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+            <div>
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Usage by pipeline stage</h3>
+              <div id="rc-stage-usage" class="space-y-1 text-sm text-gray-500">Loading…</div>
+            </div>
+            <div>
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Campaign attribution</h3>
+              <div id="rc-campaign-usage" class="space-y-1 text-sm text-gray-500">Loading…</div>
             </div>
           </div>
         </div>
@@ -2403,6 +2441,7 @@ if (!session) {
   const reviewFilter = document.getElementById('review-filter') as HTMLSelectElement;
   const reviewCampaignFilter = document.getElementById('review-campaign-filter') as HTMLSelectElement;
   const processBatchBtn = document.getElementById('process-batch-btn') as HTMLButtonElement;
+  const processTenBtn = document.getElementById('process-ten-btn') as HTMLButtonElement;
   const approveAllBtn = document.getElementById('approve-all-btn') as HTMLButtonElement;
   const loadMoreBtn = document.getElementById('load-more-btn') as HTMLButtonElement;
 
@@ -2502,7 +2541,46 @@ if (!session) {
       activeGenerations--;
       updateGenerationStatus();
       processBatchBtn.disabled = false;
-      processBatchBtn.textContent = '⚡ Generate Next';
+      processBatchBtn.textContent = '⚡ Generate 1 Draft';
+    }
+  });
+
+  processTenBtn.addEventListener('click', async () => {
+    const campaignId = reviewCampaignFilter.value;
+    if (!campaignId) {
+      showToast('Select a recruitment campaign before generating outreach', 'error');
+      return;
+    }
+
+    processBatchBtn.disabled = true;
+    processTenBtn.disabled = true;
+    let completed = 0;
+    try {
+      for (let attempt = 1; attempt <= 10; attempt++) {
+        processTenBtn.textContent = `⚡ Generating ${attempt}/10…`;
+        const res = await fetch('/api/recruitment-process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: 1, campaignId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error || data.processed !== 1) {
+          const message = data.error || data.failReason || 'No eligible email-ready prospect was generated';
+          showToast(`Stopped after ${completed}/10 drafts: ${message}`, 'error');
+          break;
+        }
+        completed++;
+        refreshStats();
+      }
+      if (completed === 10) showToast('Generated 10 drafts. Waiting for automated QA review.');
+    } catch {
+      showToast(`Stopped after ${completed}/10 drafts: network error`, 'error');
+    } finally {
+      processBatchBtn.disabled = false;
+      processTenBtn.disabled = false;
+      processTenBtn.textContent = '⚡ Generate 10 Drafts';
+      loadReviewList();
+      refreshStats();
     }
   });
 
@@ -2511,6 +2589,7 @@ if (!session) {
     // Show/hide contextual buttons
     approveAllBtn.classList.toggle('hidden', status !== 'reviewed');
     processBatchBtn.classList.toggle('hidden', status !== 'pending');
+    processTenBtn.classList.toggle('hidden', status !== 'pending');
     updateStageBtnStyles();
     try {
       const campId = reviewCampaignFilter.value;
@@ -5411,6 +5490,31 @@ if (!session) {
       if (usedEl) usedEl.textContent = used.toLocaleString();
       if (badge) badge.textContent = `${balance.toLocaleString()} credits`;
 
+      const insights = data.insights || {};
+      const formatMoney = (cents: number) => `$${((Number(cents) || 0) / 100).toFixed(2)}`;
+      const recentCreditsEl = document.getElementById('rc-recent-credits');
+      const recentValueEl = document.getElementById('rc-recent-modeled-value');
+      const lifetimeValueEl = document.getElementById('rc-lifetime-modeled-value');
+      if (recentCreditsEl) recentCreditsEl.textContent = (insights.recentCreditsUsed || 0).toLocaleString();
+      if (recentValueEl) recentValueEl.textContent = formatMoney(insights.recentModeledValueCents);
+      if (lifetimeValueEl) lifetimeValueEl.textContent = formatMoney(insights.lifetimeModeledValueCents);
+
+      const stageUsage = document.getElementById('rc-stage-usage');
+      if (stageUsage) {
+        const stages = Object.entries(insights.byStage || {});
+        stageUsage.innerHTML = stages.length
+          ? stages.map(([stage, credits]) => `<div class="flex justify-between border-b border-gray-100 py-1.5"><span class="capitalize">${escapeHtml(stage.replace(/_/g, ' '))}</span><span class="font-medium text-gray-700">${Number(credits).toLocaleString()} credits</span></div>`).join('')
+          : '<p class="text-xs text-gray-400">No credit consumption in the recent ledger window.</p>';
+      }
+
+      const campaignUsage = document.getElementById('rc-campaign-usage');
+      if (campaignUsage) {
+        const campaigns = insights.campaigns || [];
+        campaignUsage.innerHTML = campaigns.length
+          ? campaigns.map((campaign: any) => `<div class="flex justify-between gap-3 border-b border-gray-100 py-1.5"><span class="truncate" title="${escapeHtml(campaign.campaignName)}">${escapeHtml(campaign.campaignName)}<span class="block text-xs text-gray-400">${campaign.observedReturns || 0} observed · ${campaign.realizedReturns || 0} realized · ${formatMoney(campaign.realizedValueCents)} realized</span></span><span class="whitespace-nowrap font-medium text-gray-700">${campaign.credits.toLocaleString()} · ${formatMoney(campaign.modeledValueCents)}</span></div>`).join('')
+          : '<p class="text-xs text-gray-400">No campaign-attributed credit use in the recent ledger window.</p>';
+      }
+
       // Transactions
       const txList = document.getElementById('rc-transactions-list');
       if (txList && data.transactions) {
@@ -5419,18 +5523,21 @@ if (!session) {
         } else {
           txList.innerHTML = data.transactions.map((tx: any) => {
             const isDeposit = tx.amount > 0;
-            const icon = isDeposit ? '💰' : '🔍';
+            const stageLabels: Record<string, string> = { reveal: 'Apollo email reveal', research: 'Prospect research', draft: 'Outreach draft', qa: 'Quality review', send: 'Personalized outreach delivered', voice: 'Voice call', processing: 'Pipeline delivery', voice_call: 'Voice call', deposit: 'Credit deposit', adjustment: 'Adjustment', refund: 'Refund' };
+            const stage = tx.stage || tx.type;
+            const icon = isDeposit ? '💰' : stage === 'voice' || stage === 'voice_call' ? '📞' : stage === 'send' || stage === 'processing' ? '✉️' : '🔍';
             const color = isDeposit ? 'text-emerald-600' : 'text-red-500';
             const sign = isDeposit ? '+' : '';
             const date = new Date(tx.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             const time = new Date(tx.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
             const ref = tx.payment_reference ? ` · ${escapeHtml(tx.payment_reference)}` : '';
+            const campaign = tx.campaign_name ? ` · ${escapeHtml(tx.campaign_name)}` : '';
             return `<div class="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
               <div class="flex items-center gap-2">
                 <span class="text-sm">${icon}</span>
                 <div>
-                  <div class="text-sm text-gray-800">${escapeHtml(tx.description || tx.type)}</div>
-                  <div class="text-xs text-gray-400">${date}, ${time}${ref}</div>
+                  <div class="text-sm text-gray-800">${escapeHtml(stageLabels[stage] || stage)}</div>
+                  <div class="text-xs text-gray-400">${date}, ${time}${campaign}${ref}</div>
                 </div>
               </div>
               <div class="text-right">

@@ -23,7 +23,7 @@
     "resend": "^4.0.0",
     "sharp": "^0.34.3",
     "svix": "^1.90.0",
-    "vercel": "^51.4.0"
+    "vercel": "^56.5.0"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

@@ -24,6 +24,77 @@ function jsonRes(data: unknown, status = 200) {
   });
 }
 
+type CreditTransaction = {
+  amount: number;
+  type: string;
+  stage?: string | null;
+  campaign_id: string | null;
+};
+
+async function buildUsageInsights(wallet: { lifetime_used?: number }, transactions: CreditTransaction[]) {
+  const recentUsage = transactions.filter(tx => tx.amount < 0);
+  const recentCreditsUsed = recentUsage.reduce((total, tx) => total + Math.abs(tx.amount), 0);
+  const byStage = recentUsage.reduce<Record<string, number>>((totals, tx) => {
+    const stage = tx.stage || tx.type || 'processing';
+    totals[stage] = (totals[stage] || 0) + Math.abs(tx.amount);
+    return totals;
+  }, {});
+  const campaignIds = [...new Set(recentUsage.map(tx => tx.campaign_id).filter(Boolean))] as string[];
+  const campaignNames: Record<string, string> = {};
+  const campaignReturns: Record<string, { return_count: number; realized_return_count: number; realized_value_cents: number }> = {};
+
+  if (campaignIds.length > 0) {
+    const ids = campaignIds.join(',');
+    const [recruitmentRes, salesRes, returnsRes] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/recruitment_campaigns?id=in.(${ids})&select=id,name`, { headers: supaHeaders() }),
+      fetch(`${SUPABASE_URL}/rest/v1/sales_campaigns?id=in.(${ids})&select=id,name`, { headers: supaHeaders() }),
+      fetch(`${SUPABASE_URL}/rest/v1/campaign_return_summary?campaign_id=in.(${ids})&select=campaign_id,return_count,realized_return_count,realized_value_cents`, { headers: supaHeaders() }),
+    ]);
+    for (const response of [recruitmentRes, salesRes]) {
+      if (!response.ok) continue;
+      const campaigns = await response.json();
+      for (const campaign of campaigns) campaignNames[campaign.id] = campaign.name;
+    }
+    if (returnsRes.ok) {
+      const returns = await returnsRes.json();
+      for (const row of returns) {
+        campaignReturns[row.campaign_id] = {
+          return_count: Number(row.return_count) || 0,
+          realized_return_count: Number(row.realized_return_count) || 0,
+          realized_value_cents: Number(row.realized_value_cents) || 0,
+        };
+      }
+    }
+  }
+
+  const campaignUsage = recentUsage.reduce<Record<string, { credits: number; transactions: number }>>((totals, tx) => {
+    const id = tx.campaign_id || 'unattributed';
+    if (!totals[id]) totals[id] = { credits: 0, transactions: 0 };
+    totals[id].credits += Math.abs(tx.amount);
+    totals[id].transactions += 1;
+    return totals;
+  }, {});
+
+  return {
+    unitPriceCents: 50,
+    lifetimeModeledValueCents: (wallet.lifetime_used || 0) * 50,
+    recentCreditsUsed,
+    recentModeledValueCents: recentCreditsUsed * 50,
+    byStage,
+    campaigns: Object.entries(campaignUsage)
+      .map(([id, usage]) => ({
+        campaignId: id === 'unattributed' ? null : id,
+        campaignName: campaignNames[id] || (id === 'unattributed' ? 'Unattributed platform activity' : 'Archived or unavailable campaign'),
+        ...usage,
+        observedReturns: campaignReturns[id]?.return_count || 0,
+        realizedReturns: campaignReturns[id]?.realized_return_count || 0,
+        realizedValueCents: campaignReturns[id]?.realized_value_cents || 0,
+        modeledValueCents: usage.credits * 50,
+      }))
+      .sort((a, b) => b.credits - a.credits),
+  };
+}
+
 /**
  * GET /api/apollo-credits — get wallet balance + recent transactions
  */
@@ -54,7 +125,13 @@ export const GET: APIRoute = async ({ request }) => {
     );
     const transactions = txnRes.ok ? await txnRes.json() : [];
 
-    return jsonRes({ wallet, transactions });
+    const insights = await buildUsageInsights(wallet, transactions);
+    const enrichedTransactions = transactions.map((transaction: CreditTransaction & Record<string, unknown>) => ({
+      ...transaction,
+      campaign_name: transaction.campaign_id ? insights.campaigns.find(c => c.campaignId === transaction.campaign_id)?.campaignName || null : null,
+    }));
+
+    return jsonRes({ wallet, transactions: enrichedTransactions, insights });
   } catch (err) {
     console.error('apollo-credits GET error:', err);
     return jsonRes({ error: 'Failed to fetch wallet' }, 500);
@@ -139,36 +216,10 @@ export const POST: APIRoute = async ({ request }) => {
         }
       );
 
-      // Auto-resume campaigns that were paused due to zero balance
-      let resumed: string[] = [];
-      if (wallet.zero_balance_paused_at) {
-        try {
-          const pausedRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/recruitment_campaigns?status=eq.paused&select=id,name`,
-            { headers: supaHeaders() }
-          );
-          if (pausedRes.ok) {
-            const pausedCampaigns = await pausedRes.json();
-            for (const c of pausedCampaigns) {
-              await fetch(
-                `${SUPABASE_URL}/rest/v1/recruitment_campaigns?id=eq.${c.id}`,
-                {
-                  method: 'PATCH',
-                  headers: { ...supaHeaders(), Prefer: 'return=minimal' },
-                  body: JSON.stringify({ status: 'active', updated_at: new Date().toISOString() }),
-                }
-              );
-              resumed.push(c.name);
-            }
-          }
-        } catch { /* non-fatal */ }
-      }
-
-      const resumeMsg = resumed.length > 0 ? ` Resumed ${resumed.length} campaign(s).` : '';
       return jsonRes({
         wallet: updatedWallet,
-        resumed,
-        message: `Added ${amount} credits. New balance: ${newBalance}.${resumeMsg}`,
+        resumed: [],
+        message: `Added ${amount} credits. New balance: ${newBalance}. Campaign status is unchanged.`,
       });
     }
 
