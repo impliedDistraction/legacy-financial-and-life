@@ -630,9 +630,10 @@ if (!session) {
                 class="flex-1 max-w-[180px] px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-brand-500 focus:border-brand-500" />
               <label class="flex items-center gap-1 cursor-pointer">
                 <input type="checkbox" id="ai-call-test-mode" class="rounded border-gray-300 text-brand-600 focus:ring-brand-500" checked />
-                <span class="text-xs text-gray-500">Test mode</span>
+                <span class="text-xs text-gray-500">No transfer after live dial</span>
               </label>
             </div>
+            <p class="-mt-1 mb-3 text-[11px] text-amber-800">⚠️ This control still dials the prospect. It only prevents transfer to the team after the test conversation. Use <strong>Log Call Outcome</strong> below to test dashboard workflow without placing any call.</p>
             <div id="hot-leads-list" class="space-y-2"></div>
           </div>
         </div>
@@ -3343,7 +3344,7 @@ if (!session) {
     else if (sort === 'interaction') orderBy = 'last_interaction_at.desc.nullslast,sent_at.desc.nullslast';
 
     try {
-      let url = `/api/recruitment-upload?${statusFilter}&limit=${SENT_PAGE}&offset=${sentOffset}&order=${orderBy}`;
+      let url = `/api/recruitment-upload?${statusFilter}&limit=${SENT_PAGE}&offset=${sentOffset}&order=${orderBy}&include_content=true`;
       if (search) url += `&search=${encodeURIComponent(search)}`;
       const campId = sentCampaignFilter.value;
       if (campId) url += `&campaign_id=${encodeURIComponent(campId)}`;
@@ -3478,26 +3479,26 @@ if (!session) {
                 </div>
               </div>
 
-              <!-- Email Content -->
-              ${p.email_body ? `
-              <p class="text-xs font-medium text-gray-500 mb-1.5">Subject: ${escapeHtml(p.email_subject || '')}</p>
-              <div class="rounded-lg overflow-hidden border border-gray-200">
-                <!-- Mini template header -->
-                <div style="background: linear-gradient(135deg, #1e40af, #2563eb);" class="px-3 py-2 text-center">
-                  <span class="text-white text-xs font-semibold">Legacy Financial &amp; Life</span>
+              <!-- Prospect intelligence: facts and signals collected so far. -->
+              <div class="rounded-lg border border-teal-100 bg-teal-50 p-3">
+                <p class="mb-1.5 text-xs font-bold text-teal-800">🧠 Prospect Snapshot</p>
+                <div class="grid gap-x-4 gap-y-1 text-xs text-teal-900 sm:grid-cols-2">
+                  <p><span class="font-medium">Known fit:</span> ${escapeHtml(p.fit_reason || 'No fit rationale recorded yet.')}</p>
+                  <p><span class="font-medium">Research:</span> ${p.research_score != null ? `${escapeHtml(String(p.research_score))}/10` : 'Not scored'}${props.research_completed_at ? ` · refreshed ${fmtDateShort(props.research_completed_at)}` : ''}</p>
+                  <p><span class="font-medium">Email:</span> ${props.email_opened_at ? `Opened ${fmtDateShort(props.email_opened_at)}` : 'No open signal yet'}</p>
+                  <p><span class="font-medium">CTA:</span> ${props.email_clicked_at ? `Clicked ${fmtDateShort(props.email_clicked_at)}${props.email_click_bot_detected ? ' (scanner detected)' : ''}` : 'No click signal yet'}</p>
+                  <p><span class="font-medium">/join:</span> ${props.join_page_visited_at ? `Visited ${fmtDateShort(props.join_page_visited_at)}${props.join_page_visit_count > 1 ? ` (${props.join_page_visit_count} visits)` : ''}` : 'No visit signal yet'}</p>
+                  <p><span class="font-medium">AI chat:</span> ${props.chat_session_id ? 'Conversation recorded — transcript available below' : 'No chat conversation yet'}</p>
+                  <p><span class="font-medium">Reply:</span> ${p.replied_at || props.replied_at || props.email_replied_at ? `Received ${fmtDateShort(p.replied_at || props.replied_at || props.email_replied_at)}` : 'No reply recorded'}</p>
+                  <p><span class="font-medium">Consent:</span> ${props.text_consent ? 'Text consent recorded' : 'No text consent recorded'}</p>
                 </div>
-                <div class="bg-white p-3">
-                  <p class="text-xs text-gray-600 whitespace-pre-wrap max-h-32 overflow-y-auto">${escapeHtml(p.email_body)}</p>
-                  <div class="mt-2 text-center">
-                    <span class="inline-block bg-blue-600 text-white text-[10px] font-semibold px-3 py-1 rounded" style="pointer-events:none;">Explore the Opportunity →</span>
-                  </div>
-                </div>
-                <!-- Compliance footer indicator -->
-                <div class="bg-gray-50 border-t border-gray-200 px-3 py-2">
-                  <p class="text-[10px] text-gray-400 leading-relaxed">Legacy Financial &amp; Life | Luthersville, GA 30251</p>
-                  <p class="text-[10px] text-gray-400">🔗 <span class="underline">Unsubscribe</span> · <span class="underline">Not ${escapeHtml(p.name?.split(' ')[0] || 'recipient')}? Let us know</span></p>
-                </div>
-              </div>` : ''}
+                ${p.personal_notes ? `<p class="mt-2 border-t border-teal-200 pt-2 text-xs text-teal-800"><span class="font-medium">Team note:</span> ${escapeHtml(p.personal_notes)}</p>` : ''}
+              </div>
+
+              <div class="schedule-summary hidden rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-900" data-prospect-id="${p.id}"></div>
+
+              <!-- This reconstructs the controlled delivery template, including its CTA and footer. -->
+              ${p.email_body ? renderDeliveryPreview(p) : ''}
 
               <!-- AI Chat Transcript (lazy loaded) -->
               <div class="chat-log-container" data-prospect-id="${p.id}" data-loaded="false">
@@ -3554,7 +3555,7 @@ if (!session) {
               <div class="flex gap-2 flex-wrap">
                 ${p.status === 'approved' && p.email ? `<button class="action-btn send-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📧 Send Email</button>` : ''}
                 ${p.phone && ['sent','follow_up_1','follow_up_2','follow_up_exhausted','survey_sent'].includes(p.status) ? `<a href="tel:${escapeHtml(p.phone)}" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg inline-block text-center">📞 Call ${escapeHtml(p.phone)}</a>` : ''}
-                ${['sent','follow_up_1','follow_up_2','follow_up_exhausted','survey_sent'].includes(p.status) ? `<button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📞 Mark Called</button>` : ''}
+                ${['sent','follow_up_1','follow_up_2','follow_up_exhausted','survey_sent'].includes(p.status) ? `<button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📝 Log Call Outcome</button>` : ''}
                 ${['sent','follow_up_1','follow_up_2','follow_up_exhausted','survey_sent','approved'].includes(p.status) ? `<button class="action-btn convert-btn bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">🎉 Mark Converted</button>` : ''}
               </div>
             </div>
@@ -3584,7 +3585,7 @@ if (!session) {
     sentList.querySelectorAll('.call-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = (btn as HTMLElement).dataset.id;
-        const outcome = prompt('Call outcome (no_answer, spoke, scheduled, voicemail):');
+        const outcome = prompt('Log a completed manual call only (no_answer, spoke, scheduled, voicemail). This does not place a call.');
         if (!outcome) return;
         try {
           const res = await fetch('/api/recruitment-action', {
@@ -3594,7 +3595,7 @@ if (!session) {
           });
           const data = await res.json();
           if (data.error) { showToast(data.error, 'error'); return; }
-          showToast('Call logged', 'success');
+          showToast('Manual call outcome logged', 'success');
           sentOffset = 0; sentProspects = []; loadSentList();
         } catch { showToast('Failed', 'error'); }
       });
@@ -3607,14 +3608,10 @@ if (!session) {
           const res = await fetch('/api/recruitment-action', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, action: 'approve' }),
+            body: JSON.stringify({ id, action: 'mark_converted' }),
           });
-          // Then update status to converted
-          await fetch('/api/recruitment-action', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, action: 'mark_called', callOutcome: 'scheduled' }),
-          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.error) { showToast(data.error || 'Could not mark converted', 'error'); return; }
           showToast('Marked as converted!', 'success');
           sentOffset = 0; sentProspects = []; loadSentList();
         } catch { showToast('Failed', 'error'); }
@@ -3660,6 +3657,37 @@ if (!session) {
         }
       });
     });
+
+    loadScheduleSummaries(prospects);
+  }
+
+  async function loadScheduleSummaries(prospects: any[]) {
+    const ids = prospects.map((p: any) => p.id).filter(Boolean);
+    if (!ids.length) return;
+    try {
+      const res = await fetch(`/api/recruitment-schedules?prospect_ids=${encodeURIComponent(ids.join(','))}`);
+      const data = await res.json();
+      if (!res.ok || !Array.isArray(data.schedules)) return;
+      const schedulesByProspect = new Map<string, any[]>();
+      data.schedules.forEach((event: any) => {
+        const events = schedulesByProspect.get(event.prospect_id) || [];
+        events.push(event);
+        schedulesByProspect.set(event.prospect_id, events);
+      });
+      sentList.querySelectorAll('.schedule-summary').forEach((element) => {
+        const panel = element as HTMLElement;
+        const events = schedulesByProspect.get(panel.dataset.prospectId || '') || [];
+        if (!events.length) return;
+        panel.innerHTML = `<p class="mb-1 font-bold">📅 Schedule${events.length > 1 ? 's' : ''}</p>${events.map((event: any) => {
+          const when = event.start_time ? fmtDate(event.start_time) : 'Time unavailable';
+          const status = event.status || 'active';
+          return `<p>• ${escapeHtml(event.event_type || 'Calendly meeting')} — <strong>${escapeHtml(when)}</strong> <span class="text-indigo-600">(${escapeHtml(status)})</span>${event.location ? ` · ${escapeHtml(event.location)}` : ''}</p>`;
+        }).join('')}`;
+        panel.classList.remove('hidden');
+      });
+    } catch {
+      // Schedule data is supplementary; the core prospect tracking view remains usable.
+    }
   }
 
   async function loadTrackingStats() {
@@ -3919,7 +3947,7 @@ if (!session) {
           return;
         }
 
-        if (!confirm(`Start an AI call to ${name} at ${phone}?${testMode ? ' (TEST MODE — no real transfer)' : ''}`)) return;
+        if (!confirm(`Place a LIVE AI call to ${name} at ${phone}?${testMode ? ' It will not transfer to the team after the test conversation.' : ''}`)) return;
 
         el.disabled = true;
         el.textContent = '⏳ Dialing...';

@@ -259,6 +259,16 @@ export const POST: APIRoute = async ({ request }) => {
         }
         break;
 
+      case 'mark_converted':
+        update.status = 'converted';
+        update.interaction_stage = 'converted';
+        update.properties = {
+          ...(prospect.properties || {}),
+          converted_at: new Date().toISOString(),
+          conversion_source: 'dashboard_manual',
+        };
+        break;
+
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
           status: 400,
