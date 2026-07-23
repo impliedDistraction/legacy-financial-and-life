@@ -172,7 +172,7 @@ export const site = {
     subtitle: 'Build your insurance practice with experienced mentors and practical technology',
     hero: {
       heading: 'Build Your Insurance Practice with Legacy Financial & Life',
-      sub: 'Partner with Tim and Beth Byrd for mentorship, proven systems, and AI-powered tools that help field agents, agencies, FMOs, and IMOs grow their practices.'
+      sub: 'Join an enduring Legacy Financial & Life alliance for mentorship, proven systems, and AI-powered tools that help field agents, agencies, FMOs, and IMOs grow together.'
     },
     benefits: [
       {

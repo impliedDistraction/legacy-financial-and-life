@@ -102,6 +102,30 @@ export const POST: APIRoute = async ({ request }) => {
         break;
       }
 
+      case 'save_draft': {
+        const draft = String(editedEmailBody || '').trim();
+        if (!draft) {
+          return new Response(JSON.stringify({ error: 'A draft body is required' }), {
+            status: 400, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        if (!['drafted', 'reviewed', 'rejected'].includes(prospect.status)) {
+          return new Response(JSON.stringify({ error: 'Only a generated draft can be edited and rechecked' }), {
+            status: 409, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        update.email_body = draft.slice(0, 5000);
+        update.status = 'drafted';
+        update.qa_status = 'manual_edit_pending';
+        update.qa_rejection_reason = null;
+        update.properties = {
+          ...(prospect.properties || {}),
+          outreach_mode: 'initial',
+          manual_draft_edit_at: new Date().toISOString(),
+        };
+        break;
+      }
+
       case 'delete': {
         // Permanently remove the record
         const deleteRes = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}`, {

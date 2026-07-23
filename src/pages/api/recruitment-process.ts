@@ -33,6 +33,7 @@ EMAIL RULES:
 - NEVER reference specific meeting topics or fabricate shared experiences
 - NEVER mention how many years anyone has been in the business or any specific duration of experience
 - NEVER use MLM language, income claims, "unlimited earning potential", "be your own boss"
+- Describe the opportunity as joining or growing within the Legacy Financial & Life alliance. Never say "independent agent", "independent operation", "build your own business", or imply the recipient leaves the team.
 - NEVER guarantee income or disparage their current agency
 - If RESEARCH FINDINGS are provided, use them to personalize: mention their community involvement, professional background, or specific strengths you noticed — but do NOT sound stalkerish or reference private info
 
@@ -417,6 +418,11 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
         personal_notes: String(parsed.personalNotes || '').slice(0, 1000),
         processed_at: new Date().toISOString(),
         status: 'drafted',
+        properties: {
+          ...(properties || {}),
+          outreach_mode: 'initial',
+          qa_redraft_instructions: undefined,
+        },
       }),
     }
   );

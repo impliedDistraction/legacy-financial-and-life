@@ -1761,14 +1761,14 @@ if (!session) {
             const actionButtons = isPast ? '' : `
               ${c.status === 'paused' && c.source_type !== 'rescue_addon' ? `<button class="text-xs text-violet-600 hover:text-violet-800 font-medium" data-campaign-action="create_rescue_add_on" data-campaign-id="${c.id}" title="Create a paused, client-authorized rescue add-on">🛟</button>` : ''}
               ${c.source_type === 'rescue_addon' ? '<span class="text-xs text-slate-400" title="Candidate snapshot — rescue execution requires a dedicated client-authorized runner">🔒 Snapshot</span>' : `<button class="text-xs text-brand-600 hover:text-brand-800 font-medium" data-campaign-action="${c.status === 'active' ? 'pause' : 'resume'}" data-campaign-id="${c.id}" title="${c.status === 'active' ? 'Pause' : 'Resume'}">${c.status === 'active' ? '⏸' : '▶'}</button>`}
-              <button class="text-xs text-red-500 hover:text-red-700 font-medium" data-campaign-action="stop" data-campaign-id="${c.id}" title="Stop campaign">⏹</button>`;
+              ${c.source_type === 'rescue_addon' ? `<button class="text-xs text-red-500 hover:text-red-700 font-medium" data-campaign-action="delete_rescue_add_on" data-campaign-id="${c.id}" title="Remove unused rescue snapshot">🗑</button>` : `<button class="text-xs text-red-500 hover:text-red-700 font-medium" data-campaign-action="stop" data-campaign-id="${c.id}" title="Stop campaign">⏹</button>`}`;
 
       const sourceIcon = c.source_type === 'rescue_addon' ? '🛟 Rescue Add-On' : c.source_type === 'apollo_recruitment' ? '🚀 Apollo' : c.source_type === 'fl_licensee' ? '🏛️ FL Licensee' : c.source_type === 'state_licensee' ? `🏛️ ${c.search_state || 'State'} Licensee` : c.source_type === 'csv' ? '📤 CSV' : c.source_type === 'pool' ? '🎯 Pool' : c.source_type === 'prophog' ? '🔍 Prophog (legacy)' : '🚀 Apollo';
       const parentCampaign = c.parent_campaign_id ? campaignsCache.find(parent => parent.id === c.parent_campaign_id) : null;
       const parentLabel = parentCampaign ? ` · Child of ${escapeHtml(parentCampaign.name)}` : '';
 
       return `
-        <div class="bg-white rounded-xl border border-gray-200 p-4 ${isPast ? 'opacity-75' : 'hover:border-brand-300'} transition-colors">
+        <div class="campaign-card bg-white rounded-xl border border-gray-200 p-4 ${isPast ? 'opacity-75' : 'hover:border-brand-300 cursor-pointer'} transition-colors" data-campaign-open="${c.id}">
           <div class="flex items-start justify-between mb-2">
             <div>
               <h3 class="font-semibold text-gray-900">${escapeHtml(c.name)}</h3>
@@ -1840,13 +1840,44 @@ if (!session) {
 
     list.innerHTML = html;
 
+    list.querySelectorAll('[data-campaign-open]').forEach(card => {
+      card.addEventListener('click', (event) => {
+        if ((event.target as HTMLElement).closest('button, details, a')) return;
+        const campaign = campaignsCache.find(item => item.id === (card as HTMLElement).dataset.campaignOpen);
+        if (!campaign) return;
+        const counts = campaign.prospect_counts || {};
+        const openTab = (tab: 'review' | 'sent') => {
+          document.querySelectorAll('.tab-btn').forEach(button => button.classList.remove('active'));
+          document.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
+          document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
+          document.getElementById(`tab-${tab}`)?.classList.remove('hidden');
+        };
+        if (campaign.status === 'active') {
+          openTab('sent');
+          sentCampaignFilter.value = campaign.id;
+          sentFilter.value = 'sent';
+          sentOffset = 0;
+          sentProspects = [];
+          loadSentList();
+          return;
+        }
+        openTab('review');
+        reviewCampaignFilter.value = campaign.id;
+        reviewFilter.value = counts.rejected ? 'rejected' : counts.drafted ? 'drafted' : counts.reviewed ? 'reviewed' : counts.approved ? 'approved' : 'pending';
+        currentOffset = 0;
+        loadReviewList();
+      });
+    });
+
     // Wire action buttons
     list.querySelectorAll('[data-campaign-action]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const el = e.currentTarget as HTMLElement;
         const action = el.dataset.campaignAction;
         const id = el.dataset.campaignId;
         if (action === 'stop' && !confirm('Stop this campaign? It will be moved to Past Campaigns.')) return;
+        if (action === 'delete_rescue_add_on' && !confirm('Remove this unused rescue add-on snapshot? Its candidate snapshot will be deleted. No credits were spent.')) return;
         let payload: Record<string, unknown> = { action, id };
         if (action === 'create_rescue_add_on') {
           const providerPlan = prompt('Rescue provider plan: doi_only, doi_then_apollo, brave_research, or full', 'doi_only');
@@ -1856,14 +1887,17 @@ if (!session) {
           payload = { action, parentCampaignId: id, providerPlan, creditBudget };
         }
         try {
-          await fetch('/api/recruitment-campaigns', {
+          const response = await fetch('/api/recruitment-campaigns', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || data.error) throw new Error(data.error || 'Campaign action failed');
           loadCampaigns();
         } catch (err) {
           console.error('Campaign action failed:', err);
+          showToast(err instanceof Error ? err.message : 'Campaign action failed', 'error');
         }
       });
     });
@@ -2535,6 +2569,7 @@ if (!session) {
   const deleteRejectedBtn = document.getElementById('delete-rejected-btn') as HTMLButtonElement;
   const resetReviewQueueBtn = document.getElementById('reset-review-queue-btn') as HTMLButtonElement;
   const loadMoreBtn = document.getElementById('load-more-btn') as HTMLButtonElement;
+  const reviewProspectsById = new Map<string, any>();
 
   reviewFilter.addEventListener('change', () => { currentOffset = 0; loadReviewList(); });
   reviewCampaignFilter.addEventListener('change', () => { currentOffset = 0; loadReviewList(); });
@@ -2773,6 +2808,8 @@ if (!session) {
   }
 
   function renderReviewCards(prospects: any[], status: string) {
+    reviewProspectsById.clear();
+    prospects.forEach(prospect => reviewProspectsById.set(prospect.id, prospect));
     if (prospects.length === 0) {
       const msg = status === 'pending' ? 'No pending prospects. Upload a CSV to add agents.' : `No prospects with status "${status}"`;
       reviewList.innerHTML = `<div class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400"><p class="text-sm">${msg}</p></div>`;
@@ -2992,6 +3029,7 @@ if (!session) {
             <div class="mt-2 bg-gray-50 rounded-lg p-3">
               <div class="text-xs text-gray-500 mb-1">Subject: <span class="font-medium text-gray-700">${escapeHtml(p.email_subject || '')}</span></div>
               <textarea class="w-full text-xs text-gray-700 bg-white border border-gray-200 rounded p-2 min-h-[80px] email-edit" data-id="${p.id}">${escapeHtml(p.email_body || '')}</textarea>
+              <button class="safe-copy-btn mt-2 text-xs text-slate-600 hover:text-slate-900 underline" data-id="${p.id}">Copy PII-screened QA test</button>
             </div>
           </details>
           ${renderDeliveryPreview(p)}` : ''}
@@ -3012,6 +3050,7 @@ if (!session) {
             ` : ''}
             ${status === 'drafted' ? `
               <span class="text-xs text-gray-400 italic">⏳ Awaiting QA review (automated)</span>
+              <button class="action-btn save-draft-btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">Save & recheck</button>
               <button class="action-btn reject-open-btn bg-red-100 hover:bg-red-200 text-red-700 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">✗ Reject</button>
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}" title="Permanently delete">🗑️</button>
             ` : ''}
@@ -3035,6 +3074,7 @@ if (!session) {
             ${status === 'rejected' ? `
               <span class="max-w-full rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">⚠ <strong>Rejection reason:</strong> ${p.qa_rejection_reason ? escapeHtml(p.qa_rejection_reason) : (p.properties?.rejection_reason) ? escapeHtml(p.properties.rejection_reason) : 'No reason was recorded.'}</span>
               ${p.email ? `<button class="action-btn redraft-btn bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}">↻ Re-draft now</button>` : ''}
+              <button class="action-btn save-draft-btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs px-2 py-1.5 rounded-lg" data-id="${p.id}">Save edit & recheck</button>
               <button class="action-btn delete-btn bg-gray-100 hover:bg-red-100 text-gray-500 hover:text-red-600 text-xs px-2 py-1.5 rounded-lg ml-auto" data-id="${p.id}" title="Permanently delete">🗑️ Delete forever</button>
             ` : ''}
           </div>
@@ -3110,6 +3150,42 @@ if (!session) {
         showToast(data.processed ? 'Re-draft generated for QA review' : (data.error || data.failReason || 'Re-draft queued'));
         loadReviewList();
         refreshStats();
+      });
+    });
+    reviewList.querySelectorAll('.save-draft-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = getAttr(btn, 'data-id');
+        const draft = (reviewList.querySelector(`.email-edit[data-id="${id}"]`) as HTMLTextAreaElement | null)?.value || '';
+        if (await doAction(id, 'save_draft', draft)) {
+          showToast('Draft saved and queued for QA recheck');
+          loadReviewList();
+        }
+      });
+    });
+    reviewList.querySelectorAll('.safe-copy-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const prospect = reviewProspectsById.get(getAttr(btn, 'data-id'));
+        if (!prospect) return;
+        const escapeForRegex = (value: unknown) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const redactValue = (value: string, pii: unknown, replacement: string, flags = 'gi') => {
+          const escaped = escapeForRegex(pii);
+          return escaped ? value.replace(new RegExp(escaped, flags), replacement) : value;
+        };
+        const redact = (value: string) => redactValue(
+          redactValue(redactValue(value, prospect.name, '[prospect]'), prospect.email, '[email removed]'),
+          prospect.phone, '[phone removed]', 'g'
+        );
+        const currentBody = (reviewList.querySelector(`.email-edit[data-id="${prospect.id}"]`) as HTMLTextAreaElement | null)?.value || prospect.email_body || '';
+        const safeText = [
+          '[PII-SCREENED RECRUITMENT QA TEST]',
+          `State: ${prospect.state || 'not provided'}`,
+          `Status: ${prospect.status || 'not provided'}`,
+          `QA result: ${prospect.qa_rejection_reason || 'pending review'}`,
+          `Subject: ${redact(String(prospect.email_subject || ''))}`,
+          'Body:', redact(String(currentBody)),
+        ].join('\n');
+        await navigator.clipboard.writeText(safeText);
+        showToast('PII-screened QA test copied');
       });
     });
     reviewList.querySelectorAll('.reject-open-btn').forEach(btn => {

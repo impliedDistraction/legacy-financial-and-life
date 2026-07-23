@@ -45,7 +45,7 @@ const VARIANT_A: Record<ProspectTier, VariantContent> = {
     cards: [
       { emoji: '🎯', title: 'Leads That Come to You', body: 'AI-powered prospecting finds qualified leads and warms them up before you ever pick up the phone.' },
       { emoji: '👨‍🏫', title: 'Learn What Actually Works', body: '1-on-1 mentorship from agents with 15+ years and 300+ policies. Skip the trial and error.' },
-      { emoji: '�', title: 'Full-Time or Part-Time', body: "Build your business on your terms. Whether you want a full-time career or flexible part-time income, our system works around your schedule." },
+      { emoji: '�', title: 'Full-Time or Part-Time', body: 'Build your practice with the Legacy Financial team. We support full-time and part-time agents through a clear, shared onboarding plan.' },
     ],
     chatOpener: "Hey! 👋 Thanks for checking us out. Getting started in insurance can be a lot — what's been the biggest challenge so far? Where does most of your time end up going?",
   },
@@ -56,7 +56,7 @@ const VARIANT_A: Record<ProspectTier, VariantContent> = {
     },
     cards: [
       { emoji: '🤖', title: 'AI-Powered Lead Gen', body: "Stop spending hours on prospecting. Our AI finds, qualifies, and warms up clients for you." },
-      { emoji: '⏰', title: 'Full-Time or Part-Time', body: "Whether you're going all-in or building on the side, our systems flex around your life. No minimums, no mandatory office hours." },
+      { emoji: '⏰', title: 'Full-Time or Part-Time', body: 'Whether you are full-time or part-time, our team helps set a practical schedule and support plan around your responsibilities.' },
       { emoji: '🛡️', title: 'Life, Health & Wealth', body: "Life insurance, health coverage, retirement planning — serve your clients across every financial milestone with full product access." },
     ],
     chatOpener: "Hey! 👋 Thanks for checking us out. I'd love to learn a little about you — what does your day actually look like right now? Where does most of your time go?",
@@ -86,7 +86,7 @@ const VARIANT_B: Record<ProspectTier, VariantContent> = {
     cards: [
       { emoji: '👨‍🏫', title: 'Real Mentorship, Day One', body: "1-on-1 coaching from experienced agents. Weekly calls, script practice, and product training until you're confident." },
       { emoji: '🎯', title: 'Leads on Your Calendar', body: "Our team pre-qualifies prospects and books appointments so you walk into warm conversations, not cold calls." },
-      { emoji: '�', title: 'Full-Time or Part-Time', body: "Build your business on your terms. Whether you want a full-time career or flexible part-time income, our system works around your schedule." },
+      { emoji: '�', title: 'Full-Time or Part-Time', body: 'Build your practice with the Legacy Financial team. We support full-time and part-time agents through a clear, shared onboarding plan.' },
     ],
     chatOpener: "Hey! 👋 Thanks for checking us out. Starting in insurance can feel overwhelming — what's been on your mind? Anything you're trying to figure out?",
   },
@@ -97,7 +97,7 @@ const VARIANT_B: Record<ProspectTier, VariantContent> = {
     },
     cards: [
       { emoji: '🤝', title: 'People-First Culture', body: "A team that answers when you call. Mentors who remember what it was like starting out. Real support, not just a contract." },
-      { emoji: '🕐', title: 'Full-Time or Part-Time', body: "Whether you're going all-in or building on the side, our systems flex around your life. No minimums, no mandatory office hours." },
+      { emoji: '🕐', title: 'Full-Time or Part-Time', body: 'Whether you are full-time or part-time, our team helps set a practical schedule and support plan around your responsibilities.' },
       { emoji: '🛡️', title: 'Life, Health & Wealth', body: "Life insurance, health coverage, retirement planning — serve your clients across every financial milestone with full product access." },
     ],
     chatOpener: "Hey! 👋 Thanks for stopping by. I'd love to hear a little about you — what's your situation right now? What are you looking for in an opportunity?",
@@ -136,7 +136,7 @@ const PAIN_POINT_CONTENT: Record<PainPoint, PainPointContent> = {
     heroAngle: 'fighting paperwork',
   },
   income_uncertainty: {
-    card: { emoji: '💰', title: 'Predictable Income', body: "With a steady pipeline and residual commission structures, you'll know where next month's income is coming from." },
+    card: { emoji: '💰', title: 'Competitive Commission Support', body: 'With a steady pipeline and competitive commission support through the alliance, you can plan your production with greater confidence.' },
     heroAngle: 'inconsistent income',
   },
   no_mentorship: {

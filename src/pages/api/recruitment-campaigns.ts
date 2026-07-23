@@ -284,6 +284,20 @@ export const POST: APIRoute = async ({ request }) => {
       return jsonRes({ campaign: updated });
     }
 
+    if (action === 'delete_rescue_add_on') {
+      const { id } = body;
+      if (!id) return jsonRes({ error: 'id required' }, 400);
+      const currentRes = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}&select=id,source_type,status,credits_used,parent_campaign_id&limit=1`, { headers: supaHeaders() });
+      const [current] = currentRes.ok ? await currentRes.json() : [];
+      if (!current || current.source_type !== 'rescue_addon') return jsonRes({ error: 'Only rescue add-on snapshots can be removed' }, 409);
+      if (current.status !== 'paused' || Number(current.credits_used || 0) !== 0) return jsonRes({ error: 'Only paused, unused rescue snapshots can be removed' }, 409);
+      const deleteRes = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${encodeURIComponent(id)}`, {
+        method: 'DELETE', headers: { ...supaHeaders(), Prefer: 'return=minimal' },
+      });
+      if (!deleteRes.ok) throw new Error(`Rescue add-on removal failed: ${deleteRes.status}`);
+      return jsonRes({ deleted: true, refunded_credits: 0 });
+    }
+
     if (action === 'pause' || action === 'resume' || action === 'stop') {
       const { id } = body;
       if (!id) return jsonRes({ error: 'id required' }, 400);
