@@ -1716,11 +1716,13 @@ if (!session) {
       const goalMet = totalSent >= goal;
 
       // Detect stale license date filter (informational only — does NOT block campaign)
-      const hasStaleFilter = (() => {
+      const hasStaleProphogFilter = (() => {
+        if (c.source_type !== 'prophog') return false;
         const endDate = c.search_filters?.licenseEffectiveTo;
         if (!endDate) return false;
         return new Date(endDate) < new Date();
       })();
+      const isFixedCsvAudience = c.source_type === 'csv' || c.source_type === 'csv_import';
 
       // Status logic: completed > goal-met > serving (pipeline active) > raw status
       const displayStatus = c.status === 'completed' ? 'completed'
@@ -1768,10 +1770,13 @@ if (!session) {
               <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-${statusColor}-100 text-${statusColor}-700">${displayStatus}</span>
               ${actionButtons}
             </div>
-          </div>${hasStaleFilter && c.status !== 'completed' ? `
+          </div>${hasStaleProphogFilter && c.status !== 'completed' ? `
           <!-- Stale filter note (informational) -->
           <div class="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-lg">
             <p class="text-xs text-amber-700">📅 License date filter ends ${escapeHtml(c.search_filters.licenseEffectiveTo)} — Prophog may return fewer new results. Campaign continues serving from pool.</p>
+          </div>` : ''}${isFixedCsvAudience && c.search_filters?.licenseEffectiveFrom ? `
+          <div class="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <p class="text-xs text-blue-700">📋 Fixed CSV audience imported for license dates ${escapeHtml(c.search_filters.licenseEffectiveFrom)}${c.search_filters?.licenseEffectiveTo ? ` → ${escapeHtml(c.search_filters.licenseEffectiveTo)}` : ''}. This describes the imported pilot only; it does not schedule or refresh Prophog searches.</p>
           </div>` : ''}
           <!-- Outreach Progress -->
           <div class="mb-3">
@@ -2618,6 +2623,7 @@ if (!session) {
         }
         completed++;
         refreshStats();
+        refreshReviewStageCounts();
       }
       if (completed === 10) showToast('Generated 10 drafts. Waiting for automated QA review.');
     } catch {
