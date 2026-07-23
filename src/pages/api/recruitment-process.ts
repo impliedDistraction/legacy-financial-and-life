@@ -23,8 +23,8 @@ About Legacy Financial & Life:
 Given a recruit's profile, generate the two substantive body paragraphs for a personalized outreach email and a call script. The delivery template adds the greeting, CTA button, signature, and compliance footer.
 
 EMAIL RULES:
-- 90-140 words across exactly two paragraphs; warm, direct, professional
-- Paragraph 1: brief, honest introduction. Paragraph 2: value proposition and a low-pressure invitation.
+- 110-130 words across exactly two substantive paragraphs; warm, direct, professional
+- Each paragraph must contain 50-65 words and be separated by one blank line. Paragraph 1: brief, honest introduction. Paragraph 2: value proposition and a low-pressure invitation.
 - Reference their state/experience if known
 - Write as a recruiter introducing the Legacy Financial team — NOT from any individual's first-person perspective
 - Do NOT add a greeting, CTA URL, sign-off, unsubscribe text, or any other URL; the delivery template supplies them.
@@ -332,9 +332,9 @@ async function processProspect(prospect: Record<string, unknown>): Promise<{ fit
   const profile = buildProfileDescription(prospect);
   const properties = prospect.properties as Record<string, unknown> | undefined;
   const revisionRequirement = properties?.qa_redraft_instructions
-    ? `\n\nREVISION REQUIREMENT: The prior draft failed QA for: ${String(properties.qa_redraft_instructions)}. Correct that issue directly while retaining exactly two substantive paragraphs.`
+    ? `\n\nREVISION REQUIREMENT: The prior draft failed QA for: ${String(properties.qa_redraft_instructions)}. This is a structural rewrite, not a minor edit. Return 110-130 words in exactly two substantive paragraphs, with 50-65 words in each paragraph and one blank line between them. Do not include a greeting, sign-off, CTA text, footer, or URL.`
     : '';
-  const userMessage = `Generate recruitment outreach for this prospect. Return exactly two substantive body paragraphs. Do not add a greeting, sign-off, CTA text, footer, or URL.\n\n${profile}${revisionRequirement}`;
+  const userMessage = `Generate recruitment outreach for this prospect. Return 110-130 words in exactly two substantive body paragraphs, with 50-65 words per paragraph and one blank line between them. Do not add a greeting, sign-off, CTA text, footer, or URL.\n\n${profile}${revisionRequirement}`;
 
   const ollamaHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -437,7 +437,7 @@ function normalizeRecruitmentEmailBody(value: unknown): string {
       if (!paragraph) return false;
       if (/^Hi\s+\w+[,.]?$/i.test(paragraph)) return false;
       if (/^(Best|Regards|Sincerely|Warm regards|Thanks)[,]?\s*(\n|$)/im.test(paragraph)) return false;
-      if (/^Legacy Financial/i.test(paragraph)) return false;
+      if (/^Legacy Financial(?:\s*&\s*Life)?[,.]?$/i.test(paragraph)) return false;
       return !/https?:\/\/[^\s)\]}>,]+/i.test(paragraph);
     })
     .join('\n\n');

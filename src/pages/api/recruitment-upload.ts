@@ -151,7 +151,8 @@ export const GET: APIRoute = async ({ request }) => {
   const offset = parseInt(url.searchParams.get('offset') || '0');
 
   // Support composite status filters like "in.(sent,approved,converted)"
-  const defaultOrder = 'fit_score.desc.nullslast,created_at.desc';
+  // A unique final sort key keeps offset pagination stable for large rejected queues.
+  const defaultOrder = 'fit_score.desc.nullslast,created_at.desc,id.asc';
   const orderClause = order || defaultOrder;
   // When limit=1 with no search, we're likely just counting — use minimal select to save egress
   const isCountOnly = limit <= 1 && !search;

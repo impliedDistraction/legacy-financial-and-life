@@ -169,10 +169,10 @@ export const site = {
   // Hiring/Recruiting Page Content  
   hiring: {
     title: 'Join Our Growing Team',
-    subtitle: 'Build your insurance career with experienced mentors and cutting-edge tools',
+    subtitle: 'Build your insurance practice with experienced mentors and practical technology',
     hero: {
-      heading: 'Launch Your Insurance Career with Legacy Financial & Life',
-      sub: 'Join Tim and Beth Byrd as your upline and gain access to proven systems, mentorship, and the latest AI-powered tools to accelerate your success in the insurance industry.'
+      heading: 'Build Your Insurance Practice with Legacy Financial & Life',
+      sub: 'Partner with Tim and Beth Byrd for mentorship, proven systems, and AI-powered tools that help field agents, agencies, FMOs, and IMOs grow their practices.'
     },
     benefits: [
       {

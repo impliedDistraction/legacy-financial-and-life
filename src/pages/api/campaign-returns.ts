@@ -34,7 +34,7 @@ export const GET: APIRoute = async ({ request }) => {
 
   try {
     const campaignColumn = campaignKind === 'recruitment' ? 'recruitment_campaign_id' : 'sales_campaign_id';
-    const [returnsRes, summaryRes, prospectsRes, enrichmentRes, operationsRes, pipelineRes, heldRes] = await Promise.all([
+    const [returnsRes, summaryRes, prospectsRes, enrichmentRes, heldRes, pipelineRes, operationsRes] = await Promise.all([
       fetch(
         `${SUPABASE_URL}/rest/v1/campaign_returns?${campaignColumn}=eq.${encodeURIComponent(campaignId)}&order=occurred_at.desc&limit=${limit}&select=id,prospect_id,return_type,return_status,return_value_cents,source,occurred_at,notes,properties`,
         { headers: headers() }

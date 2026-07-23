@@ -34,10 +34,14 @@ export const GET: APIRoute = async ({ request }) => {
   };
 
   try {
-    // Fetch all sent/converted prospects that have any engagement beyond just being sent
+    const campaignId = new URL(request.url).searchParams.get('campaign_id')?.trim() || '';
+    const campaignFilter = campaignId ? `&campaign_id=eq.${encodeURIComponent(campaignId)}` : '';
+
+    // Fetch sent/converted prospects that have any engagement beyond just being sent.
+    // When the dashboard has a campaign selected, never mix in another campaign's leads.
     // (clicked, visited, opened, replied, chatted, or expressed interest)
     const prospectsRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/recruitment_prospects?status=in.(sent,converted,scheduled,follow_up_1,follow_up_2,follow_up_exhausted)&interaction_stage=neq.new&select=id,name,email,phone,state,city,fit_score,fit_reason,status,interaction_stage,sent_at,properties,research_score&order=sent_at.desc.nullslast&limit=50`,
+      `${SUPABASE_URL}/rest/v1/recruitment_prospects?status=in.(sent,converted,scheduled,follow_up_1,follow_up_2,follow_up_exhausted)&interaction_stage=neq.new${campaignFilter}&select=id,name,email,phone,state,city,fit_score,fit_reason,status,interaction_stage,sent_at,properties,research_score&order=sent_at.desc.nullslast&limit=50`,
       { headers },
     );
 

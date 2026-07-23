@@ -1764,13 +1764,15 @@ if (!session) {
               <button class="text-xs text-red-500 hover:text-red-700 font-medium" data-campaign-action="stop" data-campaign-id="${c.id}" title="Stop campaign">⏹</button>`;
 
       const sourceIcon = c.source_type === 'rescue_addon' ? '🛟 Rescue Add-On' : c.source_type === 'apollo_recruitment' ? '🚀 Apollo' : c.source_type === 'fl_licensee' ? '🏛️ FL Licensee' : c.source_type === 'state_licensee' ? `🏛️ ${c.search_state || 'State'} Licensee` : c.source_type === 'csv' ? '📤 CSV' : c.source_type === 'pool' ? '🎯 Pool' : c.source_type === 'prophog' ? '🔍 Prophog (legacy)' : '🚀 Apollo';
+      const parentCampaign = c.parent_campaign_id ? campaignsCache.find(parent => parent.id === c.parent_campaign_id) : null;
+      const parentLabel = parentCampaign ? ` · Child of ${escapeHtml(parentCampaign.name)}` : '';
 
       return `
         <div class="bg-white rounded-xl border border-gray-200 p-4 ${isPast ? 'opacity-75' : 'hover:border-brand-300'} transition-colors">
           <div class="flex items-start justify-between mb-2">
             <div>
               <h3 class="font-semibold text-gray-900">${escapeHtml(c.name)}</h3>
-              <p class="text-xs text-gray-500 mt-0.5">${sourceIcon} · ${escapeHtml(c.search_state)}${c.search_filters?.onlyNewAgents ? ' · 🆕 New Agents' : ''}${c.search_filters?.licenseEffectiveFrom ? ' · 📅 ' + escapeHtml(c.search_filters.licenseEffectiveFrom) + (c.search_filters?.licenseEffectiveTo ? ' → ' + escapeHtml(c.search_filters.licenseEffectiveTo) : '') : ''}</p>
+              <p class="text-xs text-gray-500 mt-0.5">${sourceIcon} · ${escapeHtml(c.search_state)}${parentLabel}${c.search_filters?.onlyNewAgents ? ' · 🆕 New Agents' : ''}${c.search_filters?.licenseEffectiveFrom ? ' · 📅 ' + escapeHtml(c.search_filters.licenseEffectiveFrom) + (c.search_filters?.licenseEffectiveTo ? ' → ' + escapeHtml(c.search_filters.licenseEffectiveTo) : '') : ''}</p>
             </div>
             <div class="flex items-center gap-2">
               ${relaunchBadge}
@@ -1897,8 +1899,8 @@ if (!session) {
           const enrichmentRows = enrichment.length
             ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Enrichment effectiveness</p>${enrichment.map((item: any) => { const attempts = Number(item.attempt_count) || 0; const enriched = Number(item.enriched_count) || 0; const emailFound = Number(item.email_found_count) || 0; const delivered = Number(item.deliverable_count) || 0; const converted = Number(item.conversion_count) || 0; const rate = attempts ? Math.round((enriched / attempts) * 100) : 0; return `<div class="text-xs text-slate-600">${escapeHtml(item.provider)} · ${enriched}/${attempts} enriched (${rate}%) · ${emailFound} emails found · ${delivered} deliverable · ${converted} converted${item.cost_cents ? ` · ${formatOutcomeMoney(item.cost_cents)} cost` : ''}</div>`; }).join('')}</div>`
             : '<p class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-400">No enrichment attempts recorded yet. Provider performance will appear here as Sentinel runs DOI, rescue, or paid enrichment.</p>';
-          const operationRows = operations.length
-            ? `<div class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-500">Review operations: ${operations.map((operation: any) => `${escapeHtml(String(operation.action || 'operation').replace(/_/g, ' '))} (${operation.affected_count || 0})`).join(' · ')}</div>`
+          const operationRows = operations.some((operation: any) => operation.action && Number(operation.affected_count) > 0)
+            ? `<div class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-500">Review operations: ${operations.filter((operation: any) => operation.action && Number(operation.affected_count) > 0).map((operation: any) => `${escapeHtml(String(operation.action).replace(/_/g, ' '))} (${operation.affected_count})`).join(' · ')}</div>`
             : '';
           const pipelineRows = pipelineEvents.length
             ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Recent pipeline decisions</p>${pipelineEvents.map((event: any) => `<div class="text-xs text-slate-600">${escapeHtml(event.from_status || 'new')} → ${escapeHtml(event.to_status)}${event.reason ? ` · ${escapeHtml(event.reason)}` : ''}</div>`).join('')}</div>`
@@ -2695,9 +2697,12 @@ if (!session) {
       const res = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
       const data = await res.json();
       const count = data.total || data.prospects?.length || 0;
-      document.getElementById('review-count')!.textContent = count > 0 ? `${count} total` : '';
+      const shown = data.prospects?.length || 0;
+      const showing = shown ? ` · showing ${currentOffset + 1}-${currentOffset + shown}` : '';
+      document.getElementById('review-count')!.textContent = count > 0 ? `${count} total${showing}` : '';
       renderReviewCards(data.prospects || [], status);
       loadMoreBtn.classList.toggle('hidden', (data.prospects?.length || 0) < PAGE_SIZE);
+      loadMoreBtn.textContent = `Next ${PAGE_SIZE} prospects`;
     } catch {
       reviewList.innerHTML = '<div class="text-center text-red-500 text-sm py-4">Failed to load prospects</div>';
     }
@@ -3578,7 +3583,7 @@ if (!session) {
     try {
       const [statsRes, warmRes] = await Promise.all([
         fetch('/api/recruitment-stats'),
-        fetch('/api/recruitment-warm-leads'),
+        fetch(`/api/recruitment-warm-leads${sentCampaignFilter.value ? `?campaign_id=${encodeURIComponent(sentCampaignFilter.value)}` : ''}`),
       ]);
       const stats = await statsRes.json();
       if (!stats.error) {
