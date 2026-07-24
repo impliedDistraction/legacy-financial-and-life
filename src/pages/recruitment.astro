@@ -2851,8 +2851,17 @@ if (!session) {
     catch { return source.slice(0, 80); }
   }
 
+  function plainPublicSnippet(value: unknown): string {
+    // Search providers sometimes return encoded markup such as
+    // "&lt;strong&gt;Name&lt;/strong&gt;". Decode it once, then remove tags and
+    // escape at render time—public research is never inserted as HTML.
+    const decoder = document.createElement('textarea');
+    decoder.innerHTML = String(value || '');
+    return decoder.value.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  }
+
   function renderResearchEvidence(evidence: any): string {
-    const snippet = String(evidence?.snippet || evidence?.excerpt || '').trim();
+    const snippet = plainPublicSnippet(evidence?.snippet || evidence?.excerpt || '');
     if (!snippet) return '';
     const href = safeExternalUrl(evidence?.url);
     const source = sourceLabel(evidence?.source || evidence?.url);
@@ -3578,6 +3587,7 @@ if (!session) {
       const scoreColor = (p.fit_score || 0) >= 7 ? 'green' : (p.fit_score || 0) >= 4 ? 'amber' : 'red';
       const stateMatch = ['GA','OH','OK','SC','MS','MI','TX','UT','AL','LA'].includes(p.state?.toUpperCase());
       const props = p.properties || {};
+      const callNotes = Array.isArray(props.call_notes) ? props.call_notes.slice(-3).reverse() : [];
 
       // Interaction indicators
       const indicators: string[] = [];
@@ -3679,6 +3689,7 @@ if (!session) {
                   <p><span class="font-medium">Consent:</span> ${props.text_consent ? 'Text consent recorded' : 'No text consent recorded'}</p>
                 </div>
                 ${p.personal_notes ? `<p class="mt-2 border-t border-teal-200 pt-2 text-xs text-teal-800"><span class="font-medium">Team note:</span> ${escapeHtml(p.personal_notes)}</p>` : ''}
+                ${callNotes.length ? `<div class="mt-2 border-t border-teal-200 pt-2"><p class="mb-1 text-xs font-medium text-teal-800">📞 Call log</p><div class="space-y-1">${callNotes.map((entry: any) => `<p class="text-xs text-teal-800"><span class="font-medium">${escapeHtml(String(entry.outcome || 'call').replace(/_/g, ' '))}</span>${entry.at ? ` · ${escapeHtml(fmtDateShort(entry.at))}` : ''}${entry.note ? ` — ${escapeHtml(entry.note)}` : ''}</p>`).join('')}</div></div>` : ''}
               </div>
 
               <div class="schedule-summary hidden rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-900" data-prospect-id="${p.id}"></div>
@@ -3744,6 +3755,23 @@ if (!session) {
                 ${['sent','follow_up_1','follow_up_2','follow_up_exhausted','survey_sent'].includes(p.status) ? `<button class="action-btn call-btn bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">📝 Log Call Outcome</button>` : ''}
                 ${['sent','follow_up_1','follow_up_2','follow_up_exhausted','survey_sent','approved'].includes(p.status) ? `<button class="action-btn convert-btn bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg" data-id="${p.id}">🎉 Mark Converted</button>` : ''}
               </div>
+              ${['sent','follow_up_1','follow_up_2','follow_up_exhausted','survey_sent'].includes(p.status) ? `
+              <div class="call-outcome-form hidden mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3" data-id="${p.id}">
+                <div class="flex items-center justify-between gap-3"><p class="text-xs font-semibold text-amber-900">📝 Log a completed call</p><span class="text-[10px] text-amber-700">Saved permanently to this prospect</span></div>
+                <p class="mt-1 text-[11px] text-amber-800">Select the result, then add context that the next team member should know.</p>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                  <button type="button" class="call-outcome-choice rounded border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900 hover:bg-amber-100" data-outcome="no_answer">📵 No answer</button>
+                  <button type="button" class="call-outcome-choice rounded border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900 hover:bg-amber-100" data-outcome="voicemail">📭 Voicemail</button>
+                  <button type="button" class="call-outcome-choice rounded border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900 hover:bg-amber-100" data-outcome="spoke">💬 Spoke</button>
+                  <button type="button" class="call-outcome-choice rounded border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900 hover:bg-amber-100" data-outcome="interested">✅ Interested</button>
+                  <button type="button" class="call-outcome-choice rounded border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900 hover:bg-amber-100" data-outcome="callback">📅 Callback</button>
+                  <button type="button" class="call-outcome-choice rounded border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900 hover:bg-amber-100" data-outcome="scheduled">🗓️ Scheduled</button>
+                  <button type="button" class="call-outcome-choice rounded border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900 hover:bg-amber-100" data-outcome="not_interested">✕ Not interested</button>
+                  <button type="button" class="call-outcome-choice rounded border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900 hover:bg-amber-100" data-outcome="wrong_number">🚫 Wrong number</button>
+                </div>
+                <textarea class="call-outcome-note mt-2 w-full rounded border border-amber-300 bg-white p-2 text-xs text-slate-700" rows="3" maxlength="1500" placeholder="Permanent internal note (optional): what happened, follow-up timing, objections, or quote needs…"></textarea>
+                <div class="mt-2 flex items-center gap-2"><button type="button" class="call-outcome-save rounded bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700">Save call log</button><button type="button" class="call-outcome-cancel text-xs text-amber-800 hover:underline">Cancel</button><span class="call-outcome-error text-xs text-red-600"></span></div>
+              </div>` : ''}
             </div>
           </details>
         </div>`;
@@ -3769,21 +3797,60 @@ if (!session) {
     });
 
     sentList.querySelectorAll('.call-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).dataset.id;
-        const outcome = prompt('Log a completed manual call only (no_answer, spoke, scheduled, voicemail). This does not place a call.');
-        if (!outcome) return;
+        const form = sentList.querySelector(`.call-outcome-form[data-id="${id}"]`) as HTMLElement | null;
+        form?.classList.toggle('hidden');
+        form?.querySelector<HTMLTextAreaElement>('.call-outcome-note')?.focus();
+      });
+    });
+
+    sentList.querySelectorAll('.call-outcome-choice').forEach(choice => {
+      choice.addEventListener('click', () => {
+        const form = choice.closest('.call-outcome-form') as HTMLElement | null;
+        if (!form) return;
+        form.dataset.outcome = (choice as HTMLElement).dataset.outcome || '';
+        form.querySelectorAll('.call-outcome-choice').forEach(option => {
+          option.classList.remove('border-amber-600', 'bg-amber-200', 'font-semibold');
+        });
+        choice.classList.add('border-amber-600', 'bg-amber-200', 'font-semibold');
+        const error = form.querySelector('.call-outcome-error') as HTMLElement | null;
+        if (error) error.textContent = '';
+      });
+    });
+
+    sentList.querySelectorAll('.call-outcome-cancel').forEach(btn => {
+      btn.addEventListener('click', () => btn.closest('.call-outcome-form')?.classList.add('hidden'));
+    });
+
+    sentList.querySelectorAll('.call-outcome-save').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const form = btn.closest('.call-outcome-form') as HTMLElement | null;
+        const id = form?.dataset.id;
+        const outcome = form?.dataset.outcome;
+        const note = form?.querySelector<HTMLTextAreaElement>('.call-outcome-note')?.value.trim() || '';
+        const error = form?.querySelector('.call-outcome-error') as HTMLElement | null;
+        if (!id || !form || !outcome) {
+          if (error) error.textContent = 'Select a call result first.';
+          return;
+        }
+        (btn as HTMLButtonElement).disabled = true;
+        (btn as HTMLButtonElement).textContent = 'Saving…';
         try {
           const res = await fetch('/api/recruitment-action', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, action: 'mark_called', callOutcome: outcome }),
+            body: JSON.stringify({ id, action: 'mark_called', callOutcome: outcome, reason: note || undefined }),
           });
-          const data = await res.json();
-          if (data.error) { showToast(data.error, 'error'); return; }
-          showToast('Manual call outcome logged', 'success');
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.error) throw new Error(data.error || 'Could not save call log');
+          showToast('Call outcome and internal note saved');
           sentOffset = 0; sentProspects = []; loadSentList();
-        } catch { showToast('Failed', 'error'); }
+        } catch (err) {
+          if (error) error.textContent = err instanceof Error ? err.message : 'Could not save call log';
+          (btn as HTMLButtonElement).disabled = false;
+          (btn as HTMLButtonElement).textContent = 'Save call log';
+        }
       });
     });
 

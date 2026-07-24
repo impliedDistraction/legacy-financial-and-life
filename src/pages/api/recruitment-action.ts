@@ -247,15 +247,31 @@ export const POST: APIRoute = async ({ request }) => {
         break;
 
       case 'mark_called':
+        if (!['no_answer', 'voicemail', 'spoke', 'interested', 'callback', 'scheduled', 'not_interested', 'wrong_number'].includes(callOutcome)) {
+          return new Response(JSON.stringify({ error: 'Choose a valid call outcome' }), {
+            status: 400, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        const callNote = typeof reason === 'string' ? reason.trim().slice(0, 1500) : '';
+        const existingCallNotes = Array.isArray(prospect.properties?.call_notes)
+          ? prospect.properties.call_notes.slice(-29)
+          : [];
+        const callEntry = {
+          at: new Date().toISOString(),
+          outcome: callOutcome,
+          note: callNote || null,
+          source: 'dashboard_manual',
+          recorded_by: session.email || 'dashboard',
+        };
         update.properties = {
           ...(prospect.properties || {}),
-          call_made_at: new Date().toISOString(),
-          call_outcome: String(callOutcome || 'no_answer').slice(0, 50),
+          call_made_at: callEntry.at,
+          call_outcome: callOutcome,
+          call_count: Number(prospect.properties?.call_count || 0) + 1,
+          call_notes: [...existingCallNotes, callEntry],
         };
         if (callOutcome === 'scheduled') {
           update.status = 'scheduled';
-        } else if (callOutcome === 'spoke') {
-          update.status = 'converted';
         }
         break;
 
