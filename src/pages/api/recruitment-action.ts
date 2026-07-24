@@ -60,6 +60,7 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     let update: Record<string, unknown> = {};
+    let savedCallEntry: Record<string, unknown> | null = null;
 
     const isLockedSample = prospect.properties?.sample_send_authorized === false;
     if (isLockedSample && (action === 'approve' || action === 'send_email')) {
@@ -263,6 +264,7 @@ export const POST: APIRoute = async ({ request }) => {
           source: 'dashboard_manual',
           recorded_by: session.email || 'dashboard',
         };
+        savedCallEntry = callEntry;
         update.properties = {
           ...(prospect.properties || {}),
           call_made_at: callEntry.at,
@@ -311,7 +313,7 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    return new Response(JSON.stringify({ success: true, action, id }), {
+    return new Response(JSON.stringify({ success: true, action, id, callEntry: savedCallEntry, status: update.status || prospect.status }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

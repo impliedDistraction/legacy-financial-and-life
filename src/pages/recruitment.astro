@@ -3587,7 +3587,8 @@ if (!session) {
       const scoreColor = (p.fit_score || 0) >= 7 ? 'green' : (p.fit_score || 0) >= 4 ? 'amber' : 'red';
       const stateMatch = ['GA','OH','OK','SC','MS','MI','TX','UT','AL','LA'].includes(p.state?.toUpperCase());
       const props = p.properties || {};
-      const callNotes = Array.isArray(props.call_notes) ? props.call_notes.slice(-3).reverse() : [];
+      const callNotes = Array.isArray(props.call_notes) ? props.call_notes.slice().reverse() : [];
+      const callOutcomeLabel = String(props.call_outcome || 'call').replace(/_/g, ' ');
 
       // Interaction indicators
       const indicators: string[] = [];
@@ -3633,6 +3634,7 @@ if (!session) {
                 <h3 class="font-semibold text-gray-900 text-sm">${escapeHtml(p.name)}</h3>
                 ${p.fit_score ? `<span class="text-xs font-bold text-${scoreColor}-600">${p.fit_score}/10</span>` : ''}
                 <span class="text-xs bg-${stageInfo.color}-100 text-${stageInfo.color}-700 px-1.5 py-0.5 rounded font-medium">${stageInfo.label}</span>
+                ${props.call_made_at ? `<span class="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded font-medium" title="Latest call logged ${fmtDate(props.call_made_at)}">📞 ${escapeHtml(callOutcomeLabel)}${props.call_count > 1 ? ` · ${Number(props.call_count)} calls` : ''}</span>` : ''}
                 ${stateMatch ? '<span class="text-xs bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Licensed</span>' : ''}
                 ${p.research_score != null ? `<span class="text-xs ${p.research_score >= 7 ? 'bg-green-50 text-green-600' : p.research_score >= 4 ? 'bg-amber-50 text-amber-600' : 'bg-gray-50 text-gray-500'} px-1.5 py-0.5 rounded">🔍 ${p.research_score}</span>` : ''}
                 ${campaignBadge(p)}
@@ -3671,7 +3673,7 @@ if (!session) {
                   ${props.join_page_visited_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.join_page_visited_at)}</span><span class="text-cyan-600">🌐 Visited /join page${props.join_page_visit_count > 1 ? ' (' + props.join_page_visit_count + ' visits)' : ''}</span></div>` : ''}
                   ${props.last_calendly_click_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.last_calendly_click_at)}</span><span class="text-blue-600">📅 Clicked Book Call${Array.isArray(props.calendly_clicks) && props.calendly_clicks.length > 1 ? ' (' + props.calendly_clicks.length + ' times)' : ''}</span></div>` : ''}
                   ${(p.replied_at || props.replied_at) ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(p.replied_at || props.replied_at)}</span><span class="text-indigo-600">💬 Replied</span></div>` : ''}
-                  ${props.call_made_at ? `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${fmtDateShort(props.call_made_at)}</span><span class="text-amber-600">📞 Call: ${escapeHtml(props.call_outcome || 'unknown')}</span></div>` : ''}
+                  ${callNotes.map((entry: any) => `<div class="flex gap-2"><span class="text-gray-400 w-36 flex-shrink-0">${entry.at ? fmtDateShort(entry.at) : '—'}</span><span class="text-amber-600">📞 Call: ${escapeHtml(String(entry.outcome || 'unknown').replace(/_/g, ' '))}${entry.note ? ` — ${escapeHtml(entry.note)}` : ''}</span></div>`).join('')}
                 </div>
               </div>
 
@@ -3689,7 +3691,7 @@ if (!session) {
                   <p><span class="font-medium">Consent:</span> ${props.text_consent ? 'Text consent recorded' : 'No text consent recorded'}</p>
                 </div>
                 ${p.personal_notes ? `<p class="mt-2 border-t border-teal-200 pt-2 text-xs text-teal-800"><span class="font-medium">Team note:</span> ${escapeHtml(p.personal_notes)}</p>` : ''}
-                ${callNotes.length ? `<div class="mt-2 border-t border-teal-200 pt-2"><p class="mb-1 text-xs font-medium text-teal-800">📞 Call log</p><div class="space-y-1">${callNotes.map((entry: any) => `<p class="text-xs text-teal-800"><span class="font-medium">${escapeHtml(String(entry.outcome || 'call').replace(/_/g, ' '))}</span>${entry.at ? ` · ${escapeHtml(fmtDateShort(entry.at))}` : ''}${entry.note ? ` — ${escapeHtml(entry.note)}` : ''}</p>`).join('')}</div></div>` : ''}
+                ${callNotes.length ? `<div class="mt-2 border-t border-teal-200 pt-2"><p class="mb-1 text-xs font-medium text-teal-800">📞 Permanent call log · ${callNotes.length} ${callNotes.length === 1 ? 'entry' : 'entries'}</p><div class="space-y-1">${callNotes.map((entry: any) => `<p class="text-xs text-teal-800"><span class="font-medium">${escapeHtml(String(entry.outcome || 'call').replace(/_/g, ' '))}</span>${entry.at ? ` · ${escapeHtml(fmtDateShort(entry.at))}` : ''}${entry.note ? ` — ${escapeHtml(entry.note)}` : ''}</p>`).join('')}</div></div>` : ''}
               </div>
 
               <div class="schedule-summary hidden rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-900" data-prospect-id="${p.id}"></div>
@@ -3844,8 +3846,23 @@ if (!session) {
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok || data.error) throw new Error(data.error || 'Could not save call log');
-          showToast('Call outcome and internal note saved');
-          sentOffset = 0; sentProspects = []; loadSentList();
+          const prospect = sentProspects.find((entry: any) => entry.id === id);
+          if (prospect && data.callEntry) {
+            const existingNotes = Array.isArray(prospect.properties?.call_notes) ? prospect.properties.call_notes : [];
+            prospect.properties = {
+              ...(prospect.properties || {}),
+              call_made_at: data.callEntry.at,
+              call_outcome: data.callEntry.outcome,
+              call_count: Number(prospect.properties?.call_count || 0) + 1,
+              call_notes: [...existingNotes, data.callEntry],
+            };
+            prospect.status = data.status || prospect.status;
+            renderSentCards(sentProspects);
+            loadTrackingStats();
+          } else {
+            sentOffset = 0; sentProspects = []; loadSentList();
+          }
+          showToast('Call outcome and internal note saved — the current card was updated');
         } catch (err) {
           if (error) error.textContent = err instanceof Error ? err.message : 'Could not save call log';
           (btn as HTMLButtonElement).disabled = false;
