@@ -79,7 +79,7 @@ export const GET: APIRoute = async ({ request }) => {
       throw new Error('Campaign result query failed');
     }
 
-    const [returns, summaries, prospects, enrichment, operations, pipelineEvents, heldProspects] = await Promise.all([
+    const [returns, summaries, prospects, enrichment, heldProspects, pipelineEvents, operations] = await Promise.all([
       returnsRes.json(),
       summaryRes.json(),
       prospectsRes ? prospectsRes.json() : Promise.resolve([]),
