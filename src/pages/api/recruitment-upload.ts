@@ -214,8 +214,18 @@ export const GET: APIRoute = async ({ request }) => {
 
   const data = await response.json();
   const total = response.headers.get('content-range')?.split('/')[1] || '0';
+  // Research snippets are collected from public search results, but can still
+  // contain incidental contact details. Keep prospect contact data intact for
+  // the operational workflow while screening only the research payload shown
+  // in the dashboard.
+  const prospects = includeContent
+    ? data.map((prospect: Record<string, unknown>) => ({
+      ...prospect,
+      web_presence: screenResearchPii(prospect.web_presence),
+    }))
+    : data;
 
-  return new Response(JSON.stringify({ prospects: data, total: parseInt(total) }), {
+  return new Response(JSON.stringify({ prospects, total: parseInt(total) }), {
     status: 200,
     headers: {
       'Content-Type': 'application/json',
@@ -229,4 +239,84 @@ function sanitize(value: unknown, maxLen: number): string | null {
   const str = String(value).trim();
   if (!str) return null;
   return str.slice(0, maxLen);
+}
+
+/**
+ * Prevent incidental PII in third-party search snippets from reaching the
+ * review UI. This is deliberately applied at read time so historic research
+ * records receive the same protection without changing their source data.
+ */
+function screenResearchPii(value: unknown): unknown {
+  if (!value || typeof value !== 'object') return value;
+  const { value: screened, redactions } = screenValue(value, '');
+  if (screened && typeof screened === 'object' && !Array.isArray(screened)) {
+    return {
+      ...(screened as Record<string, unknown>),
+      dashboardPiiScreen: { applied: true, redactions },
+    };
+  }
+  return screened;
+}
+
+function screenValue(value: unknown, key: string): { value: unknown; redactions: number } {
+  if (typeof value === 'string') {
+    if (key === 'url' || key === 'link') return screenUrl(value);
+    return screenText(value);
+  }
+  if (Array.isArray(value)) {
+    return value.reduce<{ value: unknown[]; redactions: number }>((result, item) => {
+      const screened = screenValue(item, key);
+      result.value.push(screened.value);
+      result.redactions += screened.redactions;
+      return result;
+    }, { value: [], redactions: 0 });
+  }
+  if (value && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    let redactions = 0;
+    for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
+      const screened = screenValue(childValue, childKey);
+      result[childKey] = screened.value;
+      redactions += screened.redactions;
+    }
+    return { value: result, redactions };
+  }
+  return { value, redactions: 0 };
+}
+
+function screenText(text: string): { value: string; redactions: number } {
+  const replacements: Array<[RegExp, string]> = [
+    [/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[email redacted]'],
+    [/(?<!\d)(?:\+?1[.\-\s]?)?(?:\(?\d{3}\)?[.\-\s]?)\d{3}[.\-\s]?\d{4}(?!\d)/g, '[phone redacted]'],
+    [/\b\d{3}-\d{2}-\d{4}\b/g, '[SSN redacted]'],
+    [/\b(?:\d[ -]*?){13,16}\b/g, '[card number redacted]'],
+    [/\b\d{1,6}\s+[A-Za-z0-9.'-]+(?:\s+[A-Za-z0-9.'-]+){0,4}\s+(?:street|st\.?|avenue|ave\.?|road|rd\.?|drive|dr\.?|lane|ln\.?|boulevard|blvd\.?|court|ct\.?)\b/gi, '[street address redacted]'],
+  ];
+  let screened = text;
+  let redactions = 0;
+  for (const [pattern, replacement] of replacements) {
+    screened = screened.replace(pattern, () => {
+      redactions += 1;
+      return replacement;
+    });
+  }
+  return { value: screened, redactions };
+}
+
+function screenUrl(rawUrl: string): { value: string; redactions: number } {
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return { value: '', redactions: 1 };
+    let redactions = 0;
+    for (const key of [...url.searchParams.keys()]) {
+      if (/email|mail|phone|tel|address|ssn|token|auth|key/i.test(key)) {
+        url.searchParams.delete(key);
+        redactions += 1;
+      }
+    }
+    url.hash = '';
+    return { value: url.toString(), redactions };
+  } catch {
+    return { value: '', redactions: 1 };
+  }
 }
