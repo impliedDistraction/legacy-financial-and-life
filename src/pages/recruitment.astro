@@ -1757,6 +1757,16 @@ if (!session) {
       const realizedReturns = Number(returnSummary.realized_return_count) || 0;
       const realizedValue = Number(returnSummary.realized_value_cents) || 0;
       const formatMoney = (cents: number) => `$${(cents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const outcomeTrackingStartedAt = Date.parse('2026-07-22T12:00:00Z');
+      const predatesOutcomeTracking = !observedReturns
+        && Date.parse(c.created_at || '') < outcomeTrackingStartedAt;
+      const scheduledCount = Number(counts.scheduled) || 0;
+      const convertedCount = Number(counts.converted) || 0;
+      const resultsSummary = predatesOutcomeTracking
+        ? `Outcome tracking began Jul 22, 2026${scheduledCount ? ` · ${scheduledCount} scheduled` : ''}${convertedCount ? ` · ${convertedCount} converted` : ''}`
+        : observedReturns
+          ? `${observedReturns} observed · ${realizedReturns} realized${realizedReturns ? ` · ${formatMoney(realizedValue)} realized value` : ''}`
+          : `No attributed outcomes yet${scheduledCount ? ` · ${scheduledCount} scheduled` : ''}${convertedCount ? ` · ${convertedCount} converted` : ''}`;
       const relaunchBadge = c.auto_relaunch
         ? '<span class="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded">Continuous</span>'
         : '';
@@ -1848,7 +1858,7 @@ if (!session) {
           </div>
           <details class="mb-3 rounded-lg border border-slate-200 bg-slate-50">
             <summary class="cursor-pointer px-3 py-2 text-xs font-medium text-slate-700" data-campaign-results="${c.id}">
-              📊 Results: ${observedReturns} observed · ${realizedReturns} realized · ${formatMoney(realizedValue)} realized value · View prospects
+              📊 Results: ${resultsSummary} · View prospects
             </summary>
             <div class="border-t border-slate-200 p-3" data-campaign-results-panel="${c.id}">
               <p class="text-xs text-slate-400">Open to load campaign prospects and attributed outcomes.</p>
@@ -2001,6 +2011,8 @@ if (!session) {
           const totalFound = Object.values(counts).reduce((sum: number, value: any) => sum + (Number(value) || 0), 0);
           const totalSent = (counts.sent || 0) + (counts.converted || 0) + (counts.bounced || 0) + (counts.follow_up_1 || 0) + (counts.follow_up_2 || 0) + (counts.follow_up_exhausted || 0) + (counts.survey_sent || 0) + (counts.no_response || 0);
           const context = campaignContext(campaign, totalFound, totalSent);
+          const predatesOutcomeTracking = returns.length === 0
+            && Date.parse(campaign?.created_at || '') < Date.parse('2026-07-22T12:00:00Z');
           const contextClasses: Record<string, string> = {
             blue: 'border-blue-200 bg-blue-50 text-blue-800', amber: 'border-amber-200 bg-amber-50 text-amber-800',
             violet: 'border-violet-200 bg-violet-50 text-violet-800', green: 'border-green-200 bg-green-50 text-green-800',
@@ -2017,7 +2029,7 @@ if (!session) {
             : '<p class="text-xs text-slate-400">No prospects recorded for this campaign.</p>';
           const outcomeRows = returns.length
             ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Attributed outcomes</p>${returns.map((outcome: any) => `<div class="text-xs text-slate-600">${escapeHtml(outcome.prospect?.name || 'Campaign outcome')} · ${escapeHtml(String(outcome.return_type || 'unclassified').replace(/_/g, ' '))} · ${escapeHtml(String(outcome.return_status || 'observed'))}${outcome.return_value_cents ? ` · ${formatOutcomeMoney(outcome.return_value_cents)}` : ''}</div>`).join('')}</div>`
-            : '<p class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-400">No attributed return events yet. Scheduled appointments and conversions remain visible above.</p>';
+            : `<p class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-400">${predatesOutcomeTracking ? 'Outcome attribution began Jul 22, 2026. Historical appointments and conversions were not retroactively measured; current scheduling and conversion counts remain visible above.' : 'No attributed return events yet. Scheduled appointments and conversions remain visible above.'}</p>`;
           const enrichmentRows = enrichment.length
             ? `<div class="mt-3 border-t border-slate-200 pt-2"><p class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Enrichment effectiveness</p>${enrichment.map((item: any) => { const attempts = Number(item.attempt_count) || 0; const enriched = Number(item.enriched_count) || 0; const emailFound = Number(item.email_found_count) || 0; const delivered = Number(item.deliverable_count) || 0; const converted = Number(item.conversion_count) || 0; const rate = attempts ? Math.round((enriched / attempts) * 100) : 0; return `<div class="text-xs text-slate-600">${escapeHtml(item.provider)} · ${enriched}/${attempts} enriched (${rate}%) · ${emailFound} emails found · ${delivered} deliverable · ${converted} converted${item.cost_cents ? ` · ${formatOutcomeMoney(item.cost_cents)} cost` : ''}</div>`; }).join('')}</div>`
             : '<p class="mt-3 border-t border-slate-200 pt-2 text-[11px] text-slate-400">No enrichment attempts recorded yet. Provider performance will appear here as Sentinel runs DOI, rescue, or paid enrichment.</p>';
@@ -2043,10 +2055,20 @@ if (!session) {
     const feed = document.getElementById('live-feed');
     if (!feed) return;
     try {
-      const res = await fetch('/api/recruitment-upload?limit=20&order=updated_at.desc.nullslast');
+      // Fetch extra rows before collapsing known duplicate source records so one
+      // repeatedly-updated licensee record cannot fill the entire activity card.
+      const res = await fetch('/api/recruitment-upload?limit=100&order=updated_at.desc.nullslast,created_at.desc,id.asc&include_properties=true');
       if (!res.ok) throw new Error(`${res.status}`);
       const data = await res.json();
-      const prospects = data.prospects || [];
+      const seen = new Set<string>();
+      const prospects = (data.prospects || []).filter((p: any) => {
+        const npn = typeof p.properties?.npn === 'string' ? p.properties.npn.trim() : '';
+        const fallback = [p.name, p.city, p.state].map((value: unknown) => String(value || '').trim().toLowerCase()).join('|');
+        const key = npn ? `npn:${npn}` : `person:${fallback}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, 20);
       if (prospects.length === 0) {
         feed.innerHTML = '<div class="text-xs text-gray-400 text-center py-4">No leads yet</div>';
         return;

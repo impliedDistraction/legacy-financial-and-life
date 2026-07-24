@@ -147,6 +147,7 @@ export const GET: APIRoute = async ({ request }) => {
   const order = url.searchParams.get('order');
   const emailFilter = url.searchParams.get('email');
   const includeContent = url.searchParams.get('include_content') === 'true';
+  const includeProperties = url.searchParams.get('include_properties') === 'true';
   const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 200);
   const offset = parseInt(url.searchParams.get('offset') || '0');
 
@@ -156,7 +157,7 @@ export const GET: APIRoute = async ({ request }) => {
   const orderClause = order || defaultOrder;
   // When limit=1 with no search, we're likely just counting — use minimal select to save egress
   const isCountOnly = limit <= 1 && !search;
-  const baseColumns = 'id,name,email,phone,state,city,fit_score,fit_reason,status,interaction_stage,campaign_id,source,sent_at,created_at,processed_at,approved_at,replied_at,research_score,updated_at,qa_rejection_reason';
+  const baseColumns = `id,name,email,phone,state,city,fit_score,fit_reason,status,interaction_stage,campaign_id,source,sent_at,created_at,processed_at,approved_at,replied_at,research_score,updated_at,qa_rejection_reason${includeProperties ? ',properties' : ''}`;
   const contentColumns = ',properties,email_subject,email_body,call_opener,call_voicemail,personal_notes,web_presence,current_agency,experience_level,notes';
   const selectCols = isCountOnly
     ? 'select=id'
