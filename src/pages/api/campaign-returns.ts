@@ -34,7 +34,7 @@ export const GET: APIRoute = async ({ request }) => {
 
   try {
     const campaignColumn = campaignKind === 'recruitment' ? 'recruitment_campaign_id' : 'sales_campaign_id';
-    const [returnsRes, summaryRes, prospectsRes, enrichmentRes, heldRes, pipelineRes, operationsRes] = await Promise.all([
+    const [returnsRes, summaryRes, prospectsRes, enrichmentRes, heldRes, pipelineRes, operationsRes, scheduledRes] = await Promise.all([
       fetch(
         `${SUPABASE_URL}/rest/v1/campaign_returns?${campaignColumn}=eq.${encodeURIComponent(campaignId)}&order=occurred_at.desc&limit=${limit}&select=id,prospect_id,return_type,return_status,return_value_cents,source,occurred_at,notes,properties`,
         { headers: headers() }
@@ -73,20 +73,27 @@ export const GET: APIRoute = async ({ request }) => {
           { headers: headers() }
         ).catch(() => null)
         : Promise.resolve(null),
+      campaignKind === 'recruitment'
+        ? fetch(
+          `${SUPABASE_URL}/rest/v1/recruitment_prospects?campaign_id=eq.${encodeURIComponent(campaignId)}&status=eq.scheduled&order=updated_at.desc.nullslast&limit=${limit}&select=id,name,email,phone,state,city,status,interaction_stage,fit_score,sent_at,last_interaction_at,updated_at,properties`,
+          { headers: headers() }
+        ).catch(() => null)
+        : Promise.resolve(null),
     ]);
 
     if (!returnsRes.ok || !summaryRes.ok || (prospectsRes && !prospectsRes.ok)) {
       throw new Error('Campaign result query failed');
     }
 
-    const [returns, summaries, prospects, enrichment, heldProspects, pipelineEvents, operations] = await Promise.all([
+    const [returns, summaries, prospects, enrichment, heldProspects, pipelineEvents, operations, scheduledProspects] = await Promise.all([
       returnsRes.json(),
       summaryRes.json(),
       prospectsRes ? prospectsRes.json() : Promise.resolve([]),
       enrichmentRes?.ok ? enrichmentRes.json() : Promise.resolve([]),
-      operationsRes?.ok ? operationsRes.json() : Promise.resolve([]),
-      pipelineRes?.ok ? pipelineRes.json() : Promise.resolve([]),
       heldRes?.ok ? heldRes.json() : Promise.resolve([]),
+      pipelineRes?.ok ? pipelineRes.json() : Promise.resolve([]),
+      operationsRes?.ok ? operationsRes.json() : Promise.resolve([]),
+      scheduledRes?.ok ? scheduledRes.json() : Promise.resolve([]),
     ]);
     const returnProspectIds = [...new Set(returns.map((campaignReturn: Record<string, unknown>) => campaignReturn.prospect_id).filter(Boolean))];
     const returnProspects = campaignKind === 'recruitment' && returnProspectIds.length > 0
@@ -99,6 +106,18 @@ export const GET: APIRoute = async ({ request }) => {
     const returnsWithProspects = returns.map((campaignReturn: Record<string, unknown>) => ({
       ...campaignReturn,
       prospect: campaignReturn.prospect_id ? prospectById.get(campaignReturn.prospect_id) || null : null,
+    }));
+    const scheduledProspectIds = scheduledProspects.map((prospect: Record<string, unknown>) => prospect.id).filter(Boolean);
+    const scheduledEvents = campaignKind === 'recruitment' && scheduledProspectIds.length > 0
+      ? await fetch(
+        `${SUPABASE_URL}/rest/v1/calendly_events?prospect_id=in.(${scheduledProspectIds.join(',')})&order=start_time.desc&select=prospect_id,event_type,start_time,end_time,status,match_source,is_system_booked,updated_at`,
+        { headers: headers() }
+      ).then(async (response) => response.ok ? response.json() : [])
+      : [];
+    const scheduledEventByProspectId = new Map(scheduledEvents.map((event: Record<string, unknown>) => [event.prospect_id, event]));
+    const scheduledWithBooking = scheduledProspects.map((prospect: Record<string, unknown>) => ({
+      ...prospect,
+      calendly_event: scheduledEventByProspectId.get(prospect.id) || null,
     }));
     const heldReasonSummary = heldProspects.reduce((summary: Record<string, number>, prospect: Record<string, unknown>) => {
       const properties = prospect.properties as Record<string, unknown> | undefined;
@@ -119,6 +138,7 @@ export const GET: APIRoute = async ({ request }) => {
       },
       returns: returnsWithProspects,
       prospects,
+      scheduled_prospects: scheduledWithBooking,
       enrichment,
       operations,
       pipeline_events: pipelineEvents,
