@@ -99,6 +99,17 @@ async function trackRecruitmentEvent(event: Record<string, unknown>) {
   // These don't carry X-Legacy-Prospect-Id since they originate from
   // the prospect, so we match by sender email instead.
   if (eventType === 'email.received') {
+    const toField = data.to;
+    const toAddresses = Array.isArray(toField)
+      ? toField.map(value => String(value).toLowerCase())
+      : typeof toField === 'string'
+        ? [toField.toLowerCase()]
+        : [];
+    const isForLegacyFinancial = toAddresses.some(address =>
+      address.endsWith('@legacyfinancial.app') || address.endsWith('@legacyf-l.com')
+    );
+    if (!isForLegacyFinancial) return;
+
     const fromRaw = typeof data.from === 'string' ? data.from : '';
     // Extract bare email from "Name <email>" or plain "email" formats
     const emailMatch = fromRaw.match(/<([^>]+)>/) || fromRaw.match(/^([^\s<]+@[^\s>]+)$/);
